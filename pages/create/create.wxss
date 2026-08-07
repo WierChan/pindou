@@ -106,6 +106,10 @@
   flex-wrap: wrap;
 }
 .opt-label { font-size: 14px; font-weight: 600; flex-shrink: 0; }
+.opt-col { display: flex; flex-direction: column; gap: 8px; }
+.opt-val { font-size: 13px; font-weight: 700; color: var(--accent-dark); }
+.opt-hint { font-size: 11px; color: var(--ink2); }
+.opt-slider { margin: 2px 4px; }
 .size-chips { display: flex; gap: 7px; }
 .chip {
   padding: 7px 12px;

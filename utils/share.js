@@ -53,8 +53,8 @@ function buildShareCardTo(canvas, work, scale) {
   const stats = colorStats(work.cells);
   const total = stats.reduce((a, s) => a + s.count, 0);
 
-  // 作品图（熨烫后的质感）
-  const artCell = fitCell(work, W - M * 2 - 64, 620, 4, 26);
+  // 作品图（熨烫后的质感）；min 2 保证 256 豆的大画布也能放进卡片
+  const artCell = fitCell(work, W - M * 2 - 64, 620, 2, 26);
   const artPad = Math.round(artCell * 1.1);
   const artSize = patternSize(work, { cellPx: artCell, pad: artPad });
   const artW = artSize.width, artH = artSize.height;

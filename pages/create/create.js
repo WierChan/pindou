@@ -1,7 +1,7 @@
 // 创建作品：图片转图纸 / 图案库 / 表情图案
 const { store } = require('../../utils/store');
 const { PALETTE } = require('../../utils/palette');
-const { loadImageToData, emojiToData, imageToPattern, colorStats } = require('../../utils/convert');
+const { loadImageToData, emojiToData, imageToPattern, colorStats, reduceColors } = require('../../utils/convert');
 const { TEMPLATES, templatePattern } = require('../../utils/templates');
 const { renderPatternTo, patternSize } = require('../../utils/board');
 const ui = require('../../utils/ui');
@@ -21,6 +21,9 @@ const EMOJIS = [
 // 模板缩略图会话级缓存（临时文件在小程序运行期内有效）
 let TPL_THUMBS = null;
 
+// 画布长边上限：受 wx storage 单 key 1MB 与画板渲染性能约束
+const SIZE_CAP = 256;
+
 Page({
   data: {
     insets: { top: 24, h: 44, right: 8 },
@@ -28,8 +31,14 @@ Page({
     mode: 'pick',
     templates: [],
     emojis: EMOJIS,
-    sizes: [16, 24, 32, 48],
     size: 32,
+    sizeMin: 8,
+    sizeMax: 48,
+    sizeHint: '',
+    sizesShown: [16, 24, 32, 48],
+    showColor: false,
+    colorMax: 38,
+    colorVal: 38,
     whiteEmpty: false,
     fromTpl: false,
     name: '',
@@ -42,8 +51,11 @@ Page({
   },
 
   onLoad() {
-    this.srcData = null;   // {data, w, h} 图片像素
-    this.pattern = null;   // {w, h, cells}
+    this.srcData = null;    // {data, w, h} 图片像素
+    this.pattern = null;    // {w, h, cells} 最终图纸
+    this.colorLimit = null; // 用户设定的颜色数量（null = 不限制）
+    this._base = null;      // 未做颜色缩减的基础图纸缓存
+    this._baseKey = '';
     this.name = '';
     this.uq = ui.serialQueue(); // 工具画布串行队列
     this.setData({
@@ -107,6 +119,8 @@ Page({
           this.srcData = d;
           this.fromTpl = false;
           this.name = '我的拼豆';
+          this._base = null;
+          this.colorLimit = null;
           this._renderConfig();
         }).catch(() => ui.toast('图片打开失败，换一张试试'));
       },
@@ -129,6 +143,8 @@ Page({
       this.srcData = d;
       this.fromTpl = false;
       this.name = ch + ' 拼豆';
+      this._base = null;
+      this.colorLimit = null;
       this._renderConfig();
     }).catch(() => ui.toast('生成失败，换一个试试'));
   },
@@ -146,6 +162,18 @@ Page({
     this._renderConfig();
   },
 
+  onSizeSlider(e) {
+    const v = +e.detail.value;
+    if (v === this.data.size) return;
+    this.setData({ size: v });
+    this._renderConfig();
+  },
+
+  onColorSlider(e) {
+    this.colorLimit = +e.detail.value;
+    this._renderConfig();
+  },
+
   onWhiteChange(e) {
     this.setData({ whiteEmpty: e.detail.value });
     this._renderConfig();
@@ -156,13 +184,43 @@ Page({
   },
 
   _renderConfig() {
-    if (!this.fromTpl) {
+    const extra = {};
+    let p;
+    if (this.fromTpl) {
+      p = this.pattern;
+    } else {
       if (!this.srcData) return;
-      this.pattern = imageToPattern(
-        this.srcData.data, this.srcData.w, this.srcData.h,
-        this.data.size, { whiteEmpty: this.data.whiteEmpty });
+      // 画布大小：上限 = 图片像素长边（1:1 还原），再受 SIZE_CAP 保护
+      const imgSide = Math.max(this.srcData.w, this.srcData.h);
+      const sizeMax = Math.min(SIZE_CAP, imgSide);
+      const sizeMin = Math.min(8, sizeMax);
+      const size = ui.clamp(this.data.size, sizeMin, sizeMax);
+      // 基础图纸缓存：只在大小 / 白底选项变化时重新采样，拖颜色滑杆不重算
+      const key = size + '|' + this.data.whiteEmpty;
+      if (!this._base || this._baseKey !== key) {
+        this._base = imageToPattern(this.srcData.data, this.srcData.w, this.srcData.h,
+          size, { whiteEmpty: this.data.whiteEmpty });
+        this._baseKey = key;
+      }
+      const base = this._base;
+      // 颜色数量：2 ~ 自然色数
+      const natural = colorStats(base.cells).length;
+      const colorMax = Math.max(2, natural);
+      const colorVal = this.colorLimit == null ? colorMax : ui.clamp(this.colorLimit, 2, colorMax);
+      let cells = base.cells;
+      if (colorVal < natural) cells = reduceColors(base.cells, colorVal);
+      p = this.pattern = { w: base.w, h: base.h, cells };
+      extra.size = size;
+      extra.sizeMin = sizeMin;
+      extra.sizeMax = sizeMax;
+      extra.sizeHint = sizeMax < imgSide
+        ? '最大 ' + sizeMax + ' 豆'
+        : '最大 ' + sizeMax + ' 豆 · 1:1 还原图片像素';
+      extra.sizesShown = [16, 24, 32, 48].filter(n => n >= sizeMin && n <= sizeMax);
+      extra.showColor = natural > 2;
+      extra.colorMax = colorMax;
+      extra.colorVal = colorVal;
     }
-    const p = this.pattern;
     if (!p) return;
     const stats = colorStats(p.cells);
     const total = stats.reduce((a, s) => a + s.count, 0);
@@ -171,10 +229,10 @@ Page({
 
     const ins = ui.navInsets();
     const maxPx = Math.min(340, ins.winW - 72);
-    const cellPx = ui.clamp(Math.floor(maxPx / Math.max(p.w, p.h)), 3, 14);
+    const cellPx = ui.clamp(Math.floor(maxPx / Math.max(p.w, p.h)), 1, 14);
     const size = patternSize(p, { cellPx });
 
-    this.setData({
+    this.setData(Object.assign(extra, {
       mode: 'config',
       fromTpl: this.fromTpl,
       name: this.name,
@@ -184,7 +242,7 @@ Page({
       chips,
       pvW: size.width,
       pvH: size.height,
-    }, () => {
+    }), () => {
       ui.queryNode(this, '#preview').then(r => {
         if (!r || !r.node) return;
         const scale = Math.min(2, ins.dpr);

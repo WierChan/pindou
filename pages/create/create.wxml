@@ -55,12 +55,28 @@
       </view>
 
       <block wx:if="{{!fromTpl}}">
-        <view class="opt-row">
-          <view class="opt-label">画布大小</view>
-          <view class="size-chips">
-            <view class="chip {{size === item ? 'active' : ''}}" wx:for="{{sizes}}" wx:key="*this"
+        <view class="opt-col">
+          <view class="opt-row">
+            <view class="opt-label">画布大小</view>
+            <view class="opt-val">{{size}} 豆</view>
+          </view>
+          <view class="size-chips" wx:if="{{sizesShown.length}}">
+            <view class="chip {{size === item ? 'active' : ''}}" wx:for="{{sizesShown}}" wx:key="*this"
                   bindtap="setSize" data-n="{{item}}">{{item}} 豆</view>
           </view>
+          <slider class="opt-slider" min="{{sizeMin}}" max="{{sizeMax}}" value="{{size}}" step="1"
+                  activeColor="#FF7D54" backgroundColor="#F0E9DE" block-size="20"
+                  bindchange="onSizeSlider" />
+          <view class="opt-hint">{{sizeHint}}</view>
+        </view>
+        <view class="opt-col" wx:if="{{showColor}}">
+          <view class="opt-row">
+            <view class="opt-label">颜色数量</view>
+            <view class="opt-val">{{colorVal}} 色</view>
+          </view>
+          <slider class="opt-slider" min="2" max="{{colorMax}}" value="{{colorVal}}" step="1"
+                  activeColor="#FF7D54" backgroundColor="#F0E9DE" block-size="20"
+                  bindchange="onColorSlider" />
         </view>
         <view class="switch-row">
           <view class="sw-label">白色背景不拼豆<text class="sw-small">适合白底图片</text></view>

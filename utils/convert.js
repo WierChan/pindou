@@ -144,4 +144,34 @@ function colorStats(cells) {
   return [...m.entries()].sort((a, b) => a[0] - b[0]).map(e => ({ pal: e[0], count: e[1] }));
 }
 
-module.exports = { rgb2oklab, nearestPalette, loadImageToData, emojiToData, imageToPattern, colorStats };
+// 把图纸用色缩减到 n 种（n >= 2）：反复把数量最少的颜色并入 OKLab 最相近的存活色
+function reduceColors(cells, n) {
+  n = Math.max(2, n | 0);
+  const alive = new Map(); // pal -> count
+  for (const t of cells) if (t >= 0) alive.set(t, (alive.get(t) || 0) + 1);
+  if (alive.size <= n) return cells;
+  const remap = new Map();
+  while (alive.size > n) {
+    // 数量最少的颜色
+    let minPal = -1, minC = Infinity;
+    for (const [p, c] of alive) if (c < minC) { minC = c; minPal = p; }
+    // 找最相近的存活色并入
+    const lab = PAL_LAB[minPal];
+    let best = -1, bd = Infinity;
+    for (const [p] of alive) {
+      if (p === minPal) continue;
+      const q = PAL_LAB[p];
+      const dl = lab[0] - q[0], da = lab[1] - q[1], db = lab[2] - q[2];
+      const d = dl * dl + da * da + db * db;
+      if (d < bd) { bd = d; best = p; }
+    }
+    alive.set(best, alive.get(best) + alive.get(minPal));
+    alive.delete(minPal);
+    remap.set(minPal, best);
+  }
+  // 展平映射链（A→B→C 归到 C）
+  const resolve = p => { while (remap.has(p)) p = remap.get(p); return p; };
+  return cells.map(t => (t >= 0 ? resolve(t) : -1));
+}
+
+module.exports = { rgb2oklab, nearestPalette, loadImageToData, emojiToData, imageToPattern, colorStats, reduceColors };

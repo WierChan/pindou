@@ -50,10 +50,17 @@ function drawBead(ctx, cx, cy, r, palIdx, alpha) {
 function drawFused(ctx, x, y, s, palIdx) {
   const rgb = PALETTE_RGB[palIdx];
   const e = s * 0.06; // 外扩使相邻豆融合
+  if (s < 3.5) {
+    // 极小格子直接方块填充，大画布（如 256 豆）性能好一个量级
+    ctx.fillStyle = css(rgb);
+    ctx.fillRect(x - e, y - e, s + e * 2, s + e * 2);
+    return;
+  }
   roundRect(ctx, x - e, y - e, s + e * 2, s + e * 2, s * 0.3);
   ctx.fillStyle = css(rgb); ctx.fill();
 }
 function drawFusedGloss(ctx, x, y, s) {
+  if (s < 3.5) return; // 太小看不见高光
   ctx.fillStyle = 'rgba(255,255,255,.18)';
   roundRect(ctx, x + s * 0.14, y + s * 0.1, s * 0.5, s * 0.22, s * 0.11);
   ctx.fill();
@@ -461,6 +468,7 @@ class BoardView {
     const sel = isPlay ? this.o.getSelected() : -2;
     const showNum = isPlay && s >= 15 && this.o.numbers;
     const showPeg = s >= 9;
+    const tiny = s < 3.5; // 大画布缩到很小时改用方块填充，绕开圆弧/渐变的开销
     const fused = this.fused && !isPlay && !isIron;
     const numFont = 'bold ' + Math.round(s * 0.4) + 'px sans-serif';
 
@@ -509,13 +517,18 @@ class BoardView {
             } else drawBead(ctx, mx, my, r, tc);
           }
           else if (fused) drawFused(ctx, px, py, s, tc);
+          else if (tiny) { ctx.fillStyle = css(PALETTE_RGB[tc]); ctx.fillRect(px, py, s, s); }
           else drawBead(ctx, mx, my, r, tc);
         } else if (isPlay) {
           const isSel = tc === sel;
           const rgb = PALETTE_RGB[tc];
           ctx.globalAlpha = isSel ? 0.5 : 0.2;
-          ctx.beginPath(); ctx.arc(mx, my, s * 0.38, 0, 7);
-          ctx.fillStyle = css(rgb); ctx.fill();
+          if (tiny) {
+            ctx.fillStyle = css(rgb); ctx.fillRect(px, py, s, s);
+          } else {
+            ctx.beginPath(); ctx.arc(mx, my, s * 0.38, 0, 7);
+            ctx.fillStyle = css(rgb); ctx.fill();
+          }
           ctx.globalAlpha = 1;
           if (isSel && s >= 8) {
             ctx.setLineDash([s * 0.16, s * 0.13]);
