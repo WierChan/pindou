@@ -26,6 +26,13 @@ function drawBead(ctx, cx, cy, r, palIdx, alpha) {
   if (alpha == null) alpha = 1;
   const rgb = PALETTE_RGB[palIdx];
   if (alpha < 1) ctx.globalAlpha = alpha;
+  if (r < 3) {
+    // 太小画不出孔和高光，纯色圆反而更清晰（缩略图 / 大图纸缩到很小时）
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7);
+    ctx.fillStyle = css(rgb); ctx.fill();
+    if (alpha < 1) ctx.globalAlpha = 1;
+    return;
+  }
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7);
   ctx.fillStyle = css(rgb); ctx.fill();
   const g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r);
@@ -199,10 +206,18 @@ class BoardView {
     this.oy = this._clampAxis(this.oy, this.o.h * this.scale, this.vh);
   }
 
+  // 仅更新画布在视口中的位置（布局稳定后的复测）
+  setRect(left, top) {
+    this.rl = left || 0;
+    this.rt = top || 0;
+  }
+
   // touch 对象 → 画布坐标
+  // 优先用 canvas 事件自带的 x/y（相对画布左上角，永远准确）；
+  // 部分机型同层渲染回退成原生组件后 clientX/Y 的参照系会变，导致点击整体偏移
   _tp(t) {
-    if (t.clientX != null) return { x: t.clientX - this.rl, y: t.clientY - this.rt };
-    return { x: t.x, y: t.y };
+    if (t.x != null && t.y != null) return { x: t.x, y: t.y };
+    return { x: t.clientX - this.rl, y: t.clientY - this.rt };
   }
 
   touchStart(e) {

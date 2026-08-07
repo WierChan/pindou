@@ -60,19 +60,14 @@ Page({
         onIron: n => this._applyIron(n),
       });
       this.bv.setViewport(r.width, r.height, dpr, r.left, r.top);
+      setTimeout(() => ui.syncBoardRect(this, this.bv), 600);
     });
     ui.queryNode(this, '#util').then(r => { if (r) this.utilCanvas = r.node; });
   },
 
   onResize() {
     this.setData({ insets: ui.navInsets() });
-    if (!this.bv) return;
-    setTimeout(() => {
-      ui.queryNode(this, '#board').then(r => {
-        if (!r || !this.bv) return;
-        this.bv.setViewport(r.width, r.height, this.bv.dpr, r.left, r.top);
-      });
-    }, 120);
+    setTimeout(() => ui.syncBoardRect(this, this.bv), 120);
   },
 
   onHide() { this._flushSave(); },

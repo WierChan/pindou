@@ -103,7 +103,7 @@ Page({
       count: 1,
       success: res => {
         const path = res.tempFiles ? res.tempFiles[0].tempFilePath : res.tempFilePaths[0];
-        this.uq(() => loadImageToData(this.utilCanvas, path, 1024)).then(d => {
+        this.uq(() => loadImageToData(this.utilCanvas, path, 2048)).then(d => {
           this.srcData = d;
           this.fromTpl = false;
           this.name = '我的拼豆';

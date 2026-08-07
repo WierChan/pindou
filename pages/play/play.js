@@ -122,19 +122,15 @@ Page({
         onToolTap: i => this._onToolTap(i),
       });
       this.bv.setViewport(r.width, r.height, dpr, r.left, r.top);
+      // 布局稳定后复测画布位置，防止部分机型触点参照系偏移
+      setTimeout(() => ui.syncBoardRect(this, this.bv), 600);
       // 极端情况：存档已拼满但没标记完成
       if (this.total > 0 && this.placedCount >= this.total && !this.finished) this._finish();
     });
   },
 
   _refitBoard() {
-    if (!this.bv) return;
-    setTimeout(() => {
-      ui.queryNode(this, '#board').then(r => {
-        if (!r || !this.bv) return;
-        this.bv.setViewport(r.width, r.height, this.bv.dpr, r.left, r.top);
-      });
-    }, 120);
+    setTimeout(() => ui.syncBoardRect(this, this.bv), 120);
   },
 
   /* ---------- 画板事件 ---------- */

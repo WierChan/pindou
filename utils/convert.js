@@ -1,7 +1,19 @@
-// 图片 → 拼豆图纸：降采样 + OKLab 感知空间最近色匹配
+// 图片 → 拼豆图纸：线性光空间降采样（降低像素）+ 增强 + OKLab 感知空间最近色匹配
 const { PALETTE_RGB } = require('./palette');
 
-function s2l(v) { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+/* ---------- sRGB <-> 线性光 ---------- */
+// 查表加速：sRGB 0-255 → 线性 0-1
+const S2L = new Float32Array(256);
+for (let i = 0; i < 256; i++) {
+  const v = i / 255;
+  S2L[i] = v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+}
+const s2l = v => S2L[v < 0 ? 0 : v > 255 ? 255 : Math.round(v)];
+// 线性 0-1 → sRGB 0-255
+function l2s(v) {
+  v = v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055;
+  return Math.min(255, Math.max(0, Math.round(v * 255)));
+}
 
 function rgb2oklab(r, g, b) {
   const lr = s2l(r), lg = s2l(g), lb = s2l(b);
@@ -23,15 +35,26 @@ function nearestPalette(r, g, b) {
   for (let i = 0; i < PAL_LAB.length; i++) {
     const p = PAL_LAB[i];
     const dl = lab[0] - p[0], da = lab[1] - p[1], db = lab[2] - p[2];
-    const d = dl * dl * 1.2 + da * da + db * db; // 亮度差略加权，保住明暗关系
+    const d = dl * dl + da * da + db * db; // OKLab 本身已是感知均匀，直接欧氏距离
     if (d < bd) { bd = d; bi = i; }
   }
   return bi;
 }
 
-// 把图片文件解码并降采样后读出像素（借用一块 2d canvas）
+// 轻微对比 + 饱和度提升：弥补降采样平均造成的发灰，让拼豆成品更接近原图观感
+function boost(r, g, b) {
+  const ct = v => 128 + (v - 128) * 1.1;
+  r = ct(r); g = ct(g); b = ct(b);
+  const m = 0.299 * r + 0.587 * g + 0.114 * b; // 围绕亮度拉饱和，保住色相
+  const k = 1.3;
+  const f = v => Math.min(255, Math.max(0, Math.round(m + (v - m) * k)));
+  return [f(r), f(g), f(b)];
+}
+
+// 把图片文件解码后读出像素（借用一块 2d canvas）
+// 尽量保留原始分辨率（上限 2048），降采样交给 imageToPattern 的区域平均，避免细节丢失
 function loadImageToData(canvas, src, maxSide) {
-  maxSide = maxSide || 1024;
+  maxSide = maxSide || 2048;
   return new Promise((resolve, reject) => {
     const img = canvas.createImage();
     img.onload = () => {
@@ -42,6 +65,8 @@ function loadImageToData(canvas, src, maxSide) {
         canvas.width = w; canvas.height = h;
         const ctx = canvas.getContext('2d');
         ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.imageSmoothingEnabled = true;
+        try { ctx.imageSmoothingQuality = 'high'; } catch (e) { /* 部分内核不支持 */ }
         ctx.clearRect(0, 0, w, h);
         ctx.drawImage(img, 0, 0, w, h);
         const d = ctx.getImageData(0, 0, w, h);
@@ -68,9 +93,11 @@ function emojiToData(canvas, ch) {
   return { data: d.data, w: S, h: S };
 }
 
+// 降低像素：每个拼豆格 = 源图对应区域在线性光空间的加权平均（预乘 alpha）
 // longSide = 长边豆子数；透明像素留空；whiteEmpty 时近白色也留空（适合白底图）
 function imageToPattern(data, iw, ih, longSide, opts) {
   const whiteEmpty = !!(opts && opts.whiteEmpty);
+  const enhance = !opts || opts.enhance !== false;
   let w, h;
   if (iw >= ih) { w = longSide; h = Math.max(1, Math.round(longSide * ih / iw)); }
   else { h = longSide; w = Math.max(1, Math.round(longSide * iw / ih)); }
@@ -84,15 +111,25 @@ function imageToPattern(data, iw, ih, longSide, opts) {
         let o = (y * iw + x0) * 4;
         for (let x = x0; x < x1; x++, o += 4) {
           const a = data[o + 3];
-          sr += data[o] * a; sg += data[o + 1] * a; sb += data[o + 2] * a;
-          sa += a; n++;
+          if (a) {
+            sr += S2L[data[o]] * a;
+            sg += S2L[data[o + 1]] * a;
+            sb += S2L[data[o + 2]] * a;
+            sa += a;
+          }
+          n++;
         }
       }
       if (sa / n < 80) continue; // 基本透明 → 不放豆子
       const af = sa / (n * 255);
-      let r = sr / sa, g = sg / sa, b = sb / sa;
-      // 半透明部分按白底合成
-      r = r * af + 255 * (1 - af); g = g * af + 255 * (1 - af); b = b * af + 255 * (1 - af);
+      // 线性空间平均值，半透明部分按白底（线性=1）合成
+      let lr = sr / sa, lg = sg / sa, lb = sb / sa;
+      lr = lr * af + (1 - af); lg = lg * af + (1 - af); lb = lb * af + (1 - af);
+      let r = l2s(lr), g = l2s(lg), b = l2s(lb);
+      if (enhance) {
+        const e = boost(r, g, b);
+        r = e[0]; g = e[1]; b = e[2];
+      }
       if (whiteEmpty && r >= 242 && g >= 242 && b >= 242) continue;
       cells[cy * w + cx] = nearestPalette(r, g, b);
     }

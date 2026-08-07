@@ -115,6 +115,20 @@ function saveToAlbum(path) {
   });
 }
 
+// 复测画板 canvas 的尺寸与位置（布局迟到 / 转屏 / iPad 分屏后调用）
+// 尺寸变了就整体重设视口，只是位置变了就只校准触点参照系
+function syncBoardRect(host, bv, sel) {
+  if (!bv) return;
+  queryNode(host, sel || '#board').then(r => {
+    if (!r || !bv.alive) return;
+    if (Math.abs(r.width - bv.vw) > 1 || Math.abs(r.height - bv.vh) > 1) {
+      bv.setViewport(r.width, r.height, bv.dpr, r.left, r.top);
+    } else {
+      bv.setRect(r.left, r.top);
+    }
+  });
+}
+
 // 串行任务队列：多个流程共用一块隐藏 canvas 时避免互相踩踏
 function serialQueue() {
   let tail = Promise.resolve();
@@ -127,5 +141,6 @@ function serialQueue() {
 
 module.exports = {
   clamp, winInfo, navInsets, toast, backHome,
-  queryNode, canvasToTemp, persistFile, makeThumb, saveToAlbum, serialQueue,
+  queryNode, canvasToTemp, persistFile, makeThumb, saveToAlbum,
+  serialQueue, syncBoardRect,
 };

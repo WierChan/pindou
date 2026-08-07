@@ -86,13 +86,12 @@
   position: relative;
 }
 .wc-thumb image {
+  /* image 组件不支持 width:auto，必须给显式尺寸，否则回退 320×240 被裁切 */
   position: absolute;
   left: 10px;
   top: 10px;
-  right: 10px;
-  bottom: 10px;
-  width: auto;
-  height: auto;
+  width: calc(100% - 20px);
+  height: calc(100% - 20px);
 }
 .wc-badge {
   position: absolute;
