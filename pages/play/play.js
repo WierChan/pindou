@@ -288,8 +288,8 @@ Page({
       ironed: work.ironed, boostRow: work.boostRow,
     });
     if (this.utilCanvas) {
-      this.uq(() => ui.makeThumb(this.utilCanvas, work, false))
-        .then(path => store.update(work.id, { thumb: path }))
+      this.uq(() => ui.makeThumb(this, this.utilCanvas, work, false))
+        .then(path => store.update(work.id, { thumb: path, thumbV: 2 }))
         .catch(() => { /* 缩略图失败不影响流程 */ });
     }
     if (this.bv) this.bv.o.mode = 'view';
@@ -321,7 +321,7 @@ Page({
     this.uq(() => {
       const cellPx = ui.clamp(Math.floor(240 / Math.max(work.w, work.h)), 4, 16);
       const size = renderPatternTo(this.utilCanvas, work, { cellPx, scale: 2 });
-      return ui.canvasToTemp(this.utilCanvas).then(path => show(path, size.width, size.height));
+      return ui.captureCanvas(this, this.utilCanvas).then(path => show(path, size.width, size.height));
     }).catch(() => show('', 0, 0));
   },
 

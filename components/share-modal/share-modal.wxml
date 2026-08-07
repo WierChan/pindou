@@ -10,4 +10,4 @@
     <view class="btn-link" hover-class="pressed" bindtap="close">关闭</view>
   </view>
 </view>
-<canvas type="2d" id="card" class="card-canvas"></canvas>
+<canvas type="2d" id="card" class="card-canvas" style="width:{{capW}}px;height:{{capH}}px"></canvas>

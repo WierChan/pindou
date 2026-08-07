@@ -26,6 +26,7 @@ function summarize(work) {
     total, placedN,
     completed: !!work.completed, ironDone: !!work.ironDone,
     thumb: work.thumb || '',
+    thumbV: work.thumbV || 0,
     createdAt: work.createdAt, updatedAt: work.updatedAt,
     completedAt: work.completedAt || 0,
   };

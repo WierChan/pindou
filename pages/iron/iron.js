@@ -143,8 +143,8 @@ Page({
       completedAt: Date.now(),
     });
     if (this.utilCanvas) {
-      this.uq(() => ui.makeThumb(this.utilCanvas, work, true))
-        .then(path => store.update(work.id, { thumb: path }))
+      this.uq(() => ui.makeThumb(this, this.utilCanvas, work, true))
+        .then(path => store.update(work.id, { thumb: path, thumbV: 2 }))
         .catch(() => { /* 忽略 */ });
     }
     setTimeout(() => {
@@ -176,7 +176,7 @@ Page({
     this.uq(() => {
       const cellPx = ui.clamp(Math.floor(240 / Math.max(work.w, work.h)), 4, 16);
       const size = renderPatternTo(this.utilCanvas, work, { cellPx, fused: true, scale: 2 });
-      return ui.canvasToTemp(this.utilCanvas).then(path => show(path, size.width, size.height));
+      return ui.captureCanvas(this, this.utilCanvas).then(path => show(path, size.width, size.height));
     }).catch(() => show('', 0, 0));
   },
 
@@ -189,7 +189,7 @@ Page({
     if (!this.utilCanvas || !this.work) return;
     this.uq(() => {
       buildExportTo(this.utilCanvas, this.work, true);
-      return ui.canvasToTemp(this.utilCanvas).then(path => ui.saveToAlbum(path));
+      return ui.captureCanvas(this, this.utilCanvas).then(path => ui.saveToAlbum(path));
     }).catch(() => ui.toast('导出失败，再试一次'));
   },
 

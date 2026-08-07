@@ -51,4 +51,4 @@
   <share-modal workId="{{workId}}" show="{{shareShow}}" bind:close="closeShare" bind:built="onCardBuilt" />
 </view>
 
-<canvas type="2d" id="util" class="util-canvas"></canvas>
+<canvas type="2d" id="util" class="util-canvas" style="width:{{capW}}px;height:{{capH}}px"></canvas>

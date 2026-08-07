@@ -27,7 +27,7 @@ Component({
           ui.toast('卡片生成失败');
           return;
         }
-        ui.canvasToTemp(r.node).then(path => {
+        ui.captureCanvas(this, r.node).then(path => {
           this._builtFor = this.properties.workId;
           this.path = path;
           this.setData({ img: path });

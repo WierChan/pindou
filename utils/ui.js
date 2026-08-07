@@ -66,6 +66,16 @@ function canvasToTemp(canvas) {
   });
 }
 
+// 导出前先把 canvas 的 CSS 尺寸同步成缓冲区尺寸再截图。
+// 部分基础库按 CSS 坐标系解释导出区域，与缓冲区不一致时会截出"局部放大图"；
+// 两者一致后无论哪种解释结果都正确。
+// 要求：canvas 元素绑定 style="width:{{capW}}px;height:{{capH}}px"
+function captureCanvas(host, canvas) {
+  return new Promise(resolve => {
+    host.setData({ capW: canvas.width, capH: canvas.height }, resolve);
+  }).then(() => canvasToTemp(canvas));
+}
+
 // 把临时文件持久化到用户目录，返回持久路径；oldPath 为被替换的旧文件
 function persistFile(tempPath, name, oldPath) {
   try {
@@ -83,10 +93,10 @@ function persistFile(tempPath, name, oldPath) {
 }
 
 // 生成作品缩略图（持久化文件），并清掉旧图
-function makeThumb(canvas, work, fused) {
+function makeThumb(host, canvas, work, fused) {
   const cellPx = clamp(Math.floor(140 / Math.max(work.w, work.h)), 2, 10);
   renderPatternTo(canvas, work, { cellPx, fused, scale: 2 });
-  return canvasToTemp(canvas).then(tmp =>
+  return captureCanvas(host, canvas).then(tmp =>
     persistFile(tmp, 'thumb-' + work.id + '-' + Date.now() + '.png', work.thumb));
 }
 
@@ -141,6 +151,6 @@ function serialQueue() {
 
 module.exports = {
   clamp, winInfo, navInsets, toast, backHome,
-  queryNode, canvasToTemp, persistFile, makeThumb, saveToAlbum,
+  queryNode, canvasToTemp, captureCanvas, persistFile, makeThumb, saveToAlbum,
   serialQueue, syncBoardRect,
 };

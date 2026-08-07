@@ -100,7 +100,7 @@ Page({
         const p = templatePattern(t);
         const cellPx = ui.clamp(Math.floor(120 / Math.max(p.w, p.h)), 6, 12);
         renderPatternTo(this.utilCanvas, p, { cellPx, scale: 2 });
-        return ui.canvasToTemp(this.utilCanvas).then(path => {
+        return ui.captureCanvas(this, this.utilCanvas).then(path => {
           paths[i] = path;
           this.setData({ ['templates[' + i + '].img']: path });
         });
@@ -258,8 +258,8 @@ Page({
     const work = store.create({ name, w: p.w, h: p.h, cells: p.cells });
     store.update(work.id, { boostRow: FREE_ROW_USES });
     const go = () => wx.redirectTo({ url: '/pages/play/play?id=' + work.id });
-    this.uq(() => ui.makeThumb(this.utilCanvas, work, false))
-      .then(path => { store.update(work.id, { thumb: path }); go(); })
+    this.uq(() => ui.makeThumb(this, this.utilCanvas, work, false))
+      .then(path => { store.update(work.id, { thumb: path, thumbV: 2 }); go(); })
       .catch(go);
   },
 

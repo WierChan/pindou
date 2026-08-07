@@ -64,4 +64,4 @@
   </view>
 </view>
 
-<canvas type="2d" id="util" class="util-canvas"></canvas>
+<canvas type="2d" id="util" class="util-canvas" style="width:{{capW}}px;height:{{capH}}px"></canvas>

@@ -75,7 +75,7 @@ Page({
     const fused = this.bv ? this.bv.fused : true;
     this.uq(() => {
       buildExportTo(this.utilCanvas, this.work, fused);
-      return ui.canvasToTemp(this.utilCanvas).then(path => ui.saveToAlbum(path));
+      return ui.captureCanvas(this, this.utilCanvas).then(path => ui.saveToAlbum(path));
     }).catch(() => ui.toast('导出失败，再试一次'));
   },
 

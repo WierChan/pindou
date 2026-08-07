@@ -13,6 +13,32 @@ Page({
 
   onShow() {
     this.refresh();
+    this._healThumbs();
+  },
+
+  // 老版本生成的缩略图可能只截到局部，重新生成一次（thumbV=2 为修复后版本）
+  _healThumbs() {
+    if (this._healing) return;
+    const list = store.list().filter(s => !s.thumbV || s.thumbV < 2);
+    if (!list.length) return;
+    this._healing = true;
+    ui.queryNode(this, '#util').then(r => {
+      if (!r || !r.node) { this._healing = false; return; }
+      let chain = Promise.resolve();
+      for (const s of list) {
+        chain = chain.then(() => {
+          const work = store.get(s.id);
+          if (!work) return null;
+          return ui.makeThumb(this, r.node, work, !!work.ironDone)
+            .then(path => { store.update(work.id, { thumb: path, thumbV: 2 }); })
+            .catch(() => { store.update(work.id, { thumbV: 2 }); }); // 失败也标记，避免反复重试
+        });
+      }
+      chain.then(() => {
+        this._healing = false;
+        this.refresh();
+      });
+    });
   },
 
   onResize() {
