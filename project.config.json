@@ -1,0 +1,45 @@
+{
+  "appid": "wx483d6f0b4bf6eaec",
+  "projectname": "zhijian-pindou",
+  "description": "指尖拼豆 · 微信小程序",
+  "compileType": "miniprogram",
+  "libVersion": "2.32.3",
+  "setting": {
+    "urlCheck": false,
+    "es6": true,
+    "enhance": true,
+    "postcss": true,
+    "minified": true,
+    "newFeature": true,
+    "coverView": true,
+    "nodeModules": false,
+    "autoAudits": false,
+    "showShadowRootInWxmlPanel": true,
+    "scopeDataCheck": false,
+    "uglifyFileName": false,
+    "checkInvalidKey": true,
+    "checkSiteMap": true,
+    "uploadWithSourceMap": true,
+    "compileHotReLoad": false,
+    "lazyloadPlaceholderEnable": false,
+    "useMultiFrameRuntime": true,
+    "useApiHook": true,
+    "useApiHostProcess": true,
+    "useIsolateContext": true,
+    "userConfirmedBundleSwitch": false,
+    "packNpmManually": false,
+    "packNpmRelationList": [],
+    "minifyWXSS": true,
+    "showES6CompileOption": false,
+    "babelSetting": {
+      "ignore": [],
+      "disablePlugins": [],
+      "outputPath": ""
+    }
+  },
+  "condition": {},
+  "editorSetting": {
+    "tabIndent": "insertSpaces",
+    "tabSize": 2
+  }
+}

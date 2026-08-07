@@ -1,0 +1,13 @@
+<view wx:if="{{show}}" class="overlay" bindtap="close">
+  <view class="modal share" catchtap="noop">
+    <image wx:if="{{img}}" class="share-img" src="{{img}}" mode="widthFix" show-menu-by-longpress />
+    <view wx:else class="share-loading">卡片生成中…</view>
+    <view class="share-tip">保存后可发到朋友圈，也可以直接转发给朋友</view>
+    <view class="modal-btns">
+      <view class="btn-primary" hover-class="pressed" bindtap="save">保存图片</view>
+      <button class="btn-reset btn-ghost share-fwd" open-type="share">转发给朋友</button>
+    </view>
+    <view class="btn-link" hover-class="pressed" bindtap="close">关闭</view>
+  </view>
+</view>
+<canvas type="2d" id="card" class="card-canvas"></canvas>

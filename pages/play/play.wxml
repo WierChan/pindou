@@ -1,0 +1,67 @@
+<view class="playpage">
+  <view class="topbar" style="padding-top:{{insets.top}}px;padding-right:{{insets.right}}px">
+    <view class="tb-back" hover-class="pressed" bindtap="goBack">‹</view>
+    <view class="tb-title">{{title}}</view>
+    <view class="tb-actions">
+      <view class="icon-btn" hover-class="pressed" bindtap="toggleMute">{{muted ? '🔇' : '🔊'}}</view>
+      <view wx:if="{{debug}}" class="icon-btn" bindtap="debugFill">⚡</view>
+    </view>
+  </view>
+
+  <view class="prog-wrap">
+    <view class="prog-bar"><view class="fill" style="width:{{pct}}%" /></view>
+    <view class="prog-txt">{{pct}}%</view>
+  </view>
+
+  <view class="board-area">
+    <canvas type="2d" id="board" class="board"
+            bindtouchstart="onTS" bindtouchmove="onTM"
+            bindtouchend="onTE" bindtouchcancel="onTE"></canvas>
+    <view class="zoom-fabs">
+      <view hover-class="pressed" bindtap="zoomIn">＋</view>
+      <view hover-class="pressed" bindtap="zoomOut">－</view>
+      <view hover-class="pressed" bindtap="zoomFit">⛶</view>
+    </view>
+  </view>
+
+  <view class="bottom-bar">
+    <view class="bb-inner">
+      <view class="tools-row">
+        <view class="tool-chip {{rowActive ? 'active' : ''}} {{rowCount ? '' : 'locked'}}" bindtap="tapRowTool">
+          {{rowCount ? '⚡ 整排拼豆 ' : '🔒 整排拼豆 '}}<text class="b">×{{rowCount}}</text>
+        </view>
+        <view class="tools-hint">选颜色，点或划格子上豆</view>
+      </view>
+      <scroll-view class="palette-bar" scroll-x scroll-into-view="{{scrollInto}}"
+                   scroll-with-animation enhanced show-scrollbar="{{false}}">
+        <view class="pchip {{item.active ? 'active' : ''}} {{item.done ? 'done' : ''}}"
+              wx:for="{{chips}}" wx:key="pal" id="c{{item.pal}}"
+              bindtap="tapChip" data-pal="{{item.pal}}">
+          <view class="pdot" style="background:{{item.hex}};color:{{item.tcol}}">{{item.num}}</view>
+          <view class="pcount">{{item.left}}</view>
+        </view>
+      </scroll-view>
+    </view>
+  </view>
+
+  <canvas wx:if="{{celebrating}}" type="2d" id="confetti" class="confetti"></canvas>
+
+  <view wx:if="{{modal.show}}" class="overlay">
+    <view class="modal">
+      <view class="modal-title">🎉 豆子拼齐啦！</view>
+      <view class="modal-art" wx:if="{{modal.img}}">
+        <image src="{{modal.img}}" style="width:{{modal.imgW}}px;height:{{modal.imgH}}px" />
+      </view>
+      <view class="modal-sub">
+        <view>「{{title}}」 · {{total}} 颗豆子 · {{colorN}} 种颜色</view>
+        <view>最后一步：亲手把它熨烫定型！</view>
+      </view>
+      <view class="modal-btns">
+        <view class="btn-primary" hover-class="pressed" bindtap="goIron">🔥 去熨烫</view>
+      </view>
+      <view class="btn-link" hover-class="pressed" bindtap="goHomeLater">稍后再烫，先回首页</view>
+    </view>
+  </view>
+</view>
+
+<canvas type="2d" id="util" class="util-canvas"></canvas>

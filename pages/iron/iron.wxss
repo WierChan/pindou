@@ -1,0 +1,2 @@
+/* 熨烫界面：主体样式在 app.wxss 的 playpage 骨架里 */
+.btn-ghost.center { align-self: stretch; text-align: center; padding: 12px 18px; }

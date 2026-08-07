@@ -1,0 +1,25 @@
+.modal.share { max-width: 380px; max-height: 92vh; overflow-y: auto; }
+.share-img {
+  width: 100%;
+  border-radius: 14px;
+  box-shadow: 0 10px 32px rgba(60, 40, 25, .22);
+}
+.share-loading {
+  padding: 60px 0;
+  color: var(--ink2);
+  font-size: 14px;
+}
+.share-tip { font-size: 12px; color: var(--ink2); }
+button.share-fwd {
+  align-self: auto;
+  padding: 10px 16px;
+  line-height: 1.45;
+  border-radius: 12px;
+}
+.card-canvas {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  width: 750px;
+  height: 1200px;
+}

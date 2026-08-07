@@ -1,0 +1,54 @@
+<view class="playpage">
+  <view class="topbar" style="padding-top:{{insets.top}}px;padding-right:{{insets.right}}px">
+    <view class="tb-back" hover-class="pressed" bindtap="goBack">‹</view>
+    <view class="tb-title">{{title}}</view>
+    <view class="tb-actions">
+      <view class="icon-btn" hover-class="pressed" bindtap="toggleMute">{{muted ? '🔇' : '🔊'}}</view>
+      <view wx:if="{{debug}}" class="icon-btn" bindtap="debugFill">⚡</view>
+    </view>
+  </view>
+
+  <view class="prog-wrap">
+    <view class="prog-bar"><view class="fill" style="width:{{pct}}%" /></view>
+    <view class="prog-txt">{{pct}}%</view>
+  </view>
+
+  <view class="board-area">
+    <canvas type="2d" id="board" class="board"
+            bindtouchstart="onTS" bindtouchmove="onTM"
+            bindtouchend="onTE" bindtouchcancel="onTE"></canvas>
+    <view class="zoom-fabs">
+      <view hover-class="pressed" bindtap="zoomIn">＋</view>
+      <view hover-class="pressed" bindtap="zoomOut">－</view>
+      <view hover-class="pressed" bindtap="zoomFit">⛶</view>
+    </view>
+  </view>
+
+  <view class="bottom-bar view-bottom">
+    <view class="tools-hint">🔥 按住熨斗，慢慢划过每一颗豆子，把它们烫平定型</view>
+  </view>
+
+  <canvas wx:if="{{celebrating}}" type="2d" id="confetti" class="confetti"></canvas>
+
+  <view wx:if="{{modal.show}}" class="overlay">
+    <view class="modal">
+      <view class="modal-title">✨ 大功告成！</view>
+      <view class="modal-art" wx:if="{{modal.img}}">
+        <image src="{{modal.img}}" style="width:{{modal.imgW}}px;height:{{modal.imgH}}px" />
+      </view>
+      <view class="modal-sub">
+        <view>「{{workName}}」熨烫定型完毕</view>
+        <view>这就是你亲手拼出来的作品！</view>
+      </view>
+      <view class="modal-btns">
+        <view class="btn-primary" hover-class="pressed" bindtap="openShare">分享卡片</view>
+        <view class="btn-ghost center" hover-class="pressed" bindtap="exportImage">导出图片</view>
+      </view>
+      <view class="btn-link" hover-class="pressed" bindtap="goHome">回到首页</view>
+    </view>
+  </view>
+
+  <share-modal workId="{{workId}}" show="{{shareShow}}" bind:close="closeShare" bind:built="onCardBuilt" />
+</view>
+
+<canvas type="2d" id="util" class="util-canvas"></canvas>

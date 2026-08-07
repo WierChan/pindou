@@ -1,5 +1,5 @@
 // 拼豆色板：38 色，参考常见品牌豆子配色
-export const PALETTE = [
+const PALETTE = [
   { name: '纯白', hex: '#FFFFFF' },
   { name: '米白', hex: '#F2E8D8' },
   { name: '浅灰', hex: '#C8CDD2' },
@@ -40,19 +40,21 @@ export const PALETTE = [
   { name: '橄榄', hex: '#8A8F3C' },
 ];
 
-export function hexToRgb(hex) {
+function hexToRgb(hex) {
   const n = parseInt(hex.slice(1), 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
-export const PALETTE_RGB = PALETTE.map(p => hexToRgb(p.hex));
+const PALETTE_RGB = PALETTE.map(p => hexToRgb(p.hex));
 
-export function relLum([r, g, b]) {
-  const f = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
-  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+function relLum(rgb) {
+  const f = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+  return 0.2126 * f(rgb[0]) + 0.7152 * f(rgb[1]) + 0.0722 * f(rgb[2]);
 }
 
 // 在某个色块上放文字时该用深字还是浅字
-export function textColorFor(hex) {
+function textColorFor(hex) {
   return relLum(hexToRgb(hex)) > 0.45 ? 'rgba(45,35,28,.85)' : 'rgba(255,255,255,.95)';
 }
+
+module.exports = { PALETTE, PALETTE_RGB, hexToRgb, relLum, textColorFor };

@@ -1,9 +1,9 @@
 // 图片 → 拼豆图纸：降采样 + OKLab 感知空间最近色匹配
-import { PALETTE_RGB } from './palette.js';
+const { PALETTE_RGB } = require('./palette');
 
 function s2l(v) { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
 
-export function rgb2oklab(r, g, b) {
+function rgb2oklab(r, g, b) {
   const lr = s2l(r), lg = s2l(g), lb = s2l(b);
   const l = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
   const m = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb);
@@ -15,45 +15,65 @@ export function rgb2oklab(r, g, b) {
   ];
 }
 
-const PAL_LAB = PALETTE_RGB.map(([r, g, b]) => rgb2oklab(r, g, b));
+const PAL_LAB = PALETTE_RGB.map(rgb => rgb2oklab(rgb[0], rgb[1], rgb[2]));
 
-export function nearestPalette(r, g, b) {
-  const [L, A, B] = rgb2oklab(r, g, b);
+function nearestPalette(r, g, b) {
+  const lab = rgb2oklab(r, g, b);
   let bi = 0, bd = Infinity;
   for (let i = 0; i < PAL_LAB.length; i++) {
     const p = PAL_LAB[i];
-    const dl = L - p[0], da = A - p[1], db = B - p[2];
+    const dl = lab[0] - p[0], da = lab[1] - p[1], db = lab[2] - p[2];
     const d = dl * dl * 1.2 + da * da + db * db; // 亮度差略加权，保住明暗关系
     if (d < bd) { bd = d; bi = i; }
   }
   return bi;
 }
 
-export function loadImageToCanvas(file, maxSide = 1024) {
+// 把图片文件解码并降采样后读出像素（借用一块 2d canvas）
+function loadImageToData(canvas, src, maxSide) {
+  maxSide = maxSide || 1024;
   return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
+    const img = canvas.createImage();
     img.onload = () => {
-      const k = Math.min(1, maxSide / Math.max(img.width, img.height));
-      const c = document.createElement('canvas');
-      c.width = Math.max(1, Math.round(img.width * k));
-      c.height = Math.max(1, Math.round(img.height * k));
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(url);
-      resolve(c);
+      try {
+        const k = Math.min(1, maxSide / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * k));
+        const h = Math.max(1, Math.round(img.height * k));
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        const d = ctx.getImageData(0, 0, w, h);
+        resolve({ data: d.data, w, h });
+      } catch (e) { reject(e); }
     };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('图片加载失败')); };
-    img.src = url;
+    img.onerror = () => reject(new Error('图片加载失败'));
+    img.src = src;
   });
 }
 
+// 把 emoji 画到 canvas 上并读出像素（走图片转图纸同一条管线）
+function emojiToData(canvas, ch) {
+  const S = 256;
+  canvas.width = S; canvas.height = S;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, S, S);
+  ctx.font = '208px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(ch, S / 2, S / 2 + 12);
+  const d = ctx.getImageData(0, 0, S, S);
+  return { data: d.data, w: S, h: S };
+}
+
 // longSide = 长边豆子数；透明像素留空；whiteEmpty 时近白色也留空（适合白底图）
-export function canvasToPattern(src, longSide, { whiteEmpty = false } = {}) {
-  const iw = src.width, ih = src.height;
+function imageToPattern(data, iw, ih, longSide, opts) {
+  const whiteEmpty = !!(opts && opts.whiteEmpty);
   let w, h;
   if (iw >= ih) { w = longSide; h = Math.max(1, Math.round(longSide * ih / iw)); }
   else { h = longSide; w = Math.max(1, Math.round(longSide * iw / ih)); }
-  const data = src.getContext('2d').getImageData(0, 0, iw, ih).data;
   const cells = new Array(w * h).fill(-1);
   for (let cy = 0; cy < h; cy++) {
     const y0 = Math.floor(cy * ih / h), y1 = Math.max(y0 + 1, Math.floor((cy + 1) * ih / h));
@@ -81,8 +101,10 @@ export function canvasToPattern(src, longSide, { whiteEmpty = false } = {}) {
 }
 
 // 统计每种颜色的豆子数，按色板顺序返回 [{pal, count}]
-export function colorStats(cells) {
+function colorStats(cells) {
   const m = new Map();
   for (const t of cells) if (t >= 0) m.set(t, (m.get(t) || 0) + 1);
-  return [...m.entries()].sort((a, b) => a[0] - b[0]).map(([pal, count]) => ({ pal, count }));
+  return [...m.entries()].sort((a, b) => a[0] - b[0]).map(e => ({ pal: e[0], count: e[1] }));
 }
+
+module.exports = { rgb2oklab, nearestPalette, loadImageToData, emojiToData, imageToPattern, colorStats };

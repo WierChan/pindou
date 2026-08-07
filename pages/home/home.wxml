@@ -1,0 +1,49 @@
+<view class="screen home" style="padding-top:{{padTop}}px">
+  <view class="home-header">
+    <view class="logo-dots">
+      <view class="ld ld1"><view class="ld-hole ldh1" /></view>
+      <view class="ld ld2"><view class="ld-hole ldh2" /></view>
+      <view class="ld ld3"><view class="ld-hole ldh3" /></view>
+    </view>
+    <view class="h1">指尖拼豆</view>
+    <view class="h-sub">把喜欢的图片，一颗一颗拼出来</view>
+  </view>
+
+  <view class="cta-new" hover-class="pressed" bindtap="goCreate">＋ 开始新作品</view>
+
+  <view class="tabs home-tabs">
+    <view class="tab {{tab === 'doing' ? 'active' : ''}}" bindtap="switchTab" data-tab="doing">🧵 进行中{{doing.length ? ' · ' + doing.length : ''}}</view>
+    <view class="tab {{tab === 'done' ? 'active' : ''}}" bindtap="switchTab" data-tab="done">🏆 已完成{{done.length ? ' · ' + done.length : ''}}</view>
+  </view>
+
+  <view class="home-list">
+    <view wx:if="{{!shown.length}}" class="empty-tip">
+      <block wx:if="{{tab === 'done'}}">
+        <view>还没有完成的作品～</view>
+        <view>拼完并熨烫定型后，就会收藏在这里 🏆</view>
+      </block>
+      <block wx:else>
+        <view>没有进行中的作品～</view>
+        <view>上传一张图片，或者从图案库挑一个开始吧 🎨</view>
+      </block>
+    </view>
+    <view wx:else class="works-grid">
+      <view class="work-card" wx:for="{{shown}}" wx:key="id" hover-class="pressed"
+            bindtap="openWork" data-id="{{item.id}}" data-st="{{item.st}}">
+        <view class="wc-thumb">
+          <image wx:if="{{item.thumb}}" src="{{item.thumb}}" mode="aspectFit" />
+          <view wx:if="{{item.badgeText}}" class="wc-badge {{item.st === 'iron' ? 'iron' : ''}}">{{item.badgeText}}</view>
+        </view>
+        <view class="wc-body">
+          <view class="wc-name">{{item.name}}</view>
+          <view class="wc-meta">{{item.dims}}</view>
+          <block wx:if="{{item.st !== 'done'}}">
+            <view class="wc-progress"><view class="fill" style="width:{{item.pct}}%" /></view>
+            <view class="wc-meta">{{item.footText}}</view>
+          </block>
+        </view>
+        <view class="wc-del" catchtap="delWork" data-id="{{item.id}}" data-name="{{item.name}}">✕</view>
+      </view>
+    </view>
+  </view>
+</view>

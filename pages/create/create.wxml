@@ -1,0 +1,81 @@
+<view class="screen create">
+  <view class="topbar" style="padding-top:{{insets.top}}px;padding-right:{{insets.right}}px">
+    <view class="tb-back" hover-class="pressed" bindtap="goBack">‹</view>
+    <view class="tb-title">新作品</view>
+  </view>
+
+  <!-- 选择阶段 -->
+  <view wx:if="{{mode === 'pick'}}" class="create-body">
+    <view class="tabs">
+      <view class="tab {{tab === 'image' ? 'active' : ''}}" bindtap="switchTab" data-tab="image">📷 图片转图纸</view>
+      <view class="tab {{tab === 'tpl' ? 'active' : ''}}" bindtap="switchTab" data-tab="tpl">🧸 图案库</view>
+    </view>
+
+    <block wx:if="{{tab === 'image'}}">
+      <view class="upload-zone" hover-class="uz-hover" bindtap="chooseImage">
+        <view class="uz-icon">🖼️</view>
+        <view class="uz-title">选择一张图片</view>
+        <view class="uz-sub">照片、表情包、logo 都可以</view>
+        <view class="uz-sub">转成拼豆图纸后开拼</view>
+      </view>
+    </block>
+
+    <block wx:else>
+      <view class="pick-label">⭐ 新手友好 · 几分钟拼完一幅</view>
+      <view class="tpl-grid">
+        <view class="tpl-card" wx:for="{{templates}}" wx:key="name" hover-class="pressed"
+              bindtap="pickTpl" data-i="{{index}}">
+          <image wx:if="{{item.img}}" class="tpl-img" src="{{item.img}}" mode="aspectFit" />
+          <view wx:else class="tpl-img" />
+          <view class="tpl-name">{{item.name}} · {{item.count}} 颗</view>
+        </view>
+      </view>
+
+      <view class="pick-label">😀 表情图案 · 点一个直接转图纸</view>
+      <view class="emoji-grid">
+        <view class="emoji-btn" wx:for="{{emojis}}" wx:key="*this" hover-class="pressed"
+              bindtap="pickEmoji" data-ch="{{item}}">{{item}}</view>
+      </view>
+    </block>
+  </view>
+
+  <!-- 配置阶段 -->
+  <view wx:else class="create-body">
+    <view class="btn-ghost" hover-class="pressed" bindtap="backToPick">‹ 重新选择</view>
+
+    <view class="panel">
+      <view class="preview-wrap">
+        <canvas type="2d" id="preview" style="width:{{pvW}}px;height:{{pvH}}px"></canvas>
+      </view>
+      <view class="stats-line">{{dimText}} · <text class="b">{{total}}</text> 颗豆子 · <text class="b">{{colorN}}</text> 种颜色</view>
+      <view class="color-chips">
+        <view class="cchip" wx:for="{{chips}}" wx:key="index">
+          <view class="dot" style="background:{{item.hex}}" />{{item.count}}
+        </view>
+      </view>
+
+      <block wx:if="{{!fromTpl}}">
+        <view class="opt-row">
+          <view class="opt-label">画布大小</view>
+          <view class="size-chips">
+            <view class="chip {{size === item ? 'active' : ''}}" wx:for="{{sizes}}" wx:key="*this"
+                  bindtap="setSize" data-n="{{item}}">{{item}} 豆</view>
+          </view>
+        </view>
+        <view class="switch-row">
+          <view class="sw-label">白色背景不拼豆<text class="sw-small">适合白底图片</text></view>
+          <switch checked="{{whiteEmpty}}" color="#FF7D54" bindchange="onWhiteChange" />
+        </view>
+      </block>
+
+      <view class="name-row">
+        <view class="opt-label">作品名</view>
+        <input value="{{name}}" maxlength="20" placeholder="给作品起个名字" bindinput="onName" />
+      </view>
+    </view>
+
+    <view class="btn-primary" hover-class="pressed" bindtap="start">开始拼豆！</view>
+  </view>
+</view>
+
+<canvas type="2d" id="util" class="util-canvas"></canvas>

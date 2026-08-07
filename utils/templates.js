@@ -1,6 +1,6 @@
 // 内置图案库：字符画定义，'.' 为留空
-import { nearestPalette } from './convert.js';
-import { hexToRgb } from './palette.js';
+const { nearestPalette } = require('./convert');
+const { hexToRgb } = require('./palette');
 
 const C = {
   R: '#E02B26', // 大红
@@ -12,7 +12,7 @@ const C = {
   K: '#22252A', // 黑
 };
 
-export const TEMPLATES = [
+const TEMPLATES = [
   {
     name: '爱心',
     rows: [
@@ -89,16 +89,21 @@ export const TEMPLATES = [
 ];
 
 // 把字符画编译成图纸 {w, h, cells}
-export function templatePattern(t) {
+function templatePattern(t) {
   const h = t.rows.length, w = t.rows[0].length;
   const cache = {};
   const cells = [];
   for (const row of t.rows) {
     for (const ch of row) {
       if (ch === '.') { cells.push(-1); continue; }
-      if (cache[ch] == null) cache[ch] = nearestPalette(...hexToRgb(C[ch]));
+      if (cache[ch] == null) {
+        const rgb = hexToRgb(C[ch]);
+        cache[ch] = nearestPalette(rgb[0], rgb[1], rgb[2]);
+      }
       cells.push(cache[ch]);
     }
   }
   return { w, h, cells };
 }
+
+module.exports = { TEMPLATES, templatePattern };
