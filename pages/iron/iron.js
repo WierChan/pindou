@@ -12,6 +12,8 @@ const { DEBUG } = require('../../utils/config');
 Page({
   data: {
     insets: { top: 24, h: 44, right: 8 },
+    capW: 700,
+    capH: 900,
     title: '',
     workName: '',
     pct: 0,
@@ -144,7 +146,7 @@ Page({
     });
     if (this.utilCanvas) {
       this.uq(() => ui.makeThumb(this, this.utilCanvas, work, true))
-        .then(path => store.update(work.id, { thumb: path, thumbV: 2 }))
+        .then(path => store.update(work.id, { thumb: path, thumbV: 4 }))
         .catch(() => { /* 忽略 */ });
     }
     setTimeout(() => {
@@ -175,8 +177,9 @@ Page({
     if (!this.utilCanvas) { show('', 0, 0); return; }
     this.uq(() => {
       const cellPx = ui.clamp(Math.floor(240 / Math.max(work.w, work.h)), 4, 16);
-      const size = renderPatternTo(this.utilCanvas, work, { cellPx, fused: true, scale: 2 });
-      return ui.captureCanvas(this, this.utilCanvas).then(path => show(path, size.width, size.height));
+      let size = null; // captureCanvas 内部会先调 draw() 再导出
+      const draw = () => (size = renderPatternTo(this.utilCanvas, work, { cellPx, fused: true, scale: 2 }));
+      return ui.captureCanvas(this, this.utilCanvas, draw).then(path => show(path, size.width, size.height));
     }).catch(() => show('', 0, 0));
   },
 
@@ -188,8 +191,8 @@ Page({
   exportImage() {
     if (!this.utilCanvas || !this.work) return;
     this.uq(() => {
-      buildExportTo(this.utilCanvas, this.work, true);
-      return ui.captureCanvas(this, this.utilCanvas).then(path => ui.saveToAlbum(path));
+      const draw = () => buildExportTo(this.utilCanvas, this.work, true);
+      return ui.captureCanvas(this, this.utilCanvas, draw).then(path => ui.saveToAlbum(path));
     }).catch(() => ui.toast('导出失败，再试一次'));
   },
 

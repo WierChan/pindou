@@ -13,7 +13,7 @@ Component({
       observer(v) { if (v) this.build(); },
     },
   },
-  data: { img: '' },
+  data: { img: '', capW: 750, capH: 1200 },
   methods: {
     build() {
       if (this._builtFor === this.properties.workId && this.data.img) return;
@@ -21,13 +21,8 @@ Component({
       if (!work) return;
       ui.queryNode(this, '#card').then(r => {
         if (!r || !r.node) { ui.toast('卡片生成失败'); return; }
-        try {
-          buildShareCardTo(r.node, work, 2);
-        } catch (e) {
-          ui.toast('卡片生成失败');
-          return;
-        }
-        ui.captureCanvas(this, r.node).then(path => {
+        const draw = () => buildShareCardTo(r.node, work, 2);
+        ui.captureCanvas(this, r.node, draw, '#card').then(path => {
           this._builtFor = this.properties.workId;
           this.path = path;
           this.setData({ img: path });

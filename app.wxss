@@ -302,7 +302,6 @@ button.btn-reset::after { border: none; }
 .pchip.active {
   border-color: var(--accent);
   background: #FFF6F1;
-  transform: translateY(-2px);
 }
 .pchip.done { opacity: .38; }
 .pdot {

@@ -49,14 +49,16 @@ function queryNode(host, sel) {
   });
 }
 
-// canvas 整个缓冲区导出为临时图片文件
+// canvas 整个缓冲区导出为临时图片文件。
+// 不传 x/y/width/height：真机和开发者工具对区域参数的单位解释不一致
+// （逻辑像素 / 物理像素 / 缓冲区像素都有），显式传值总会在某个环境截出局部；
+// 省略后基础库按自己的口径默认导出"整张画布"，任何环境都完整。
+// destWidth/destHeight 只控制输出分辨率，与截取区域无关，可以安全指定。
 function canvasToTemp(canvas) {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       wx.canvasToTempFilePath({
         canvas,
-        x: 0, y: 0,
-        width: canvas.width, height: canvas.height,
         destWidth: canvas.width, destHeight: canvas.height,
         fileType: 'png',
         success: r => resolve(r.tempFilePath),
@@ -66,14 +68,39 @@ function canvasToTemp(canvas) {
   });
 }
 
-// 导出前先把 canvas 的 CSS 尺寸同步成缓冲区尺寸再截图。
-// 部分基础库按 CSS 坐标系解释导出区域，与缓冲区不一致时会截出"局部放大图"；
-// 两者一致后无论哪种解释结果都正确。
-// 要求：canvas 元素绑定 style="width:{{capW}}px;height:{{capH}}px"
-function captureCanvas(host, canvas) {
+// 等 canvas 的 CSS 布局尺寸真正变成 w×h。
+// setData 回调只代表数据已提交，布局在渲染层是异步生效的，必须轮询节点实测尺寸确认；
+// 超时就放弃等待照常导出（导出可能不完整，但比一直卡住好）。
+function waitLayout(host, sel, w, h, tries) {
+  if (tries == null) tries = 12;
   return new Promise(resolve => {
-    host.setData({ capW: canvas.width, capH: canvas.height }, resolve);
-  }).then(() => canvasToTemp(canvas));
+    const q = host.createSelectorQuery();
+    q.select(sel).boundingClientRect();
+    q.exec(res => resolve(res && res[0] ? res[0] : null));
+  }).then(r => {
+    if (r && Math.abs(r.width - w) < 2 && Math.abs(r.height - h) < 2) return true;
+    if (tries <= 0) return false;
+    return new Promise(resolve => setTimeout(resolve, 80))
+      .then(() => waitLayout(host, sel, w, h, tries - 1));
+  });
+}
+
+// 绘制并整幅导出 canvas。
+// 真机上导出区域按 canvas 的 CSS 坐标系解释，CSS 尺寸与缓冲区不一致时会截出
+// "局部放大图"。因此：先绘制确定缓冲区尺寸 → 把 CSS 同步成同样大小并轮询确认
+// 布局已生效 → 再重绘一次（防止原生层在缩放画布时丢内容）→ 导出。
+// draw() 负责设置缓冲区尺寸并完成绘制，会被调用两次；
+// canvas 元素需绑定 style="width:{{capW}}px;height:{{capH}}px"，sel 默认 '#util'。
+function captureCanvas(host, canvas, draw, sel) {
+  return Promise.resolve().then(() => {
+    draw();
+    const W = canvas.width, H = canvas.height;
+    return new Promise(resolve => host.setData({ capW: W, capH: H }, resolve))
+      .then(() => waitLayout(host, sel || '#util', W, H));
+  }).then(() => {
+    draw();
+    return canvasToTemp(canvas);
+  });
 }
 
 // 把临时文件持久化到用户目录，返回持久路径；oldPath 为被替换的旧文件
@@ -95,8 +122,8 @@ function persistFile(tempPath, name, oldPath) {
 // 生成作品缩略图（持久化文件），并清掉旧图
 function makeThumb(host, canvas, work, fused) {
   const cellPx = clamp(Math.floor(140 / Math.max(work.w, work.h)), 2, 10);
-  renderPatternTo(canvas, work, { cellPx, fused, scale: 2 });
-  return captureCanvas(host, canvas).then(tmp =>
+  const draw = () => renderPatternTo(canvas, work, { cellPx, fused, scale: 2 });
+  return captureCanvas(host, canvas, draw).then(tmp =>
     persistFile(tmp, 'thumb-' + work.id + '-' + Date.now() + '.png', work.thumb));
 }
 

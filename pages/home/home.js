@@ -9,6 +9,8 @@ Page({
     doing: [],
     done: [],
     shown: [],
+    capW: 700,
+    capH: 900,
   },
 
   onShow() {
@@ -16,10 +18,12 @@ Page({
     this._healThumbs();
   },
 
-  // 老版本生成的缩略图可能只截到局部，重新生成一次（thumbV=2 为修复后版本）
+  // 老版本生成的缩略图可能只截到局部，重新生成一次（thumbV=4 为修复后版本）。
+  // 失败不写版本号（下次启动还能重试），只在本次会话内跳过，避免每次 onShow 反复重跑。
   _healThumbs() {
     if (this._healing) return;
-    const list = store.list().filter(s => !s.thumbV || s.thumbV < 2);
+    const tried = this._healTried || (this._healTried = {});
+    const list = store.list().filter(s => (!s.thumbV || s.thumbV < 4) && !tried[s.id]);
     if (!list.length) return;
     this._healing = true;
     ui.queryNode(this, '#util').then(r => {
@@ -29,9 +33,10 @@ Page({
         chain = chain.then(() => {
           const work = store.get(s.id);
           if (!work) return null;
+          tried[s.id] = 1;
           return ui.makeThumb(this, r.node, work, !!work.ironDone)
-            .then(path => { store.update(work.id, { thumb: path, thumbV: 2 }); })
-            .catch(() => { store.update(work.id, { thumbV: 2 }); }); // 失败也标记，避免反复重试
+            .then(path => { store.update(work.id, { thumb: path, thumbV: 4 }); })
+            .catch(() => { /* 保留旧图，下次启动再试 */ });
         });
       }
       chain.then(() => {

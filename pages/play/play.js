@@ -11,6 +11,8 @@ const { DEBUG, FREE_ROW_USES } = require('../../utils/config');
 Page({
   data: {
     insets: { top: 24, h: 44, right: 8 },
+    capW: 700,
+    capH: 900,
     title: '',
     pct: 0,
     chips: [],
@@ -289,7 +291,7 @@ Page({
     });
     if (this.utilCanvas) {
       this.uq(() => ui.makeThumb(this, this.utilCanvas, work, false))
-        .then(path => store.update(work.id, { thumb: path, thumbV: 2 }))
+        .then(path => store.update(work.id, { thumb: path, thumbV: 4 }))
         .catch(() => { /* 缩略图失败不影响流程 */ });
     }
     if (this.bv) this.bv.o.mode = 'view';
@@ -320,8 +322,9 @@ Page({
     if (!this.utilCanvas) { show('', 0, 0); return; }
     this.uq(() => {
       const cellPx = ui.clamp(Math.floor(240 / Math.max(work.w, work.h)), 4, 16);
-      const size = renderPatternTo(this.utilCanvas, work, { cellPx, scale: 2 });
-      return ui.captureCanvas(this, this.utilCanvas).then(path => show(path, size.width, size.height));
+      let size = null; // captureCanvas 内部会先调 draw() 再导出
+      const draw = () => (size = renderPatternTo(this.utilCanvas, work, { cellPx, scale: 2 }));
+      return ui.captureCanvas(this, this.utilCanvas, draw).then(path => show(path, size.width, size.height));
     }).catch(() => show('', 0, 0));
   },
 

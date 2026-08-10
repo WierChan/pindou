@@ -27,6 +27,8 @@ const SIZE_CAP = 256;
 Page({
   data: {
     insets: { top: 24, h: 44, right: 8 },
+    capW: 700,
+    capH: 900,
     tab: 'image',
     mode: 'pick',
     templates: [],
@@ -99,8 +101,8 @@ Page({
       chain = chain.then(() => this.uq(() => {
         const p = templatePattern(t);
         const cellPx = ui.clamp(Math.floor(120 / Math.max(p.w, p.h)), 6, 12);
-        renderPatternTo(this.utilCanvas, p, { cellPx, scale: 2 });
-        return ui.captureCanvas(this, this.utilCanvas).then(path => {
+        const draw = () => renderPatternTo(this.utilCanvas, p, { cellPx, scale: 2 });
+        return ui.captureCanvas(this, this.utilCanvas, draw).then(path => {
           paths[i] = path;
           this.setData({ ['templates[' + i + '].img']: path });
         });
@@ -259,7 +261,7 @@ Page({
     store.update(work.id, { boostRow: FREE_ROW_USES });
     const go = () => wx.redirectTo({ url: '/pages/play/play?id=' + work.id });
     this.uq(() => ui.makeThumb(this, this.utilCanvas, work, false))
-      .then(path => { store.update(work.id, { thumb: path, thumbV: 2 }); go(); })
+      .then(path => { store.update(work.id, { thumb: path, thumbV: 4 }); go(); })
       .catch(go);
   },
 

@@ -7,6 +7,8 @@ const ui = require('../../utils/ui');
 Page({
   data: {
     insets: { top: 24, h: 44, right: 8 },
+    capW: 700,
+    capH: 900,
     title: '',
     fusedOn: true,
     shareShow: false,
@@ -74,8 +76,8 @@ Page({
     if (!this.utilCanvas || !this.work) return;
     const fused = this.bv ? this.bv.fused : true;
     this.uq(() => {
-      buildExportTo(this.utilCanvas, this.work, fused);
-      return ui.captureCanvas(this, this.utilCanvas).then(path => ui.saveToAlbum(path));
+      const draw = () => buildExportTo(this.utilCanvas, this.work, fused);
+      return ui.captureCanvas(this, this.utilCanvas, draw).then(path => ui.saveToAlbum(path));
     }).catch(() => ui.toast('导出失败，再试一次'));
   },
 
