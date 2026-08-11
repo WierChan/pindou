@@ -52,7 +52,8 @@ function boost(r, g, b) {
 }
 
 // 把图片文件解码后读出像素（借用一块 2d canvas）
-// 尽量保留原始分辨率（上限 2048），降采样交给 imageToPattern 的区域平均，避免细节丢失
+// maxSide 由调用方决定：图片转图纸用 512 —— 真机上解码/读回/重采样都快一个量级，
+// 且对 ≤256 豆的画布每格仍有 ≥2×2 采样；不大于 maxSide 的小图不缩放（像素画 1:1 还原）
 function loadImageToData(canvas, src, maxSide) {
   maxSide = maxSide || 2048;
   return new Promise((resolve, reject) => {

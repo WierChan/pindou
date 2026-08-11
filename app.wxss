@@ -1,18 +1,25 @@
-/* 指尖拼豆 · 全局样式（px 布局 + 弹性栅格，手机 / iPad 通用） */
+/* 指尖拼豆 · 全局样式（像素街机风：方角 + 粗描边 + 掉落式硬投影，px 布局，手机 / iPad 通用） */
 page {
-  --bg: #FAF6EF;
+  --bg: #F3EFDF;
   --card: #FFFFFF;
-  --ink: #3D3630;
-  --ink2: #8C8177;
-  --accent: #FF7D54;
-  --accent-dark: #E8623A;
-  --line: rgba(120, 90, 60, .12);
-  --radius: 16px;
-  --shadow: 0 4px 16px rgba(120, 90, 60, .10);
+  --ink: #23213A;
+  --ink2: #8B87A6;
+  --accent: #E8504F;
+  --accent-dark: #A93231;
+  --blue: #3E6FD8;
+  --blue-dark: #27499A;
+  --coin: #F8C82C;
+  --coin-dark: #C09314;
+  --chipbg: #EFEDF9;
+  --line: rgba(35, 33, 58, .14);
+  --radius: 0px;
+  --shadow: 4px 4px 0 #C9C4E0;
 
   background: var(--bg);
-  background-image: radial-gradient(rgba(120, 90, 60, .05) 1.2px, transparent 1.2px);
-  background-size: 22px 22px;
+  /* 像素格子底纹 */
+  background-image:
+    repeating-linear-gradient(0deg, rgba(35, 33, 58, .05) 0, rgba(35, 33, 58, .05) 1px, transparent 1px, transparent 13px),
+    repeating-linear-gradient(90deg, rgba(35, 33, 58, .05) 0, rgba(35, 33, 58, .05) 1px, transparent 1px, transparent 13px);
   color: var(--ink);
   font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   font-size: 15px;
@@ -23,8 +30,8 @@ view, text, image, canvas, input, scroll-view, button {
   box-sizing: border-box;
 }
 
-/* 通用按压反馈 */
-.pressed { transform: scale(.96); }
+/* 通用按压反馈：像素风按键往右下"按进去" */
+.pressed { transform: translate(2px, 2px); }
 
 /* 隐藏的工具画布：用于生成缩略图 / 导出图 / 读取图片像素 */
 .util-canvas {
@@ -60,11 +67,13 @@ view, text, image, canvas, input, scroll-view, button {
 .tb-back {
   width: 38px;
   height: 38px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--card);
-  box-shadow: var(--shadow);
-  font-size: 24px;
-  line-height: 34px;
+  border: 3px solid var(--ink);
+  box-shadow: 3px 3px 0 #C9C4E0;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 28px;
   text-align: center;
   flex-shrink: 0;
   transition: transform .12s;
@@ -72,8 +81,9 @@ view, text, image, canvas, input, scroll-view, button {
 .tb-title {
   flex: 1;
   min-width: 0;
-  font-weight: 700;
+  font-weight: 800;
   font-size: 17px;
+  letter-spacing: 1px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -82,10 +92,11 @@ view, text, image, canvas, input, scroll-view, button {
 .icon-btn {
   width: 38px;
   height: 38px;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--card);
-  box-shadow: var(--shadow);
-  font-size: 17px;
+  border: 3px solid var(--ink);
+  box-shadow: 3px 3px 0 #C9C4E0;
+  font-size: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -96,42 +107,50 @@ view, text, image, canvas, input, scroll-view, button {
 .tabs { display: flex; gap: 10px; }
 .tab {
   flex: 1;
-  padding: 12px;
-  border-radius: 12px;
+  padding: 11px 6px;
+  border-radius: 0;
   background: var(--card);
-  box-shadow: var(--shadow);
-  font-weight: 600;
+  border: 3px solid var(--ink);
+  box-shadow: 3px 3px 0 #C9C4E0;
+  font-weight: 700;
   font-size: 15px;
   color: var(--ink2);
   text-align: center;
   transition: transform .12s;
 }
-.tab.active { background: var(--ink); color: #fff; }
+.tab.active {
+  background: var(--blue);
+  color: #fff;
+  box-shadow: 3px 3px 0 var(--blue-dark);
+}
 
 .btn-primary {
-  padding: 15px;
+  padding: 14px;
   background: var(--accent);
   color: #fff;
   font-size: 16px;
-  font-weight: 700;
-  border-radius: var(--radius);
-  box-shadow: 0 6px 18px rgba(255, 125, 84, .35);
+  font-weight: 800;
+  letter-spacing: 2px;
+  border: 3px solid var(--ink);
+  border-radius: 0;
+  box-shadow: 4px 4px 0 var(--accent-dark);
   text-align: center;
   transition: transform .12s;
 }
-.btn-primary.slim { padding: 11px 22px; font-size: 14px; }
+.btn-primary.slim { padding: 10px 22px; font-size: 14px; }
 .btn-ghost {
-  padding: 10px 16px;
-  border-radius: 12px;
+  padding: 9px 16px;
+  border-radius: 0;
   background: var(--card);
-  box-shadow: var(--shadow);
-  font-weight: 600;
+  border: 3px solid var(--ink);
+  box-shadow: 3px 3px 0 #C9C4E0;
+  font-weight: 700;
   font-size: 14px;
   align-self: flex-start;
   text-align: center;
   transition: transform .12s;
 }
-.btn-ghost.slim2 { padding: 11px 18px; align-self: auto; }
+.btn-ghost.slim2 { padding: 10px 18px; align-self: auto; }
 .btn-link {
   color: var(--ink2);
   font-size: 13px;
@@ -179,23 +198,25 @@ button.btn-reset::after { border: none; }
 }
 .prog-bar {
   flex: 1;
-  height: 6px;
-  background: #EFE8DB;
-  border-radius: 3px;
+  height: 12px;
+  background: var(--card);
+  border: 2px solid var(--ink);
+  border-radius: 0;
   overflow: hidden;
 }
 .prog-bar .fill {
   display: block;
   height: 100%;
   width: 0;
-  background: linear-gradient(90deg, #FFAB7B, var(--accent));
-  border-radius: 3px;
+  /* 像素分段进度条 */
+  background: repeating-linear-gradient(90deg, var(--accent) 0, var(--accent) 8px, #F3766F 8px, #F3766F 10px);
+  border-radius: 0;
   transition: width .25s;
 }
 .prog-txt {
   font-size: 12px;
-  font-weight: 700;
-  color: var(--ink2);
+  font-weight: 800;
+  color: var(--accent-dark);
   min-width: 34px;
   text-align: right;
 }
@@ -224,10 +245,12 @@ button.btn-reset::after { border: none; }
 .zoom-fabs view {
   width: 40px;
   height: 40px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, .92);
-  box-shadow: var(--shadow);
+  border-radius: 0;
+  background: var(--card);
+  border: 2px solid var(--ink);
+  box-shadow: 3px 3px 0 #C9C4E0;
   font-size: 18px;
+  font-weight: 700;
   color: var(--ink);
   display: flex;
   align-items: center;
@@ -247,8 +270,9 @@ button.btn-reset::after { border: none; }
 
 .bottom-bar {
   background: var(--card);
-  border-radius: 20px 20px 0 0;
-  box-shadow: 0 -6px 24px rgba(120, 90, 60, .12);
+  border-top: 3px solid var(--ink);
+  border-radius: 0;
+  box-shadow: 0 -4px 0 #E9E5F5;
   padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
 }
 .bb-inner { max-width: 720px; margin: 0 auto; }
@@ -261,17 +285,20 @@ button.btn-reset::after { border: none; }
 }
 .tool-chip {
   padding: 8px 14px;
-  border-radius: 999px;
-  background: #F7F2E9;
+  border-radius: 0;
+  background: var(--chipbg);
   font-size: 13px;
   font-weight: 700;
   color: var(--ink);
-  border: 2px solid rgba(0, 0, 0, 0);
+  border: 2px solid var(--ink);
   flex-shrink: 0;
   transition: transform .12s;
 }
 .tool-chip .b { color: var(--accent-dark); }
-.tool-chip.active { border-color: var(--accent); background: #FFF0E8; }
+.tool-chip.active {
+  background: var(--coin);
+  box-shadow: 3px 3px 0 var(--coin-dark);
+}
 .tool-chip.locked { opacity: .6; }
 .tools-hint {
   font-size: 12px;
@@ -295,26 +322,28 @@ button.btn-reset::after { border: none; }
   vertical-align: top;
   padding: 5px 6px;
   margin-right: 10px;
-  border-radius: 12px;
+  border-radius: 0;
   border: 2px solid rgba(0, 0, 0, 0);
   transition: transform .1s;
 }
 .pchip.active {
-  border-color: var(--accent);
-  background: #FFF6F1;
+  border-color: var(--ink);
+  background: var(--chipbg);
+  box-shadow: 3px 3px 0 #C9C4E0;
 }
 .pchip.done { opacity: .38; }
 .pdot {
   width: 34px;
   height: 34px;
-  border-radius: 50%;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 13px;
   font-weight: 800;
-  border: 1px solid rgba(0, 0, 0, .1);
-  box-shadow: inset -2px -3px 6px rgba(0, 0, 0, .12), inset 2px 3px 6px rgba(255, 255, 255, .5);
+  border: 2px solid var(--ink);
+  /* 像素方块的硬斜面高光 */
+  box-shadow: inset -3px -3px 0 rgba(0, 0, 0, .16), inset 3px 3px 0 rgba(255, 255, 255, .5);
 }
 .pcount { font-size: 11px; font-weight: 600; color: var(--ink2); }
 
@@ -342,7 +371,7 @@ button.btn-reset::after { border: none; }
   right: 0;
   bottom: 0;
   z-index: 100;
-  background: rgba(60, 45, 30, .45);
+  background: rgba(35, 33, 58, .5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -352,7 +381,9 @@ button.btn-reset::after { border: none; }
 @keyframes fadeIn { from { opacity: 0; } }
 .modal {
   background: var(--card);
-  border-radius: 22px;
+  border: 4px solid var(--ink);
+  border-radius: 0;
+  box-shadow: 6px 6px 0 rgba(14, 13, 29, .35);
   padding: 26px 22px;
   width: 100%;
   max-width: 340px;
@@ -363,7 +394,7 @@ button.btn-reset::after { border: none; }
   animation: popUp .35s cubic-bezier(.2, 1.4, .4, 1);
 }
 @keyframes popUp { from { transform: scale(.7); opacity: 0; } }
-.modal-title { font-size: 22px; font-weight: 800; }
+.modal-title { font-size: 22px; font-weight: 800; letter-spacing: 2px; }
 .modal-art { display: flex; justify-content: center; }
 .modal-sub { color: var(--ink2); font-size: 14px; line-height: 1.7; }
 .modal-btns { display: flex; gap: 10px; }

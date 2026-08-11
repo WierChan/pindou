@@ -97,6 +97,21 @@ const audio = {
       beep({ freq: f, dur: 0.16, type: 'triangle', gain: 0.14, at: i * 0.1 }));
     beep({ freq: 1318, dur: 0.4, type: 'sine', gain: 0.1, at: 0.42 });
   },
+  /* ---- 首页小互动音效（同样走静音开关） ---- */
+  // 单音（点豆子 / 标题音阶）
+  note(freq) {
+    beep({ freq: freq || 660, dur: 0.1, type: 'square', gain: 0.07 });
+  },
+  // 豆豆跳一下：两声上行
+  hop() {
+    beep({ freq: 392, dur: 0.07, gain: 0.08 });
+    beep({ freq: 523, dur: 0.09, gain: 0.08, at: 0.07 });
+  },
+  // 彩蛋小号角
+  fanfare() {
+    [659, 784, 880, 1046].forEach((f, i) =>
+      beep({ freq: f, dur: 0.1, gain: 0.09, at: i * 0.09 }));
+  },
 };
 
 module.exports = { audio };

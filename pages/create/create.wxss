@@ -6,16 +6,16 @@
 }
 
 .upload-zone {
-  border: 2.5px dashed rgba(255, 125, 84, .5);
-  border-radius: var(--radius);
-  background: rgba(255, 255, 255, .6);
+  border: 3px dashed var(--accent);
+  border-radius: 0;
+  background: rgba(255, 255, 255, .75);
   text-align: center;
   padding: 44px 20px;
   transition: background .15s;
 }
-.uz-hover { background: rgba(255, 235, 225, .8); }
+.uz-hover { background: #FDECEB; }
 .uz-icon { font-size: 40px; }
-.uz-title { font-size: 17px; font-weight: 700; margin-top: 10px; }
+.uz-title { font-size: 17px; font-weight: 800; letter-spacing: 1px; margin-top: 10px; }
 .uz-sub { color: var(--ink2); font-size: 13px; margin-top: 6px; line-height: 1.5; }
 
 .pick-label {
@@ -36,8 +36,9 @@
   padding: 11px 0;
   text-align: center;
   background: var(--card);
-  border-radius: 14px;
-  box-shadow: var(--shadow);
+  border: 3px solid var(--ink);
+  border-radius: 0;
+  box-shadow: 3px 3px 0 #C9C4E0;
   transition: transform .1s;
 }
 
@@ -54,7 +55,8 @@
 }
 .tpl-card {
   background: var(--card);
-  border-radius: var(--radius);
+  border: 3px solid var(--ink);
+  border-radius: 0;
   box-shadow: var(--shadow);
   padding: 16px 12px;
   text-align: center;
@@ -65,7 +67,8 @@
 
 .panel {
   background: var(--card);
-  border-radius: var(--radius);
+  border: 3px solid var(--ink);
+  border-radius: 0;
   box-shadow: var(--shadow);
   padding: 18px;
   display: flex;
@@ -85,17 +88,18 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  background: #F7F2E9;
+  background: var(--chipbg);
+  border: 1.5px solid var(--line);
   padding: 4px 10px 4px 5px;
-  border-radius: 999px;
+  border-radius: 0;
   font-size: 12px;
   color: var(--ink2);
 }
 .cchip .dot {
   width: 16px;
   height: 16px;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, .08);
+  border-radius: 0;
+  border: 1.5px solid rgba(35, 33, 58, .35);
 }
 
 .opt-row {
@@ -113,13 +117,18 @@
 .size-chips { display: flex; gap: 7px; }
 .chip {
   padding: 7px 12px;
-  border-radius: 999px;
+  border-radius: 0;
   font-size: 13px;
   font-weight: 600;
-  background: #F7F2E9;
+  background: var(--chipbg);
+  border: 2px solid var(--ink);
   color: var(--ink2);
 }
-.chip.active { background: var(--ink); color: #fff; }
+.chip.active {
+  background: var(--blue);
+  color: #fff;
+  box-shadow: 2px 2px 0 var(--blue-dark);
+}
 
 .switch-row {
   display: flex;
@@ -142,9 +151,9 @@
 .name-row { display: flex; align-items: center; gap: 12px; }
 .name-row input {
   flex: 1;
-  border: 1.5px solid var(--line);
-  border-radius: 10px;
+  border: 2px solid var(--ink);
+  border-radius: 0;
   padding: 10px 12px;
   height: 42px;
-  background: #FDFBF6;
+  background: #FBFAF3;
 }

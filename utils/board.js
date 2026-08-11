@@ -6,7 +6,7 @@ const css = (rgb, a) => a == null || a >= 1
   ? 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')'
   : 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',' + a + ')';
 const mix = (c1, c2, t) => [0, 1, 2].map(i => Math.round(c1[i] + (c2[i] - c1[i]) * t));
-const BLACK = [30, 25, 20];
+const BLACK = [35, 33, 58]; // 像素风描边靛墨
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const now = () => Date.now();
 
@@ -21,49 +21,40 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-// 单颗豆子（俯视：圆片 + 中孔 + 高光）
+// 单颗豆子（像素风：无描边方块 + 深色方孔 + 左上硬高光）
 function drawBead(ctx, cx, cy, r, palIdx, alpha) {
   if (alpha == null) alpha = 1;
   const rgb = PALETTE_RGB[palIdx];
   if (alpha < 1) ctx.globalAlpha = alpha;
+  const side = r * 1.9;
+  const x = cx - side / 2, y = cy - side / 2;
   if (r < 3) {
-    // 太小画不出孔和高光，纯色圆反而更清晰（缩略图 / 大图纸缩到很小时）
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7);
-    ctx.fillStyle = css(rgb); ctx.fill();
+    // 太小画不出孔和高光，纯色方块反而更清晰（缩略图 / 大图纸缩到很小时）
+    ctx.fillStyle = css(rgb);
+    ctx.fillRect(x, y, side, side);
     if (alpha < 1) ctx.globalAlpha = 1;
     return;
   }
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7);
-  ctx.fillStyle = css(rgb); ctx.fill();
-  const g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r);
-  g.addColorStop(0, 'rgba(255,255,255,.5)');
-  g.addColorStop(0.5, 'rgba(255,255,255,0)');
-  g.addColorStop(1, 'rgba(0,0,0,.22)');
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7);
-  ctx.fillStyle = g; ctx.fill();
-  ctx.beginPath(); ctx.arc(cx, cy, r * 0.32, 0, 7);
-  ctx.fillStyle = css(mix(rgb, BLACK, 0.45)); ctx.fill();
+  ctx.fillStyle = css(rgb);
+  ctx.fillRect(x, y, side, side);
+  ctx.fillStyle = css(mix(rgb, BLACK, 0.45));
+  ctx.fillRect(cx - side * 0.18, cy - side * 0.18, side * 0.36, side * 0.36);
+  ctx.fillStyle = 'rgba(255,255,255,.75)';
+  ctx.fillRect(x + side * 0.1, y + side * 0.1, side * 0.2, side * 0.2);
   if (alpha < 1) ctx.globalAlpha = 1;
 }
 
-// 熨烫后的融合豆（圆角方块互相搭接 + 高光）
+// 熨烫后的融合豆（像素风：方块互相搭接 + 高光条）
 function drawFused(ctx, x, y, s, palIdx) {
   const rgb = PALETTE_RGB[palIdx];
   const e = s * 0.06; // 外扩使相邻豆融合
-  if (s < 3.5) {
-    // 极小格子直接方块填充，大画布（如 256 豆）性能好一个量级
-    ctx.fillStyle = css(rgb);
-    ctx.fillRect(x - e, y - e, s + e * 2, s + e * 2);
-    return;
-  }
-  roundRect(ctx, x - e, y - e, s + e * 2, s + e * 2, s * 0.3);
-  ctx.fillStyle = css(rgb); ctx.fill();
+  ctx.fillStyle = css(rgb);
+  ctx.fillRect(x - e, y - e, s + e * 2, s + e * 2);
 }
 function drawFusedGloss(ctx, x, y, s) {
   if (s < 3.5) return; // 太小看不见高光
   ctx.fillStyle = 'rgba(255,255,255,.18)';
-  roundRect(ctx, x + s * 0.14, y + s * 0.1, s * 0.5, s * 0.22, s * 0.11);
-  ctx.fill();
+  ctx.fillRect(x + s * 0.14, y + s * 0.1, s * 0.5, s * 0.22);
 }
 
 // 图纸的逻辑尺寸
@@ -82,9 +73,17 @@ function drawPatternInto(ctx, p, opts) {
   const size = patternSize(p, opts);
   const cellPx = size.cellPx, pad = size.pad;
   const w = p.w, h = p.h, cells = p.cells;
-  roundRect(ctx, 0, 0, size.width, size.height, Math.min(16, pad));
-  ctx.fillStyle = '#FFFDF7'; ctx.fill();
-  ctx.strokeStyle = 'rgba(120,90,60,.12)'; ctx.lineWidth = 1; ctx.stroke();
+  roundRect(ctx, 1, 1, size.width - 2, size.height - 2, Math.min(4, pad * 0.3));
+  ctx.fillStyle = '#FFFFFF'; ctx.fill();
+  ctx.strokeStyle = 'rgba(35,33,58,.9)'; ctx.lineWidth = 2; ctx.stroke();
+  // 底板蒙孔（方点）
+  if (cellPx >= 5) {
+    ctx.fillStyle = 'rgba(35,33,58,.08)';
+    const d = Math.max(1, cellPx * 0.12);
+    for (let cy = 0; cy < h; cy++) for (let cx = 0; cx < w; cx++) {
+      ctx.fillRect(pad + cx * cellPx + (cellPx - d) / 2, pad + cy * cellPx + (cellPx - d) / 2, d, d);
+    }
+  }
   for (let cy = 0; cy < h; cy++) {
     for (let cx = 0; cx < w; cx++) {
       const i = cy * w + cx, t = cells[i];
@@ -128,6 +127,7 @@ function renderPatternTo(canvas, p, opts) {
  *   numbers: Map(palIdx -> 序号),
  *   getSelected: () => palIdx,
  *   getTool: () => null | 'row',
+ *   canSwipe: () => bool,  // play 模式：是否允许划动连续上豆；不允许时单指拖动改为平移（不传 = 允许）
  *   onPlace(i), onWrong(i), onToolTap(i), onIron(n)
  * }
  * 页面负责：查询 canvas 节点后 new BoardView(node, opts)，
@@ -282,7 +282,7 @@ class BoardView {
     const dx = p.x - prev.x, dy = p.y - prev.y;
     this.gesture.moved += Math.hypot(dx, dy);
     const tool = this.o.getTool ? this.o.getTool() : null;
-    if (this.o.mode === 'play' && !tool) {
+    if (this.o.mode === 'play' && !tool && (!this.o.canSwipe || this.o.canSwipe())) {
       // 沿轨迹逐格上豆，避免快速滑动漏格
       const steps = Math.ceil(Math.hypot(dx, dy) / (this.scale * 0.4)) || 1;
       for (let i = 1; i <= steps; i++) {
@@ -447,14 +447,15 @@ class BoardView {
     const s = this.scale, ox = this.ox, oy = this.oy;
     const w = this.o.w, h = this.o.h, cells = this.o.cells, placed = this.o.placed;
 
-    // 底板
+    // 底板（像素风：右下掉落式硬投影 + 白底 + 靛墨描边）
     const pad = Math.max(6, s * 0.4);
-    ctx.shadowColor = 'rgba(120,90,60,.16)';
-    ctx.shadowBlur = 16; ctx.shadowOffsetY = 4;
-    roundRect(ctx, ox - pad, oy - pad, w * s + pad * 2, h * s + pad * 2, Math.min(18, Math.max(6, s * 0.6)));
-    ctx.fillStyle = '#FFFDF7'; ctx.fill();
-    ctx.shadowColor = 'rgba(0,0,0,0)'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-    ctx.strokeStyle = 'rgba(120,90,60,.12)'; ctx.lineWidth = 1; ctx.stroke();
+    const bx = ox - pad, by = oy - pad, bw = w * s + pad * 2, bh = h * s + pad * 2;
+    const br = Math.min(4, Math.max(2, s * 0.12));
+    roundRect(ctx, bx + 5, by + 5, bw, bh, br);
+    ctx.fillStyle = 'rgba(35,33,58,.16)'; ctx.fill();
+    roundRect(ctx, bx, by, bw, bh, br);
+    ctx.fillStyle = '#FFFFFF'; ctx.fill();
+    ctx.strokeStyle = 'rgba(35,33,58,.9)'; ctx.lineWidth = 2; ctx.stroke();
 
     // 可见范围裁剪
     const x0 = clamp(Math.floor((0 - ox) / s), 0, w - 1);
@@ -485,8 +486,9 @@ class BoardView {
         const px = ox + cx * s, py = oy + cy * s;
         const mx = px + s / 2, my = py + s / 2;
         if (showPeg && !fused) {
-          ctx.beginPath(); ctx.arc(mx, my, Math.max(1, s * 0.06), 0, 7);
-          ctx.fillStyle = 'rgba(101,80,60,.10)'; ctx.fill();
+          const d = Math.max(1, s * 0.12);
+          ctx.fillStyle = 'rgba(35,33,58,.10)';
+          ctx.fillRect(mx - d / 2, my - d / 2, d, d);
         }
         if (tc < 0) continue;
         if (placed[i]) {
@@ -526,21 +528,23 @@ class BoardView {
           if (tiny) {
             ctx.fillStyle = css(rgb); ctx.fillRect(px, py, s, s);
           } else {
-            ctx.beginPath(); ctx.arc(mx, my, s * 0.38, 0, 7);
-            ctx.fillStyle = css(rgb); ctx.fill();
+            const gs = s * 0.76;
+            ctx.fillStyle = css(rgb);
+            ctx.fillRect(mx - gs / 2, my - gs / 2, gs, gs);
           }
           ctx.globalAlpha = 1;
           if (isSel && s >= 8) {
+            const ds = s * 0.84;
             ctx.setLineDash([s * 0.16, s * 0.13]);
             ctx.strokeStyle = css(mix(rgb, BLACK, 0.3), 0.75);
             ctx.lineWidth = Math.max(1, s * 0.06);
-            ctx.beginPath(); ctx.arc(mx, my, s * 0.42, 0, 7); ctx.stroke();
+            ctx.strokeRect(mx - ds / 2, my - ds / 2, ds, ds);
             ctx.setLineDash([]);
           }
           if (showNum) {
             const n = this.o.numbers.get(tc);
             if (n != null) {
-              ctx.fillStyle = 'rgba(60,45,35,.72)';
+              ctx.fillStyle = 'rgba(35,33,58,.75)';
               ctx.fillText(String(n), mx, my + s * 0.02);
               ctx.font = numFont;
             }
@@ -558,16 +562,17 @@ class BoardView {
       }
     }
 
-    // 放错提示红圈
+    // 放错提示红框（像素风：外扩的方框）
     if (this.wrongFx) {
       const k = (t - this.wrongFx.t0) / 320;
       if (k >= 1) this.wrongFx = null;
       else {
         const i = this.wrongFx.i;
         const mx = ox + (i % w) * s + s / 2, my = oy + Math.floor(i / w) * s + s / 2;
-        ctx.strokeStyle = 'rgba(224,60,50,' + (1 - k) + ')';
+        const ws = s * (0.84 + 0.6 * k);
+        ctx.strokeStyle = 'rgba(232,80,79,' + (1 - k) + ')';
         ctx.lineWidth = Math.max(1.5, s * 0.09);
-        ctx.beginPath(); ctx.arc(mx, my, s * (0.42 + 0.3 * k), 0, 7); ctx.stroke();
+        ctx.strokeRect(mx - ws / 2, my - ws / 2, ws, ws);
       }
     }
 
@@ -579,10 +584,9 @@ class BoardView {
         if (kk >= 1) { this.steam.splice(k, 1); continue; }
         const x = sp.x + Math.sin(age * 0.008 + sp.seed) * 6;
         const y = sp.y - age * 0.05;
-        ctx.beginPath();
-        ctx.arc(x, y, sp.r * (1 + 1.8 * kk), 0, 7);
+        const sr = sp.r * (1 + 1.8 * kk);
         ctx.fillStyle = 'rgba(255,255,255,' + (0.38 * (1 - kk)) + ')';
-        ctx.fill();
+        ctx.fillRect(x - sr, y - sr, sr * 2, sr * 2);
       }
       if (this.ironPos && this.pointers.size >= 1) {
         drawIron(ctx, this.ironPos.x, this.ironPos.y, this._ironSize());
@@ -632,15 +636,15 @@ function drawIron(ctx, x, y, s) {
   ctx.scale(0.72, 0.64);
   plate();
   const bg = ctx.createLinearGradient(-w, 0, w, 0);
-  bg.addColorStop(0, '#E8623A');
-  bg.addColorStop(0.5, '#FF8E60');
-  bg.addColorStop(1, '#D9552F');
+  bg.addColorStop(0, '#2E5BB8');
+  bg.addColorStop(0.5, '#5B8AE8');
+  bg.addColorStop(1, '#27499A');
   ctx.fillStyle = bg;
   ctx.fill();
   ctx.restore();
   // 手柄
   roundRect(ctx, -w * 0.38, -s * 0.04, w * 0.76, s * 0.2, s * 0.1);
-  ctx.fillStyle = '#54382A';
+  ctx.fillStyle = '#23213A';
   ctx.fill();
   // 蒸汽孔
   ctx.fillStyle = 'rgba(90,100,110,.65)';

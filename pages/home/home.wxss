@@ -1,20 +1,123 @@
 .home { padding-bottom: 40px; }
 
-.home-header { text-align: center; padding: 26px 0 20px; }
-.h1 { font-size: 30px; font-weight: 800; letter-spacing: 2px; }
-.h-sub { color: var(--ink2); margin-top: 6px; font-size: 14px; }
+.home-header { text-align: center; padding: 8px 0 20px; }
 
+/* ================= 云朵地平线小场景 ================= */
+.px-scene {
+  position: relative;
+  height: 100px;
+  margin: 2px 0 0;
+  border-bottom: 2.5px dashed rgba(35, 33, 58, .8); /* 地平线 */
+}
+
+/* 像素太阳（104×88 内联 PNG） */
+.sun {
+  position: absolute;
+  right: 18px;
+  top: 0;
+  width: 46px;
+  height: 39px;
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGgAAABYCAYAAAAZZrIMAAABbUlEQVR4Ae3BsU0cUQBF0fufVvJEFOAMETIFrOiEwNU5oBM0BQwhInMBRONo3MEkK7R38TtncOO2Zd45MJ3XwQ0LpRZKLZRaKLVQaqHUQqmFUgulFkotlFootVBqodRCqQ0utC3zzoHpvA6+sW2Zdw5M53VwgVBqodRCqYVSC6UWSi2U2uDKHu6fdsTeP14HVxRKLZRaKLVQaqHUQqmFUjsh9/byyVd6fL7DLJRaKLVQaqHUQqmFUguldtqWeecC03kdXNGPn7848vfPb65pW+adC4RSC6UWSi2UWii1UGqh1AZX9nD/tHPg7eWTr/T4fMeR94/XwRWFUgulFkotlFootVBqodROyD0+3/E/C6UWSi2UWii1UGqh1EKpDS60LfPOgem8Dr6xbZl3DkzndXCBUGqh1EKphVILpRZKLZTa4MZty7xzYDqvgxsWSi2UWii1UGqh1EKphVILpRZKLZRaKLVQaqHUQqmFUvsH3EwxLlIKlY0AAAAASUVORK5CYII=");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+
+/* 圆包像素云（112×56 内联 PNG） */
+.cloud {
+  position: absolute;
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHAAAAA4CAYAAAAl63xKAAAA7klEQVR4Ae3Bi42EMABDwRd3AqEKqB+q4FNKroOsdGgVeeWZwmB1WhsDXc9RMCbCmghrIqyJsCbCmghrIqwVvqxOa6PjvHdGWuaNN67nKAwkwpoIayKsibAmwpoIayKsFV6q09roOO+dX7bMG29cz1F4QYQ1EdZEWBNhTYQ1EdZEWCt8UKe10XHeO/F/y7zRcz1HoUOENRHWRFgTYU2ENRHWRFgrdVobHee9E+Ms80aPCGsirImwJsKaCGsirImwJsKaCGsirImwJsKaCGsirImwVvigTmsjhrmeo9AhwpoIayKsibAmwpoIayKs/QHA7yHoGA98eAAAAABJRU5ErkJggg==");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+.c1 { left: 12px; top: 16px; width: 84px; height: 42px; animation: drift 9s ease-in-out infinite; }
+.c2 { right: 76px; top: 2px; width: 62px; height: 31px; animation: drift 12s ease-in-out infinite reverse; }
+@keyframes drift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(12px); }
+}
+
+/* 像素十字星（闪烁） */
+.spark { position: absolute; animation: twk 2.4s ease-in-out infinite; }
+.spark::before, .spark::after { content: ''; position: absolute; }
+.sp1 { width: 12px; height: 12px; left: 36%; top: 30px; }
+.sp1::before { left: 4px; top: 0; width: 4px; height: 12px; background: var(--coin); }
+.sp1::after { left: 0; top: 4px; width: 12px; height: 4px; background: var(--coin); }
+.sp2 { width: 10px; height: 10px; right: 26%; top: 10px; animation-delay: .9s; }
+.sp2::before { left: 3.5px; top: 0; width: 3px; height: 10px; background: var(--accent); }
+.sp2::after { left: 0; top: 3.5px; width: 10px; height: 3px; background: var(--accent); }
+@keyframes twk {
+  0%, 100% { transform: scale(1); opacity: .9; }
+  50% { transform: scale(.5); opacity: .35; }
+}
+
+/* 草丛 */
+.grass { position: absolute; bottom: 0; width: 4px; height: 4px; background: #57B96A; }
+.grass::before { content: ''; position: absolute; left: 4px; top: -4px; width: 4px; height: 8px; background: #57B96A; }
+.grass::after { content: ''; position: absolute; left: 8px; top: 0; width: 4px; height: 4px; background: #57B96A; }
+.g1 { left: 11%; }
+.g2 { right: 9%; }
+
+/* 落地阴影 */
+.gshadow { position: absolute; bottom: 1px; height: 3px; background: rgba(35, 33, 58, .15); }
+.gs-m { left: calc(50% - 73px); width: 44px; }
+.gs-b { left: calc(50% - 20px); width: 94px; }
+
+/* 吉祥物「豆豆」：站在地平线上，可戳（睁眼/眨眼两帧内联 PNG，16×16 大眼可爱版） */
+.mascot {
+  position: absolute;
+  left: calc(50% - 75px);
+  bottom: 0;
+  width: 48px;
+  height: 48px;
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAACTElEQVR4Ae3BMW4TQQCF4X+eXKXOBTabessUGy5DwQkokbZYiZITRCKXAReUW8f4AtRuhxMwkTKyYvPe9xUu3DjMlSt2OO4LF0yENRHWRFgTYU2ENRHWRFgrnNk4zJUO21q4ZtNS6XE47gtnJMKaCGsirImwJsKaCGsirBU6jcNcadjWQrzdtFRaDsd9oYMIayKsibAmwpoIayKsibBWeMU4zJWGbS203Hz4TI/Tj2/Ev01LpeVw3BcaRFgTYU2ENRHWRFgTYU2EtR3v7PTjG/F+RFgTYU2ENRHWRFgTYU2EtTIOc6VhWwvnNC2VlpffP2m5v3ukZVsLPaal0vLy+yct93ePtGxr4ZympdIiwpoIayKsibAmwpoIayKsibAmwpoIayKsibAmwpoIayKs7bhw93ePXLL7u0eumQhrIqyJsCbCmghrIqyJsLaj082fj/T5jrObPx/pcbp9pocIayKsibAmwpoIayKsibAmwpoIayKsibAmwpoIayKsibC2o9Pp9pke21o4p69Pv+ixrQ+c04ln3pMIayKsibAmwpoIayKsibBWeMU4zJWGbS1csq9Pv+jx5dMDl2xaKi2H477QIMKaCGsirImwJsKaCGsirO34z3359ED8mwhrIqyJsCbCmghrIqyJsFboNA5zpWFbC/F201JpORz3hQ4irImwJsKaCGsirImwJsJa4czGYa502NbCNZuWSo/DcV84IxHWRFgTYU2ENRHWRFgTYa1w4cZhrlyxw3FfuGAirImwJsKaCGsirImwJsLaX5ckWtpJgT4MAAAAAElFTkSuQmCC");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+.mascot.blink {
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAACMUlEQVR4Ae3BIU7sUACF4f+ejEKzgaa+EtG8zSBYwZMkFU2QrADBZkgFsr6ZDaDH3rcCSsLNZGbeOd9XuHJ9N1Zu2HZcCldMhDUR1kRYE2FNhDUR1kRYK5xZ342VButcuGXDVGmxHZfCGYmwJsKaCGsirImwJsKaCGuFRn03VnascyF+b5gqe7bjUmggwpoIayKsibAmwpoIayKsFX7Qd2NlxzoX9tz9+UuL08cr8b1hquzZjkthhwhrIqyJsCbCmghrIqyJsHbgwk4fr8TliLAmwpoIayKsibAmwpoIa6XvxsqOdS7E7Rqmyh4R1kRYE2FNhDUR1kRYE2FNhDUR1kRYE2FNhDUR1kRYE2HtwIUNU+Wc1rnQYpgq57TOhUsSYU2ENRHWRFgTYU2ENRHWDjS6+3qkxTq/c83WuXBOd1+PtDjdv9NChDUR1kRYE2FNhDUR1kRYE2FNhDUR1kRYE2FNhDUR1kRYO9DodP/ONXt5+6TF89MD53S6f+eSRFgTYU2ENRHWRFgTYU2EtcIP+m6s7FjnwjV7efukxfPTA9dsmCp7tuNS2CHCmghrIqyJsCbCmghrIqwd+M89Pz0Q3xNhTYQ1EdZEWBNhTYQ1EdYKjfpurOxY50L83jBV9mzHpdBAhDUR1kRYE2FNhDUR1kRYK5xZ342VButcuGXDVGmxHZfCGYmwJsKaCGsirImwJsKaCGuFK9d3Y+WGbcelcMVEWBNhTYQ1EdZEWBNhTYS1f5PTVM15acthAAAAAElFTkSuQmCC");
+}
+.mascot.jump { animation: pjump .5s ease-out; }
+.mascot.wobble { animation: pwobble .8s ease-in-out; }
+@keyframes pjump {
+  0% { transform: translateY(0) scale(1, 1); }
+  14% { transform: translateY(3px) scale(1.14, .84); }
+  45% { transform: translateY(-20px) scale(.94, 1.1); }
+  72% { transform: translateY(0) scale(1.08, .92); }
+  100% { transform: translateY(0) scale(1, 1); }
+}
+@keyframes pwobble {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(-14deg); }
+  35% { transform: rotate(12deg); }
+  55% { transform: rotate(-9deg); }
+  75% { transform: rotate(6deg); }
+}
+
+/* 三颗方豆 logo：站在地平线上，可弹（像素方豆：方块 + 方孔 + 硬高光） */
 .logo-dots {
+  position: absolute;
+  left: calc(50% - 19px);
+  bottom: 2px;
   display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 14px;
+  gap: 8px;
 }
 .ld {
   width: 26px;
   height: 26px;
-  border-radius: 50%;
+  border-radius: 0;
+  border: 3px solid var(--ink);
   position: relative;
+  box-shadow: inset 3px 3px 0 rgba(255, 255, 255, .45);
+}
+.ld.pop { animation: bpop .42s ease-out; }
+@keyframes bpop {
+  0% { transform: scale(1, 1); }
+  30% { transform: scale(1.25, .7) translateY(3px); }
+  60% { transform: scale(.85, 1.2) translateY(-7px); }
+  100% { transform: scale(1, 1); }
 }
 .ld-hole {
   position: absolute;
@@ -22,27 +125,80 @@
   top: 32%;
   right: 32%;
   bottom: 32%;
-  border-radius: 50%;
+  border-radius: 0;
 }
-.ld1 { background: radial-gradient(circle at 34% 30%, #FFB39F, #FF7D54 58%, #D95B33); box-shadow: 0 3px 6px rgba(217, 91, 51, .3); }
-.ldh1 { background: #A8431F; }
-.ld2 { background: radial-gradient(circle at 34% 30%, #9ED2F5, #57ACE8 58%, #3B7FBB); box-shadow: 0 3px 6px rgba(59, 127, 187, .3); }
-.ldh2 { background: #2A5E8F; }
-.ld3 { background: radial-gradient(circle at 34% 30%, #FFE38A, #FFC913 58%, #D9A400); box-shadow: 0 3px 6px rgba(217, 164, 0, .3); }
-.ldh3 { background: #A87F00; }
+.ld1 { background: var(--accent); }
+.ldh1 { background: var(--accent-dark); }
+.ld2 { background: var(--blue); }
+.ldh2 { background: var(--blue-dark); }
+.ld3 { background: var(--coin); }
+.ldh3 { background: var(--coin-dark); }
+
+/* 表情泡 */
+.emote {
+  position: absolute;
+  top: 6px;
+  transform: translate(-50%, 0);
+  background: #fff;
+  border: 2.5px solid var(--ink);
+  padding: 2px 8px;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+  z-index: 3;
+  animation: emoterise .85s ease-out forwards;
+}
+@keyframes emoterise {
+  0% { transform: translate(-50%, 0) scale(.4); opacity: 0; }
+  20% { transform: translate(-50%, -8px) scale(1.15); opacity: 1; }
+  100% { transform: translate(-50%, -32px) scale(1); opacity: 0; }
+}
+
+/* ================= 标题（四个字可跳舞） ================= */
+.h1 {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+.h1c {
+  font-size: 30px;
+  font-weight: 800;
+  text-shadow: 3px 3px 0 rgba(232, 80, 79, .25);
+}
+.h1.wave .h1c { animation: chb .45s ease-out both; }
+.h1.wave .h1c:nth-child(2) { animation-delay: .08s; }
+.h1.wave .h1c:nth-child(3) { animation-delay: .16s; }
+.h1.wave .h1c:nth-child(4) { animation-delay: .24s; }
+@keyframes chb {
+  0% { transform: translateY(0); }
+  40% { transform: translateY(-11px) scale(1.12); }
+  100% { transform: translateY(0); }
+}
+
+.h-sub { color: var(--ink2); margin-top: 6px; font-size: 14px; }
 
 .cta-new {
   display: block;
   width: 100%;
-  padding: 16px;
+  padding: 15px;
   background: var(--accent);
   color: #fff;
   font-size: 17px;
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: 3px;
   text-align: center;
-  border-radius: var(--radius);
-  box-shadow: 0 6px 18px rgba(255, 125, 84, .35);
+  border: 3px solid var(--ink);
+  border-radius: 0;
+  box-shadow: 5px 5px 0 var(--accent-dark);
   transition: transform .12s;
+}
+.cta-new.pump { animation: pump .4s ease-out; }
+@keyframes pump {
+  0% { transform: translate(0, 0); }
+  30% { transform: translate(3px, 3px); }
+  65% { transform: translate(-1px, -1px); }
+  100% { transform: translate(0, 0); }
 }
 
 .home-tabs { margin-top: 16px; }
@@ -54,8 +210,8 @@
   padding: 48px 20px;
   line-height: 1.9;
   font-size: 15px;
-  border: 2px dashed var(--line);
-  border-radius: var(--radius);
+  border: 3px dashed rgba(35, 33, 58, .3);
+  border-radius: 0;
   margin-top: 8px;
 }
 
@@ -73,7 +229,8 @@
 
 .work-card {
   background: var(--card);
-  border-radius: var(--radius);
+  border: 3px solid var(--ink);
+  border-radius: 0;
   box-shadow: var(--shadow);
   overflow: hidden;
   position: relative;
@@ -82,7 +239,7 @@
 .wc-thumb {
   width: 100%;
   padding-top: 100%; /* 1:1，兼容不支持 aspect-ratio 的旧内核 */
-  background: #FBF7EF;
+  background: #F4F2FB;
   position: relative;
 }
 .wc-thumb image {
@@ -97,14 +254,15 @@
   position: absolute;
   left: 8px;
   top: 8px;
-  background: #4CAF50;
+  background: #57B96A;
   color: #fff;
   font-size: 11px;
   padding: 3px 8px;
-  border-radius: 999px;
-  font-weight: 600;
+  border: 2px solid var(--ink);
+  border-radius: 0;
+  font-weight: 700;
 }
-.wc-badge.iron { background: var(--accent); }
+.wc-badge.iron { background: var(--coin); color: var(--ink); }
 .wc-body { padding: 10px 12px 12px; }
 .wc-name {
   font-weight: 700;
@@ -115,17 +273,19 @@
 }
 .wc-meta { color: var(--ink2); font-size: 12px; margin-top: 3px; }
 .wc-progress {
-  height: 5px;
-  background: #F0E9DE;
-  border-radius: 3px;
+  height: 10px;
+  background: var(--chipbg);
+  border: 2px solid var(--ink);
+  border-radius: 0;
   margin-top: 8px;
   overflow: hidden;
 }
 .wc-progress .fill {
   display: block;
   height: 100%;
-  background: var(--accent);
-  border-radius: 3px;
+  /* 像素分段进度条 */
+  background: repeating-linear-gradient(90deg, var(--accent) 0, var(--accent) 6px, #F3766F 6px, #F3766F 8px);
+  border-radius: 0;
 }
 .wc-del {
   position: absolute;
@@ -133,12 +293,14 @@
   top: 6px;
   width: 26px;
   height: 26px;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, .28);
-  color: #fff;
+  border-radius: 0;
+  background: var(--card);
+  border: 2px solid var(--ink);
+  color: var(--ink);
   font-size: 12px;
+  font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: .75;
+  opacity: .92;
 }

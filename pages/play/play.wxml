@@ -30,7 +30,11 @@
         <view class="tool-chip {{rowActive ? 'active' : ''}} {{rowCount ? '' : 'locked'}}" bindtap="tapRowTool">
           {{rowCount ? '⚡ 整排拼豆 ' : '🔒 整排拼豆 '}}<text class="b">×{{rowCount}}</text>
         </view>
-        <view class="tools-hint">选颜色，点或划格子上豆</view>
+        <view class="tool-chip {{swipeActive ? 'active' : ''}}" bindtap="tapSwipe">
+          <block wx:if="{{swipeActive}}">🖐️ 滑动中 <text class="b">{{swipeLeft}}s</text></block>
+          <block wx:else>📺 滑动拼豆</block>
+        </view>
+        <view class="tools-hint">{{swipeActive ? '划过格子连续上豆！' : '选颜色，点格子上豆'}}</view>
       </view>
       <scroll-view class="palette-bar" scroll-x scroll-into-view="{{scrollInto}}"
                    scroll-with-animation enhanced show-scrollbar="{{false}}">

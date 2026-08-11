@@ -1,15 +1,31 @@
 <view class="screen home" style="padding-top:{{padTop}}px">
   <view class="home-header">
-    <view class="logo-dots">
-      <view class="ld ld1"><view class="ld-hole ldh1" /></view>
-      <view class="ld ld2"><view class="ld-hole ldh2" /></view>
-      <view class="ld ld3"><view class="ld-hole ldh3" /></view>
+    <!-- 云朵地平线小场景：装饰 + 轻互动（点豆豆/豆子/标题有动画音效；连戳豆豆 5 下撒花） -->
+    <view class="px-scene">
+      <view class="sun" />
+      <view class="cloud c1" />
+      <view class="cloud c2" />
+      <view class="spark sp1" />
+      <view class="spark sp2" />
+      <view class="grass g1" />
+      <view class="grass g2" />
+      <view class="gshadow gs-m" />
+      <view class="gshadow gs-b" />
+      <view class="mascot {{mAnim}} {{mBlink ? 'blink' : ''}}" bindtap="tapMascot" />
+      <view class="logo-dots">
+        <view class="ld ld1 {{b0}}" bindtap="tapBead" data-i="0"><view class="ld-hole ldh1" /></view>
+        <view class="ld ld2 {{b1}}" bindtap="tapBead" data-i="1"><view class="ld-hole ldh2" /></view>
+        <view class="ld ld3 {{b2}}" bindtap="tapBead" data-i="2"><view class="ld-hole ldh3" /></view>
+      </view>
+      <view wx:for="{{emotes}}" wx:key="id" class="emote" style="left:{{item.x}}">{{item.txt}}</view>
     </view>
-    <view class="h1">指尖拼豆</view>
+    <view class="h1 {{titleWave ? 'wave' : ''}}" bindtap="tapTitle">
+      <text class="h1c">指</text><text class="h1c">尖</text><text class="h1c">拼</text><text class="h1c">豆</text>
+    </view>
     <view class="h-sub">把喜欢的图片，一颗一颗拼出来</view>
   </view>
 
-  <view class="cta-new" hover-class="pressed" bindtap="goCreate">＋ 开始新作品</view>
+  <view class="cta-new {{ctaAnim}}" hover-class="pressed" bindtap="goCreate">＋ 开始新作品</view>
 
   <view class="tabs home-tabs">
     <view class="tab {{tab === 'doing' ? 'active' : ''}}" bindtap="switchTab" data-tab="doing">🧵 进行中{{doing.length ? ' · ' + doing.length : ''}}</view>
@@ -48,4 +64,5 @@
   </view>
 </view>
 
+<canvas wx:if="{{celebrating}}" type="2d" id="confetti" class="confetti"></canvas>
 <canvas type="2d" id="util" class="util-canvas" style="width:{{capW}}px;height:{{capH}}px"></canvas>

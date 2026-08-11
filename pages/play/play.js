@@ -6,7 +6,9 @@ const { BoardView, renderPatternTo } = require('../../utils/board');
 const { audio } = require('../../utils/audio');
 const { celebrate } = require('../../utils/confetti');
 const ui = require('../../utils/ui');
-const { DEBUG, FREE_ROW_USES } = require('../../utils/config');
+const { DEBUG, FREE_ROW_USES, SWIPE_AD_SECONDS, SWIPE_AD_UNIT_ID } = require('../../utils/config');
+
+const SWIPE_KEY = 'pindou.swipeUntil'; // 滑动拼豆到期时间戳（跨作品/跨会话有效）
 
 Page({
   data: {
@@ -18,6 +20,8 @@ Page({
     chips: [],
     rowCount: 0,
     rowActive: false,
+    swipeActive: false,
+    swipeLeft: 0,
     muted: false,
     debug: DEBUG,
     total: 0,
@@ -57,6 +61,10 @@ Page({
     this.pending = [];
     this.flushTimer = 0;
     this.saveTimer = 0;
+    // 滑动拼豆权限：平时只能点按上豆，看广告解锁限时滑动
+    this.swipeUntil = 0;
+    try { this.swipeUntil = +wx.getStorageSync(SWIPE_KEY) || 0; } catch (e) { /* 忽略 */ }
+    this.swipeTimer = 0;
 
     const chips = this.colorsUsed.map((pal, i) => {
       const n = this.remaining.get(pal);
@@ -79,6 +87,7 @@ Page({
       colorN: this.colorsUsed.length,
       pct: this._pct(),
     });
+    if (Date.now() < this.swipeUntil) this._startSwipeTicker();
   },
 
   onReady() {
@@ -97,6 +106,7 @@ Page({
   onUnload() {
     this._gone = true;
     clearTimeout(this.flushTimer);
+    clearInterval(this.swipeTimer);
     this._flushSave();
     if (this.bv) this.bv.destroy();
   },
@@ -116,6 +126,7 @@ Page({
         numbers: this.numbers,
         getSelected: () => this.sel,
         getTool: () => this.tool,
+        canSwipe: () => Date.now() < this.swipeUntil,
         onPlace: i => this._onPlace(i),
         onWrong: () => {
           audio.wrong();
@@ -191,6 +202,61 @@ Page({
     if (this.tool) ui.toast('点任意一行，整排自动拼好');
     this.setData({ rowActive: !!this.tool });
     if (this.bv) this.bv.requestRender();
+  },
+
+  /* ---------- 滑动拼豆（看广告限时解锁） ---------- */
+  tapSwipe() {
+    if (this.finished) return;
+    if (Date.now() < this.swipeUntil) {
+      ui.toast('滑动拼豆还剩 ' + Math.ceil((this.swipeUntil - Date.now()) / 1000) + ' 秒');
+      return;
+    }
+    this._unlockSwipe();
+  },
+
+  // 广告位预留：配置 SWIPE_AD_UNIT_ID 后改用激励视频，看完发放时长——
+  //   this._swipeAd = this._swipeAd || wx.createRewardedVideoAd({ adUnitId: SWIPE_AD_UNIT_ID });
+  //   this._swipeAd.onClose(res => { if (res && res.isEnded) this._grantSwipe(); });
+  //   this._swipeAd.show().catch(() => this._swipeAd.load().then(() => this._swipeAd.show()));
+  // 接入前：弹窗说明后直接发放体验时长
+  _unlockSwipe() {
+    if (SWIPE_AD_UNIT_ID) {
+      ui.toast('广告加载失败，稍后再试');
+      return;
+    }
+    wx.showModal({
+      title: '解锁滑动拼豆',
+      content: '看一段广告，即可获得 ' + SWIPE_AD_SECONDS + ' 秒「划过格子连续上豆」\n（广告位接入前先免费体验）',
+      confirmText: '立即解锁',
+      confirmColor: '#E8504F',
+      success: r => { if (r.confirm) this._grantSwipe(); },
+    });
+  },
+
+  _grantSwipe() {
+    if (this._gone) return;
+    this.swipeUntil = Date.now() + SWIPE_AD_SECONDS * 1000;
+    try { wx.setStorageSync(SWIPE_KEY, this.swipeUntil); } catch (e) { /* 忽略 */ }
+    ui.toast('滑动拼豆已开启，' + SWIPE_AD_SECONDS + ' 秒内随便划 ✨');
+    this._startSwipeTicker();
+  },
+
+  _startSwipeTicker() {
+    clearInterval(this.swipeTimer);
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((this.swipeUntil - Date.now()) / 1000));
+      const active = left > 0;
+      if (left !== this.data.swipeLeft || active !== this.data.swipeActive) {
+        this.setData({ swipeActive: active, swipeLeft: left });
+      }
+      if (!active) {
+        clearInterval(this.swipeTimer);
+        this.swipeTimer = 0;
+        ui.toast('滑动时间用完啦，点按继续拼～');
+      }
+    };
+    tick();
+    this.swipeTimer = setInterval(tick, 500);
   },
 
   _onToolTap(i) {
@@ -291,7 +357,7 @@ Page({
     });
     if (this.utilCanvas) {
       this.uq(() => ui.makeThumb(this, this.utilCanvas, work, false))
-        .then(path => store.update(work.id, { thumb: path, thumbV: 4 }))
+        .then(path => store.update(work.id, { thumb: path, thumbV: 6 }))
         .catch(() => { /* 缩略图失败不影响流程 */ });
     }
     if (this.bv) this.bv.o.mode = 'view';

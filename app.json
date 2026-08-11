@@ -8,9 +8,9 @@
   ],
   "window": {
     "navigationStyle": "custom",
-    "backgroundColor": "#FAF6EF",
+    "backgroundColor": "#F3EFDF",
     "backgroundTextStyle": "dark",
-    "navigationBarBackgroundColor": "#FAF6EF",
+    "navigationBarBackgroundColor": "#F3EFDF",
     "navigationBarTitleText": "指尖拼豆",
     "navigationBarTextStyle": "black"
   },

@@ -65,7 +65,7 @@
                   bindtap="setSize" data-n="{{item}}">{{item}} 豆</view>
           </view>
           <slider class="opt-slider" min="{{sizeMin}}" max="{{sizeMax}}" value="{{size}}" step="1"
-                  activeColor="#FF7D54" backgroundColor="#F0E9DE" block-size="20"
+                  activeColor="#E8504F" backgroundColor="#E4E1F2" block-size="20"
                   bindchange="onSizeSlider" />
           <view class="opt-hint">{{sizeHint}}</view>
         </view>
@@ -75,12 +75,12 @@
             <view class="opt-val">{{colorVal}} 色</view>
           </view>
           <slider class="opt-slider" min="2" max="{{colorMax}}" value="{{colorVal}}" step="1"
-                  activeColor="#FF7D54" backgroundColor="#F0E9DE" block-size="20"
+                  activeColor="#E8504F" backgroundColor="#E4E1F2" block-size="20"
                   bindchange="onColorSlider" />
         </view>
         <view class="switch-row">
           <view class="sw-label">白色背景不拼豆<text class="sw-small">适合白底图片</text></view>
-          <switch checked="{{whiteEmpty}}" color="#FF7D54" bindchange="onWhiteChange" />
+          <switch checked="{{whiteEmpty}}" color="#E8504F" bindchange="onWhiteChange" />
         </view>
       </block>
 
@@ -95,3 +95,5 @@
 </view>
 
 <canvas type="2d" id="util" class="util-canvas" style="width:{{capW}}px;height:{{capH}}px"></canvas>
+<!-- 图片解码专用画布：与模板缩略图的导出队列分离，选图后立即可用 -->
+<canvas type="2d" id="util2" class="util-canvas"></canvas>
