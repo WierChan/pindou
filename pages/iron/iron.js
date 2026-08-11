@@ -2,7 +2,7 @@
 const { store } = require('../../utils/store');
 const { PALETTE } = require('../../utils/palette');
 const { colorStats } = require('../../utils/convert');
-const { BoardView, renderPatternTo } = require('../../utils/board');
+const { BoardView, renderPatternTo, getBeadShape } = require('../../utils/board');
 const { buildExportTo } = require('../../utils/share');
 const { audio } = require('../../utils/audio');
 const { celebrate } = require('../../utils/confetti');
@@ -146,7 +146,7 @@ Page({
     });
     if (this.utilCanvas) {
       this.uq(() => ui.makeThumb(this, this.utilCanvas, work, true))
-        .then(path => store.update(work.id, { thumb: path, thumbV: 6 }))
+        .then(path => store.update(work.id, { thumb: path, thumbV: 6, thumbShape: getBeadShape() }, true))
         .catch(() => { /* 忽略 */ });
     }
     setTimeout(() => {

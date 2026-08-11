@@ -2,7 +2,7 @@
 const { store } = require('../../utils/store');
 const { PALETTE, textColorFor } = require('../../utils/palette');
 const { colorStats } = require('../../utils/convert');
-const { BoardView, renderPatternTo } = require('../../utils/board');
+const { BoardView, renderPatternTo, getBeadShape, setBeadShape } = require('../../utils/board');
 const { audio } = require('../../utils/audio');
 const { celebrate } = require('../../utils/confetti');
 const ui = require('../../utils/ui');
@@ -22,6 +22,7 @@ Page({
     rowActive: false,
     swipeActive: false,
     swipeLeft: 0,
+    beadShape: 'square',
     muted: false,
     debug: DEBUG,
     total: 0,
@@ -82,6 +83,7 @@ Page({
       title: work.name,
       chips,
       rowCount: work.boostRow,
+      beadShape: getBeadShape(),
       muted: audio.muted,
       total: this.total,
       colorN: this.colorsUsed.length,
@@ -162,6 +164,14 @@ Page({
   toggleMute() {
     audio.setMuted(!audio.muted);
     this.setData({ muted: audio.muted });
+  },
+  // 豆子形状切换：全局生效（画板/预览/缩略图/分享图同一套绘制）
+  toggleShape() {
+    const s = getBeadShape() === 'round' ? 'square' : 'round';
+    setBeadShape(s);
+    this.setData({ beadShape: s });
+    if (this.bv) this.bv.requestRender();
+    ui.toast(s === 'round' ? '已切换为圆形豆子 ●' : '已切换为方形豆子 ■');
   },
   debugFill() {
     if (this.finished || !this.bv) return;
@@ -357,7 +367,7 @@ Page({
     });
     if (this.utilCanvas) {
       this.uq(() => ui.makeThumb(this, this.utilCanvas, work, false))
-        .then(path => store.update(work.id, { thumb: path, thumbV: 6 }))
+        .then(path => store.update(work.id, { thumb: path, thumbV: 6, thumbShape: getBeadShape() }, true))
         .catch(() => { /* 缩略图失败不影响流程 */ });
     }
     if (this.bv) this.bv.o.mode = 'view';

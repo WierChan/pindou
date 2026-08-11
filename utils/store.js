@@ -27,6 +27,7 @@ function summarize(work) {
     completed: !!work.completed, ironDone: !!work.ironDone,
     thumb: work.thumb || '',
     thumbV: work.thumbV || 0,
+    thumbShape: work.thumbShape || '',
     createdAt: work.createdAt, updatedAt: work.updatedAt,
     completedAt: work.completedAt || 0,
   };
@@ -68,10 +69,13 @@ const store = {
     syncIndex(work);
     return work;
   },
-  update(id, patch) {
+  // quiet=true：静默更新（如缩略图重生成），不刷新 updatedAt，
+  // 避免把没有真实活跃的作品顶到首页"进行中"最前面
+  update(id, patch, quiet) {
     const work = this.get(id);
     if (!work) return null;
-    Object.assign(work, patch, { updatedAt: Date.now() });
+    Object.assign(work, patch);
+    if (!quiet) work.updatedAt = Date.now();
     try { wx.setStorageSync(WORK_KEY(id), work); }
     catch (e) { console.warn('保存失败（可能空间不足）', e); }
     syncIndex(work);

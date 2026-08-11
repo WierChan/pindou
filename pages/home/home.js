@@ -2,6 +2,7 @@
 const { store } = require('../../utils/store');
 const { audio } = require('../../utils/audio');
 const { celebrate } = require('../../utils/confetti');
+const { getBeadShape } = require('../../utils/board');
 const ui = require('../../utils/ui');
 
 const EMOTES = ['♪', '★', '!', '✦', '♥'];
@@ -36,12 +37,15 @@ Page({
   onHide() { this._stopFx(); },
   onUnload() { this._stopFx(); },
 
-  // 老缩略图需要重新生成：v4 之前可能只截到局部，v5 起为像素方豆，v6 起豆子去描边。
+  // 老缩略图需要重新生成：v4 之前可能只截到局部，v5 起为像素方豆，v6 起豆子去描边；
+  // 另外豆子形状设置变化后（thumbShape 与当前不一致）也重新生成。
   // 失败不写版本号（下次启动还能重试），只在本次会话内跳过，避免每次 onShow 反复重跑。
   _healThumbs() {
     if (this._healing) return;
+    const shape = getBeadShape();
     const tried = this._healTried || (this._healTried = {});
-    const list = store.list().filter(s => (!s.thumbV || s.thumbV < 6) && !tried[s.id]);
+    const list = store.list().filter(s =>
+      (!s.thumbV || s.thumbV < 6 || (s.thumbShape || 'square') !== shape) && !tried[s.id + '|' + shape]);
     if (!list.length) return;
     this._healing = true;
     ui.queryNode(this, '#util').then(r => {
@@ -51,10 +55,11 @@ Page({
         chain = chain.then(() => {
           const work = store.get(s.id);
           if (!work) return null;
-          tried[s.id] = 1;
           return ui.makeThumb(this, r.node, work, !!work.ironDone)
-            .then(path => { store.update(work.id, { thumb: path, thumbV: 6 }); })
-            .catch(() => { /* 保留旧图，下次启动再试 */ });
+            .then(path => { store.update(work.id, { thumb: path, thumbV: 6, thumbShape: shape }, true); })
+            // 只在失败时标记跳过（保留旧图，本次会话不再重试）；
+            // 成功后 thumbShape 已更新，来回切换形状时才能每次都重新生成
+            .catch(() => { tried[s.id + '|' + shape] = 1; });
         });
       }
       chain.then(() => {

@@ -3,7 +3,7 @@ const { store } = require('../../utils/store');
 const { PALETTE } = require('../../utils/palette');
 const { loadImageToData, emojiToData, imageToPattern, colorStats, reduceColors } = require('../../utils/convert');
 const { TEMPLATES, templatePattern } = require('../../utils/templates');
-const { renderPatternTo, patternSize } = require('../../utils/board');
+const { renderPatternTo, patternSize, getBeadShape } = require('../../utils/board');
 const ui = require('../../utils/ui');
 const { FREE_ROW_USES } = require('../../utils/config');
 
@@ -283,7 +283,7 @@ Page({
     store.update(work.id, { boostRow: FREE_ROW_USES });
     const go = () => wx.redirectTo({ url: '/pages/play/play?id=' + work.id });
     this.uq(() => ui.makeThumb(this, this.utilCanvas, work, false))
-      .then(path => { store.update(work.id, { thumb: path, thumbV: 6 }); go(); })
+      .then(path => { store.update(work.id, { thumb: path, thumbV: 6, thumbShape: getBeadShape() }, true); go(); })
       .catch(go);
   },
 

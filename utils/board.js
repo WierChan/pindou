@@ -7,6 +7,15 @@ const css = (rgb, a) => a == null || a >= 1
   : 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',' + a + ')';
 const mix = (c1, c2, t) => [0, 1, 2].map(i => Math.round(c1[i] + (c2[i] - c1[i]) * t));
 const BLACK = [35, 33, 58]; // 像素风描边靛墨
+
+/* ---- 豆子形状：'square' 方形像素豆 / 'round' 圆形经典豆（全局设置，持久化） ---- */
+let BEAD_SHAPE = 'square';
+try { if (wx.getStorageSync('pindou.beadShape') === 'round') BEAD_SHAPE = 'round'; } catch (e) { /* 忽略 */ }
+function getBeadShape() { return BEAD_SHAPE; }
+function setBeadShape(s) {
+  BEAD_SHAPE = s === 'round' ? 'round' : 'square';
+  try { wx.setStorageSync('pindou.beadShape', BEAD_SHAPE); } catch (e) { /* 忽略 */ }
+}
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const now = () => Date.now();
 
@@ -21,40 +30,69 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-// 单颗豆子（像素风：无描边方块 + 深色方孔 + 左上硬高光）
+// 单颗豆子：方形 = 无描边方块 + 深色方孔 + 左上硬高光；圆形 = 圆片 + 径向光泽 + 圆孔
 function drawBead(ctx, cx, cy, r, palIdx, alpha) {
   if (alpha == null) alpha = 1;
   const rgb = PALETTE_RGB[palIdx];
   if (alpha < 1) ctx.globalAlpha = alpha;
-  const side = r * 1.9;
-  const x = cx - side / 2, y = cy - side / 2;
   if (r < 3) {
-    // 太小画不出孔和高光，纯色方块反而更清晰（缩略图 / 大图纸缩到很小时）
-    ctx.fillStyle = css(rgb);
-    ctx.fillRect(x, y, side, side);
+    // 太小画不出孔和高光，纯色块反而更清晰（缩略图 / 大图纸缩到很小时）
+    if (BEAD_SHAPE === 'round') {
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7);
+      ctx.fillStyle = css(rgb); ctx.fill();
+    } else {
+      const side = r * 1.9;
+      ctx.fillStyle = css(rgb);
+      ctx.fillRect(cx - side / 2, cy - side / 2, side, side);
+    }
     if (alpha < 1) ctx.globalAlpha = 1;
     return;
   }
-  ctx.fillStyle = css(rgb);
-  ctx.fillRect(x, y, side, side);
-  ctx.fillStyle = css(mix(rgb, BLACK, 0.45));
-  ctx.fillRect(cx - side * 0.18, cy - side * 0.18, side * 0.36, side * 0.36);
-  ctx.fillStyle = 'rgba(255,255,255,.75)';
-  ctx.fillRect(x + side * 0.1, y + side * 0.1, side * 0.2, side * 0.2);
+  if (BEAD_SHAPE === 'round') {
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7);
+    ctx.fillStyle = css(rgb); ctx.fill();
+    const g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r);
+    g.addColorStop(0, 'rgba(255,255,255,.5)');
+    g.addColorStop(0.5, 'rgba(255,255,255,0)');
+    g.addColorStop(1, 'rgba(0,0,0,.22)');
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7);
+    ctx.fillStyle = g; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, r * 0.32, 0, 7);
+    ctx.fillStyle = css(mix(rgb, BLACK, 0.45)); ctx.fill();
+  } else {
+    const side = r * 1.9;
+    const x = cx - side / 2, y = cy - side / 2;
+    ctx.fillStyle = css(rgb);
+    ctx.fillRect(x, y, side, side);
+    ctx.fillStyle = css(mix(rgb, BLACK, 0.45));
+    ctx.fillRect(cx - side * 0.18, cy - side * 0.18, side * 0.36, side * 0.36);
+    ctx.fillStyle = 'rgba(255,255,255,.75)';
+    ctx.fillRect(x + side * 0.1, y + side * 0.1, side * 0.2, side * 0.2);
+  }
   if (alpha < 1) ctx.globalAlpha = 1;
 }
 
-// 熨烫后的融合豆（像素风：方块互相搭接 + 高光条）
+// 熨烫后的融合豆：方形 = 方块搭接；圆形 = 圆角方块搭接
 function drawFused(ctx, x, y, s, palIdx) {
   const rgb = PALETTE_RGB[palIdx];
   const e = s * 0.06; // 外扩使相邻豆融合
+  if (BEAD_SHAPE === 'round' && s >= 3.5) {
+    roundRect(ctx, x - e, y - e, s + e * 2, s + e * 2, s * 0.3);
+    ctx.fillStyle = css(rgb); ctx.fill();
+    return;
+  }
   ctx.fillStyle = css(rgb);
   ctx.fillRect(x - e, y - e, s + e * 2, s + e * 2);
 }
 function drawFusedGloss(ctx, x, y, s) {
   if (s < 3.5) return; // 太小看不见高光
   ctx.fillStyle = 'rgba(255,255,255,.18)';
-  ctx.fillRect(x + s * 0.14, y + s * 0.1, s * 0.5, s * 0.22);
+  if (BEAD_SHAPE === 'round') {
+    roundRect(ctx, x + s * 0.14, y + s * 0.1, s * 0.5, s * 0.22, s * 0.11);
+    ctx.fill();
+  } else {
+    ctx.fillRect(x + s * 0.14, y + s * 0.1, s * 0.5, s * 0.22);
+  }
 }
 
 // 图纸的逻辑尺寸
@@ -76,12 +114,21 @@ function drawPatternInto(ctx, p, opts) {
   roundRect(ctx, 1, 1, size.width - 2, size.height - 2, Math.min(4, pad * 0.3));
   ctx.fillStyle = '#FFFFFF'; ctx.fill();
   ctx.strokeStyle = 'rgba(35,33,58,.9)'; ctx.lineWidth = 2; ctx.stroke();
-  // 底板蒙孔（方点）
+  // 底板蒙孔（方豆=方点，圆豆=圆点）
   if (cellPx >= 5) {
     ctx.fillStyle = 'rgba(35,33,58,.08)';
-    const d = Math.max(1, cellPx * 0.12);
-    for (let cy = 0; cy < h; cy++) for (let cx = 0; cx < w; cx++) {
-      ctx.fillRect(pad + cx * cellPx + (cellPx - d) / 2, pad + cy * cellPx + (cellPx - d) / 2, d, d);
+    if (BEAD_SHAPE === 'round') {
+      const pr = Math.max(0.8, cellPx * 0.07);
+      for (let cy = 0; cy < h; cy++) for (let cx = 0; cx < w; cx++) {
+        ctx.beginPath();
+        ctx.arc(pad + cx * cellPx + cellPx / 2, pad + cy * cellPx + cellPx / 2, pr, 0, 7);
+        ctx.fill();
+      }
+    } else {
+      const d = Math.max(1, cellPx * 0.12);
+      for (let cy = 0; cy < h; cy++) for (let cx = 0; cx < w; cx++) {
+        ctx.fillRect(pad + cx * cellPx + (cellPx - d) / 2, pad + cy * cellPx + (cellPx - d) / 2, d, d);
+      }
     }
   }
   for (let cy = 0; cy < h; cy++) {
@@ -486,9 +533,13 @@ class BoardView {
         const px = ox + cx * s, py = oy + cy * s;
         const mx = px + s / 2, my = py + s / 2;
         if (showPeg && !fused) {
-          const d = Math.max(1, s * 0.12);
           ctx.fillStyle = 'rgba(35,33,58,.10)';
-          ctx.fillRect(mx - d / 2, my - d / 2, d, d);
+          if (BEAD_SHAPE === 'round') {
+            ctx.beginPath(); ctx.arc(mx, my, Math.max(1, s * 0.06), 0, 7); ctx.fill();
+          } else {
+            const d = Math.max(1, s * 0.12);
+            ctx.fillRect(mx - d / 2, my - d / 2, d, d);
+          }
         }
         if (tc < 0) continue;
         if (placed[i]) {
@@ -527,6 +578,9 @@ class BoardView {
           ctx.globalAlpha = isSel ? 0.5 : 0.2;
           if (tiny) {
             ctx.fillStyle = css(rgb); ctx.fillRect(px, py, s, s);
+          } else if (BEAD_SHAPE === 'round') {
+            ctx.beginPath(); ctx.arc(mx, my, s * 0.38, 0, 7);
+            ctx.fillStyle = css(rgb); ctx.fill();
           } else {
             const gs = s * 0.76;
             ctx.fillStyle = css(rgb);
@@ -534,11 +588,15 @@ class BoardView {
           }
           ctx.globalAlpha = 1;
           if (isSel && s >= 8) {
-            const ds = s * 0.84;
             ctx.setLineDash([s * 0.16, s * 0.13]);
             ctx.strokeStyle = css(mix(rgb, BLACK, 0.3), 0.75);
             ctx.lineWidth = Math.max(1, s * 0.06);
-            ctx.strokeRect(mx - ds / 2, my - ds / 2, ds, ds);
+            if (BEAD_SHAPE === 'round') {
+              ctx.beginPath(); ctx.arc(mx, my, s * 0.42, 0, 7); ctx.stroke();
+            } else {
+              const ds = s * 0.84;
+              ctx.strokeRect(mx - ds / 2, my - ds / 2, ds, ds);
+            }
             ctx.setLineDash([]);
           }
           if (showNum) {
@@ -569,10 +627,14 @@ class BoardView {
       else {
         const i = this.wrongFx.i;
         const mx = ox + (i % w) * s + s / 2, my = oy + Math.floor(i / w) * s + s / 2;
-        const ws = s * (0.84 + 0.6 * k);
         ctx.strokeStyle = 'rgba(232,80,79,' + (1 - k) + ')';
         ctx.lineWidth = Math.max(1.5, s * 0.09);
-        ctx.strokeRect(mx - ws / 2, my - ws / 2, ws, ws);
+        if (BEAD_SHAPE === 'round') {
+          ctx.beginPath(); ctx.arc(mx, my, s * (0.42 + 0.3 * k), 0, 7); ctx.stroke();
+        } else {
+          const ws = s * (0.84 + 0.6 * k);
+          ctx.strokeRect(mx - ws / 2, my - ws / 2, ws, ws);
+        }
       }
     }
 
@@ -656,4 +718,4 @@ function drawIron(ctx, x, y, s) {
   ctx.restore();
 }
 
-module.exports = { drawBead, patternSize, drawPatternInto, renderPatternTo, BoardView };
+module.exports = { drawBead, patternSize, drawPatternInto, renderPatternTo, BoardView, getBeadShape, setBeadShape };

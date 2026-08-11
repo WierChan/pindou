@@ -3,6 +3,7 @@
     <view class="tb-back" hover-class="pressed" bindtap="goBack">‹</view>
     <view class="tb-title">{{title}}</view>
     <view class="tb-actions">
+      <view class="icon-btn" hover-class="pressed" bindtap="toggleShape">{{beadShape === 'round' ? '●' : '■'}}</view>
       <view class="icon-btn" hover-class="pressed" bindtap="toggleMute">{{muted ? '🔇' : '🔊'}}</view>
       <view wx:if="{{debug}}" class="icon-btn" bindtap="debugFill">⚡</view>
     </view>
