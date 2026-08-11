@@ -4,6 +4,31 @@ const { colorStats } = require('./convert');
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
+// 分享二维码（assets/share-qr.jpg）：模块级缓存，加载失败静默（卡片退化为纯文字引导）
+let qrImg = null;
+let qrTried = false;
+function loadShareAssets(canvas) {
+  if (qrImg || qrTried) return Promise.resolve();
+  return new Promise(resolve => {
+    try {
+      const img = canvas.createImage();
+      img.onload = () => { qrImg = img; resolve(); };
+      img.onerror = () => { qrTried = true; resolve(); };
+      img.src = '/assets/share-qr.jpg';
+    } catch (e) { qrTried = true; resolve(); }
+  });
+}
+
+// 便利店遮阳棚：粉白条纹 + 方齿垂边（画在图顶部）
+function awning(ctx, W) {
+  const sw = 36;
+  for (let x = 0, i = 0; x < W; x += sw, i++) {
+    ctx.fillStyle = i % 2 ? '#FFFFFF' : '#EABFC3';
+    ctx.fillRect(x, 0, Math.min(sw, W - x), 18);
+    if (i % 2 === 0) ctx.fillRect(x, 18, Math.min(sw, W - x), 9); // 齿
+  }
+}
+
 // 像素格子底纹（与 app.wxss 的页面底纹同款）
 function bgGrid(ctx, W, H) {
   ctx.fillStyle = 'rgba(95,74,78,.06)';
@@ -68,7 +93,7 @@ function buildShareCardTo(canvas, work, scale) {
   const artSize = patternSize(work, { cellPx: artCell, pad: artPad });
   const artW = artSize.width, artH = artSize.height;
 
-  const headerH = 130;
+  const headerH = 146;
   const panelH = artH + 64;
   const infoH = 116;
   const inviteH = 200;
@@ -80,20 +105,21 @@ function buildShareCardTo(canvas, work, scale) {
   const ctx = canvas.getContext('2d');
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
-  // 背景 + 像素格纹
+  // 背景 + 像素格纹 + 遮阳棚
   ctx.fillStyle = '#FBF5EC';
   ctx.fillRect(0, 0, W, H);
   bgGrid(ctx, W, H);
+  awning(ctx, W);
 
-  // 头部：三颗方豆 + 标题（带像素红错位阴影）
-  drawBrandBeads(ctx, W / 2, 52, 17, 18);
+  // 头部：三颗方豆 + 标题（带像素粉错位阴影）
+  drawBrandBeads(ctx, W / 2, 60, 17, 18);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
   ctx.font = 'bold 40px sans-serif';
   ctx.fillStyle = 'rgba(201,131,143,.4)';
-  ctx.fillText('指尖拼豆', W / 2 + 4, 116);
+  ctx.fillText('拼豆便利店', W / 2 + 4, 134);
   ctx.fillStyle = '#5F4A4E';
-  ctx.fillText('指尖拼豆', W / 2, 112);
+  ctx.fillText('拼豆便利店', W / 2, 130);
 
   // 作品面板
   const py = headerH;
@@ -113,21 +139,36 @@ function buildShareCardTo(canvas, work, scale) {
   ctx.font = '24px sans-serif';
   ctx.fillText('我拼好了 ' + total + ' 颗豆子 · ' + stats.length + ' 种颜色 · ' + fmtDate(work.completedAt || work.updatedAt), W / 2, iy + 94);
 
-  // 邀请区（小程序无网页链接，用搜索引导替代二维码）
+  // 邀请区：有小程序码则「左码右文案」，否则纯文字搜索引导
   const qy = iy + infoH;
-  pixelPanel(ctx, M, qy, W - M * 2, inviteH - 20);
-  drawBrandBeads(ctx, W / 2, qy + 46, 10, 10);
-  ctx.fillStyle = '#5F4A4E';
-  ctx.font = 'bold 30px sans-serif';
-  ctx.fillText('微信搜索小程序「指尖拼豆」', W / 2, qy + 102);
-  ctx.fillStyle = '#A59795';
-  ctx.font = '23px sans-serif';
-  ctx.fillText('把喜欢的图片，一颗一颗拼出来', W / 2, qy + 144);
+  const panelInH = inviteH - 20;
+  pixelPanel(ctx, M, qy, W - M * 2, panelInH);
+  if (qrImg) {
+    const qs = 136;
+    const qx = M + 34, qyy = qy + (panelInH - qs) / 2;
+    ctx.drawImage(qrImg, qx, qyy, qs, qs);
+    const tx = qx + qs + (W - M - (qx + qs)) / 2; // 右侧文案区中心
+    drawBrandBeads(ctx, tx, qy + 44, 9, 9);
+    ctx.fillStyle = '#5F4A4E';
+    ctx.font = 'bold 28px sans-serif';
+    ctx.fillText('扫码打开「拼豆便利店」', tx, qy + 96);
+    ctx.fillStyle = '#A59795';
+    ctx.font = '21px sans-serif';
+    ctx.fillText('把喜欢的图片，一颗一颗拼出来', tx, qy + 134);
+  } else {
+    drawBrandBeads(ctx, W / 2, qy + 46, 10, 10);
+    ctx.fillStyle = '#5F4A4E';
+    ctx.font = 'bold 30px sans-serif';
+    ctx.fillText('微信搜索小程序「拼豆便利店」', W / 2, qy + 102);
+    ctx.fillStyle = '#A59795';
+    ctx.font = '23px sans-serif';
+    ctx.fillText('把喜欢的图片，一颗一颗拼出来', W / 2, qy + 144);
+  }
 
   // 页脚
   ctx.fillStyle = '#B7A8A4';
   ctx.font = '21px sans-serif';
-  ctx.fillText('—— 指尖拼豆 · 电子拼豆手作 ——', W / 2, qy + inviteH + 26);
+  ctx.fillText('—— 拼豆便利店 · 电子拼豆手作 ——', W / 2, qy + inviteH + 26);
 
   return { width: W, height: H };
 }
@@ -155,10 +196,11 @@ function buildExportTo(canvas, work, fused, scale) {
   const ctx = canvas.getContext('2d');
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
-  // 背景 + 像素格纹
+  // 背景 + 像素格纹 + 遮阳棚
   ctx.fillStyle = '#FBF5EC';
   ctx.fillRect(0, 0, W, H);
   bgGrid(ctx, W, H);
+  awning(ctx, W);
 
   // 白色画框
   const px0 = W / 2 - panelW / 2, py0 = topM;
@@ -182,7 +224,7 @@ function buildExportTo(canvas, work, fused, scale) {
   // 底部品牌落款：三颗小方豆 + 应用名
   const fy = iy + infoH + 34;
   ctx.font = 'bold 26px sans-serif';
-  const brand = '指尖拼豆';
+  const brand = '拼豆便利店';
   const tw = ctx.measureText(brand).width;
   const beadR = 8, gap = 8, beadsW = beadR * 2 * 3 + gap * 2;
   const totalW = beadsW + 16 + tw;
@@ -194,4 +236,4 @@ function buildExportTo(canvas, work, fused, scale) {
   return { width: W, height: H };
 }
 
-module.exports = { buildShareCardTo, buildExportTo };
+module.exports = { buildShareCardTo, buildExportTo, loadShareAssets };

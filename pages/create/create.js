@@ -301,7 +301,7 @@ Page({
 
   onShareAppMessage() {
     return {
-      title: '指尖拼豆 · 把喜欢的图片，一颗一颗拼出来',
+      title: '拼豆便利店 · 把喜欢的图片，一颗一颗拼出来',
       path: '/pages/home/home',
     };
   },

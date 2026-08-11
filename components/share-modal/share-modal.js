@@ -1,6 +1,6 @@
 // 分享卡片弹窗：生成长图，可保存到相册或转发给朋友
 const { store } = require('../../utils/store');
-const { buildShareCardTo } = require('../../utils/share');
+const { buildShareCardTo, loadShareAssets } = require('../../utils/share');
 const ui = require('../../utils/ui');
 
 Component({
@@ -22,7 +22,9 @@ Component({
       ui.queryNode(this, '#card').then(r => {
         if (!r || !r.node) { ui.toast('卡片生成失败'); return; }
         const draw = () => buildShareCardTo(r.node, work, 2);
-        ui.captureCanvas(this, r.node, draw, '#card').then(path => {
+        // 先预加载小程序码（没有该资源时静默，卡片退化为文字引导）
+        loadShareAssets(r.node).then(() =>
+        ui.captureCanvas(this, r.node, draw, '#card')).then(path => {
           this._builtFor = this.properties.workId;
           this.path = path;
           this.setData({ img: path });

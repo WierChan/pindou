@@ -328,6 +328,8 @@ Page({
     const doneNow = [...affected].filter(t => this.remaining.get(t) === 0);
     if (doneNow.length) {
       audio.colorDone();
+      // 里程碑轻震：拼完一种颜色（普通上豆不震，震动语义留给错误与里程碑）
+      try { wx.vibrateShort({ type: 'light' }); } catch (e) { /* 忽略 */ }
       ui.toast('「' + PALETTE[doneNow[0]].name + '」拼完啦 ✓');
       if (doneNow.indexOf(this.sel) >= 0) {
         const start = this.colorsUsed.indexOf(this.sel);
@@ -376,6 +378,8 @@ Page({
     if (this.bv) this.bv.o.mode = 'view';
     setTimeout(() => {
       audio.finish();
+      // 里程碑中震：整幅豆子拼齐
+      try { wx.vibrateShort({ type: 'medium' }); } catch (e) { /* 忽略 */ }
       this._celebrate();
     }, 350);
     setTimeout(() => this._showDoneModal(), 1300);
@@ -414,7 +418,7 @@ Page({
 
   onShareAppMessage() {
     return {
-      title: '指尖拼豆 · 把喜欢的图片，一颗一颗拼出来',
+      title: '拼豆便利店 · 把喜欢的图片，一颗一颗拼出来',
       path: '/pages/home/home',
     };
   },

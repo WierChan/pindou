@@ -389,7 +389,7 @@ Page({
 
   onShareAppMessage() {
     return {
-      title: '指尖拼豆 · 自由画布，想拼什么拼什么',
+      title: '拼豆便利店 · 自由画布，想拼什么拼什么',
       path: '/pages/home/home',
     };
   },

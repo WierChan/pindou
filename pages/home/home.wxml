@@ -1,12 +1,14 @@
 <view class="screen home" style="padding-top:{{padTop}}px">
   <view class="home-header">
+    <!-- 便利店遮阳棚（粉白条纹 + 方齿垂边，纯装饰） -->
+    <view class="awning" />
     <!-- 云朵地平线小场景：装饰 + 轻互动（点豆豆/豆子/标题有动画音效；连戳豆豆 5 下撒花） -->
     <view class="px-scene">
       <view class="sun" />
-      <view class="cloud c1" />
       <view class="cloud c2" />
       <view class="spark sp1" />
       <view class="spark sp2" />
+      <view class="store {{stAnim}}" bindtap="tapStore" />
       <view class="grass g1" />
       <view class="grass g2" />
       <view class="gshadow gs-m" />
@@ -20,15 +22,15 @@
       <view wx:for="{{emotes}}" wx:key="id" class="emote" style="left:{{item.x}}">{{item.txt}}</view>
     </view>
     <view class="h1 {{titleWave ? 'wave' : ''}}" bindtap="tapTitle">
-      <text class="h1c">指</text><text class="h1c">尖</text><text class="h1c">拼</text><text class="h1c">豆</text>
+      <text class="h1c">拼</text><text class="h1c">豆</text><text class="h1c">便</text><text class="h1c">利</text><text class="h1c">店</text>
     </view>
-    <view class="h-sub">把喜欢的图片，一颗一颗拼出来</view>
+    <view class="h-sub">欢迎光临！把喜欢的图片，一颗一颗拼出来</view>
   </view>
 
   <view class="cta-new {{ctaAnim}}" hover-class="pressed" bindtap="goCreate">＋ 开始新作品</view>
 
   <view class="tabs home-tabs">
-    <view class="tab {{tab === 'doing' ? 'active' : ''}}" bindtap="switchTab" data-tab="doing">🧵 进行中{{doing.length ? ' · ' + doing.length : ''}}</view>
+    <view class="tab {{tab === 'doing' ? 'active' : ''}}" bindtap="switchTab" data-tab="doing">🧺 进行中{{doing.length ? ' · ' + doing.length : ''}}</view>
     <view class="tab {{tab === 'done' ? 'active' : ''}}" bindtap="switchTab" data-tab="done">🏆 已完成{{done.length ? ' · ' + done.length : ''}}</view>
   </view>
 

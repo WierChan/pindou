@@ -150,6 +150,8 @@ Page({
     setTimeout(() => {
       this.setData({ pct: 100 });
       audio.finish();
+      // 里程碑中震：熨烫定型完成
+      try { wx.vibrateShort({ type: 'medium' }); } catch (e) { /* 忽略 */ }
       this._celebrate();
     }, 300);
     setTimeout(() => this._showDoneModal(), 1200);
@@ -198,7 +200,7 @@ Page({
 
   onShareAppMessage() {
     const msg = {
-      title: '我拼好了「' + (this.work ? this.work.name : '拼豆作品') + '」，来一起玩指尖拼豆！',
+      title: '我拼好了「' + (this.work ? this.work.name : '拼豆作品') + '」，来拼豆便利店逛逛！',
       path: '/pages/home/home',
     };
     if (this.shareImg) msg.imageUrl = this.shareImg;

@@ -1,6 +1,23 @@
 .home { padding-bottom: 40px; }
 
-.home-header { text-align: center; padding: 8px 0 20px; }
+.home-header { text-align: center; padding: 0 0 20px; }
+
+/* 便利店遮阳棚：粉白条纹 + 方齿垂边（出血到屏幕两侧） */
+.awning {
+  position: relative;
+  height: 13px;
+  margin: 0 -16px 8px;
+  background: repeating-linear-gradient(90deg, var(--accent) 0, var(--accent) 18px, #FFFFFF 18px, #FFFFFF 36px);
+}
+.awning::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 7px;
+  background: repeating-linear-gradient(90deg, var(--accent) 0, var(--accent) 18px, transparent 18px, transparent 36px);
+}
 
 /* ================= 云朵地平线小场景 ================= */
 .px-scene {
@@ -31,7 +48,6 @@
   background-repeat: no-repeat;
   image-rendering: pixelated;
 }
-.c1 { left: 12px; top: 16px; width: 84px; height: 42px; animation: drift 9s ease-in-out infinite; }
 .c2 { right: 76px; top: 2px; width: 62px; height: 31px; animation: drift 12s ease-in-out infinite reverse; }
 @keyframes drift {
   0%, 100% { transform: translateX(0); }
@@ -56,7 +72,7 @@
 .grass { position: absolute; bottom: 0; width: 4px; height: 4px; background: #8FBF87; }
 .grass::before { content: ''; position: absolute; left: 4px; top: -4px; width: 4px; height: 8px; background: #8FBF87; }
 .grass::after { content: ''; position: absolute; left: 8px; top: 0; width: 4px; height: 4px; background: #8FBF87; }
-.g1 { left: 11%; }
+.g1 { left: 22%; }
 .g2 { right: 9%; }
 
 /* 落地阴影 */
@@ -79,6 +95,35 @@
 .mascot.blink {
   background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAACMUlEQVR4Ae3BIU7sUACF4f+ejEKzgaa+EtG8zSBYwZMkFU2QrADBZkgFsr6ZDaDH3rcCSsLNZGbeOd9XuHJ9N1Zu2HZcCldMhDUR1kRYE2FNhDUR1kRYK5xZ342VButcuGXDVGmxHZfCGYmwJsKaCGsirImwJsKaCGuFRn03VnascyF+b5gqe7bjUmggwpoIayKsibAmwpoIayKsFX7Qd2NlxzoX9tz9+UuL08cr8b1hquzZjkthhwhrIqyJsCbCmghrIqyJsHbgwk4fr8TliLAmwpoIayKsibAmwpoIa6XvxsqOdS7E7Rqmyh4R1kRYE2FNhDUR1kRYE2FNhDUR1kRYE2FNhDUR1kRYE2HtwIUNU+Wc1rnQYpgq57TOhUsSYU2ENRHWRFgTYU2ENRHWDjS6+3qkxTq/c83WuXBOd1+PtDjdv9NChDUR1kRYE2FNhDUR1kRYE2FNhDUR1kRYE2FNhDUR1kRYO9DodP/ONXt5+6TF89MD53S6f+eSRFgTYU2ENRHWRFgTYU2EtcIP+m6s7FjnwjV7efukxfPTA9dsmCp7tuNS2CHCmghrIqyJsCbCmghrIqwd+M89Pz0Q3xNhTYQ1EdZEWBNhTYQ1EdYKjfpurOxY50L83jBV9mzHpdBAhDUR1kRYE2FNhDUR1kRYK5xZ342VButcuGXDVGmxHZfCGYmwJsKaCGsirImwJsKaCGuFK9d3Y+WGbcelcMVEWBNhTYQ1EdZEWBNhTYS1f5PTVM15acthAAAAAElFTkSuQmCC");
 }
+/* 像素便利店小房子（128×80 内联 PNG，可点：叮咚 + 欢迎光临气泡） */
+.store {
+  position: absolute;
+  left: 3%;
+  bottom: 0;
+  width: 64px;
+  height: 40px;
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAABQCAYAAADRAH3kAAABYklEQVR4Ae3BIW6TAQCG4bdf/gQ1WcE9GlRFdZt0R9iOwMQcEocAhWZHYMlmqagivcfEJGqq3KBL+POnLN/7PDNecbXeHtGbdfd4P+OEoGpB1YKqBVULqhZULajacLXeHjnhy+0tY8xXS8Z43u0ZY75aMsbzbs8Y89WSMZ53e0Y6ckJQtaBqQdWCqgVVC6oWVC2oWlC1oGpB1YKqBVULqhZUbcYrrtbbI3qz7h7vZ5wQVC2oWlC1oGpB1YKqBVUbGOnHw090PtebS8YIqhZULahaULWgakHVgqoNTOzP4SvndLG4YUq/P39jSh8+fWRKQdWCqgVVC6oWVC2oWlC1gTN7937BGC9PB/TvgqoFVQuqFlQtqFpQtaBqA2f28nRA5xNULahaULWgakHVgqoFVRuY2MXiBv2/gqoFVQuqFlQtqFpQtaBqAyNdby7RdL5vfjGloGpB1YKqBVULqhZULajaXyoIKA9zBVVxAAAAAElFTkSuQmCC");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+/* 门头灯：曦黄小方灯，像素式硬闪 */
+.store::after {
+  content: '';
+  position: absolute;
+  right: 15%;
+  top: -7px;
+  width: 8px;
+  height: 8px;
+  background: var(--blue);
+  box-shadow: 0 0 6px 2px rgba(242, 203, 142, .8);
+  animation: lampblink 1.6s steps(1) infinite;
+}
+@keyframes lampblink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .25; }
+}
+.store.pop { animation: bpop .42s ease-out; transform-origin: bottom center; }
 .mascot.jump { animation: pjump .5s ease-out; }
 .mascot.wobble { animation: pwobble .8s ease-in-out; }
 @keyframes pjump {
@@ -158,7 +203,7 @@
 .h1 {
   display: flex;
   justify-content: center;
-  gap: 12px;
+  gap: 7px;
   margin-top: 14px;
 }
 .h1c {
@@ -170,6 +215,7 @@
 .h1.wave .h1c:nth-child(2) { animation-delay: .08s; }
 .h1.wave .h1c:nth-child(3) { animation-delay: .16s; }
 .h1.wave .h1c:nth-child(4) { animation-delay: .24s; }
+.h1.wave .h1c:nth-child(5) { animation-delay: .32s; }
 @keyframes chb {
   0% { transform: translateY(0); }
   40% { transform: translateY(-11px) scale(1.12); }

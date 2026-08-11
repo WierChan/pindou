@@ -99,7 +99,7 @@ Page({
 
   onShareAppMessage() {
     const msg = {
-      title: '我拼好了「' + (this.work ? this.work.name : '拼豆作品') + '」，来一起玩指尖拼豆！',
+      title: '我拼好了「' + (this.work ? this.work.name : '拼豆作品') + '」，来拼豆便利店逛逛！',
       path: '/pages/home/home',
     };
     if (this.shareImg) msg.imageUrl = this.shareImg;

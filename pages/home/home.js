@@ -37,6 +37,7 @@ Page({
     capW: 700,
     capH: 900,
     mAnim: '',        // 豆豆动画类：jump / wobble
+    stAnim: '',       // 便利店小房子弹跳
     mBlink: false,    // 眨眼帧
     b0: '', b1: '', b2: '',  // 三颗豆的弹跳类
     titleWave: false, // 标题跳舞
@@ -194,6 +195,14 @@ Page({
     }
   },
 
+  // 点便利店小房子：叮咚门铃 + 弹跳 + 欢迎光临气泡
+  tapStore() {
+    audio.note(784);
+    setTimeout(() => audio.note(587), 140);
+    this._animCls('stAnim', 'pop', 460);
+    this._emote('欢迎光临', 'calc(3% + 32px)');
+  },
+
   tapBead(e) {
     const i = +e.currentTarget.dataset.i;
     audio.note(BEAD_NOTES[i]);
@@ -217,12 +226,12 @@ Page({
   tapTitle() {
     if (this._waveT) return;
     this.setData({ titleWave: true });
-    [0, 1, 2, 3].forEach(i =>
+    [0, 1, 2, 3, 4].forEach(i =>
       setTimeout(() => audio.note(Math.round(523 * Math.pow(1.19, i))), i * 80));
     this._waveT = setTimeout(() => {
       this._waveT = 0;
       this.setData({ titleWave: false });
-    }, 900);
+    }, 1000);
   },
 
   // 复用完成庆祝的撒花模块
@@ -282,7 +291,7 @@ Page({
 
   onShareAppMessage() {
     return {
-      title: '指尖拼豆 · 把喜欢的图片，一颗一颗拼出来',
+      title: '拼豆便利店 · 把喜欢的图片，一颗一颗拼出来',
       path: '/pages/home/home',
     };
   },
