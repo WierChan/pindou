@@ -7,8 +7,9 @@
   <!-- 选择阶段 -->
   <view wx:if="{{mode === 'pick'}}" class="create-body">
     <view class="tabs">
-      <view class="tab {{tab === 'image' ? 'active' : ''}}" bindtap="switchTab" data-tab="image">📷 图片转图纸</view>
+      <view class="tab {{tab === 'image' ? 'active' : ''}}" bindtap="switchTab" data-tab="image">📷 图片</view>
       <view class="tab {{tab === 'tpl' ? 'active' : ''}}" bindtap="switchTab" data-tab="tpl">🧸 图案库</view>
+      <view class="tab {{tab === 'free' ? 'active' : ''}}" bindtap="switchTab" data-tab="free">✏️ 自由画布</view>
     </view>
 
     <block wx:if="{{tab === 'image'}}">
@@ -17,6 +18,15 @@
         <view class="uz-title">选择一张图片</view>
         <view class="uz-sub">照片、表情包、logo 都可以</view>
         <view class="uz-sub">转成拼豆图纸后开拼</view>
+      </view>
+    </block>
+
+    <block wx:elif="{{tab === 'free'}}">
+      <view class="upload-zone" hover-class="uz-hover" bindtap="startFree">
+        <view class="uz-icon">✏️</view>
+        <view class="uz-title">开始自由创作</view>
+        <view class="uz-sub">无边拼豆板 · 全色板不限量，画到哪算哪</view>
+        <view class="uz-sub">完成时自动裁剪成作品，可熨烫、分享、导出</view>
       </view>
     </block>
 

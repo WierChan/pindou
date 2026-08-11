@@ -1,0 +1,44 @@
+<view class="playpage">
+  <view class="topbar" style="padding-top:{{insets.top}}px;padding-right:{{insets.right}}px">
+    <view class="tb-back" hover-class="pressed" bindtap="goBack">‹</view>
+    <view class="tb-title">{{title}}</view>
+    <view class="tb-actions">
+      <view class="icon-btn" hover-class="pressed" bindtap="toggleShape">{{beadShape === 'round' ? '●' : '■'}}</view>
+      <view class="icon-btn" hover-class="pressed" bindtap="toggleMute">{{muted ? '🔇' : '🔊'}}</view>
+    </view>
+  </view>
+
+  <view class="free-info">
+    <view class="fi-count">已拼 <text class="b">{{count}}</text> 颗</view>
+    <view class="fi-hint">无边拼豆板：画到哪算哪，完成时自动裁剪</view>
+  </view>
+
+  <view class="board-area">
+    <canvas type="2d" id="board" class="board"
+            bindtouchstart="onTS" bindtouchmove="onTM"
+            bindtouchend="onTE" bindtouchcancel="onTE"></canvas>
+    <view class="zoom-fabs">
+      <view hover-class="pressed" bindtap="zoomFit">⛶</view>
+    </view>
+  </view>
+
+  <view class="bottom-bar">
+    <view class="bb-inner">
+      <view class="tools-row">
+        <view class="tool-chip {{eraser ? 'active' : ''}}" bindtap="tapEraser">🧽 橡皮</view>
+        <view class="tool-chip done-chip" bindtap="finishWork">✅ 完成创作</view>
+        <view class="tools-hint">{{eraser ? '点或划格子擦掉豆子' : '选颜色，点或划格子上豆'}}</view>
+      </view>
+      <scroll-view class="palette-bar" scroll-x scroll-into-view="{{scrollInto}}"
+                   scroll-with-animation enhanced show-scrollbar="{{false}}">
+        <view class="pchip {{item.active ? 'active' : ''}}"
+              wx:for="{{chips}}" wx:key="pal" id="c{{item.pal}}"
+              bindtap="tapChip" data-pal="{{item.pal}}">
+          <view class="pdot" style="background:{{item.hex}};color:{{item.tcol}}"></view>
+        </view>
+      </scroll-view>
+    </view>
+  </view>
+</view>
+
+<canvas type="2d" id="util" class="util-canvas" style="width:{{capW}}px;height:{{capH}}px"></canvas>

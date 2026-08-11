@@ -89,8 +89,6 @@ Page({
   onTS(e) { if (this.bv && !this.finished) this.bv.touchStart(e); },
   onTM(e) { if (this.bv && !this.finished) this.bv.touchMove(e); },
   onTE(e) { if (this.bv) this.bv.touchEnd(e); },
-  zoomIn() { if (this.bv) this.bv.zoomAt(1.3); },
-  zoomOut() { if (this.bv) this.bv.zoomAt(1 / 1.3); },
   zoomFit() { if (this.bv) this.bv.fit(); },
 
   goBack() {

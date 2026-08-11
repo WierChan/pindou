@@ -1,0 +1,37 @@
+/* 自由画布：主体样式在 app.wxss 的 playpage 骨架里 */
+.free-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px 8px;
+  max-width: 720px;
+  width: 100%;
+  margin: 0 auto;
+}
+.fi-count {
+  background: var(--card);
+  border: 2px solid var(--ink);
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.fi-count .b { color: var(--accent-dark); }
+.fi-hint {
+  font-size: 12px;
+  color: var(--ink2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* 完成按钮：用主色调醒目一点 */
+.tool-chip.done-chip {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 3px 3px 0 var(--accent-dark);
+}
+
+/* 自由模式色卡不显示数量，豆子块稍小一点放得下更多色 */
+.pchip .pdot { width: 30px; height: 30px; }

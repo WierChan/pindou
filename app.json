@@ -3,6 +3,7 @@
     "pages/home/home",
     "pages/create/create",
     "pages/play/play",
+    "pages/free/free",
     "pages/iron/iron",
     "pages/view/view"
   ],

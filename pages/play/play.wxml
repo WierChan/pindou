@@ -19,8 +19,6 @@
             bindtouchstart="onTS" bindtouchmove="onTM"
             bindtouchend="onTE" bindtouchcancel="onTE"></canvas>
     <view class="zoom-fabs">
-      <view hover-class="pressed" bindtap="zoomIn">＋</view>
-      <view hover-class="pressed" bindtap="zoomOut">－</view>
       <view hover-class="pressed" bindtap="zoomFit">⛶</view>
     </view>
   </view>

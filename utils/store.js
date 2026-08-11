@@ -24,6 +24,7 @@ function summarize(work) {
   return {
     id: work.id, name: work.name, w: work.w, h: work.h,
     total, placedN,
+    free: !!work.free,
     completed: !!work.completed, ironDone: !!work.ironDone,
     thumb: work.thumb || '',
     thumbV: work.thumbV || 0,
@@ -61,6 +62,7 @@ const store = {
     const work = {
       id: genId(), name: o.name, w: o.w, h: o.h, cells: o.cells,
       placed: new Array(o.cells.length).fill(0),
+      free: !!o.free, // 自由画布模式：cells 即用户作品本身，可随意增改
       completed: false, ironDone: false, thumb: '',
       createdAt: Date.now(), updatedAt: Date.now(),
     };

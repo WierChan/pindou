@@ -39,6 +39,11 @@ Page({
       wx.redirectTo({ url: (work.ironDone ? '/pages/view/view?id=' : '/pages/iron/iron?id=') + work.id });
       return;
     }
+    if (work.free) {
+      // 自由画布作品走专属页面
+      wx.redirectTo({ url: '/pages/free/free?id=' + work.id });
+      return;
+    }
     if (work.boostRow == null) work.boostRow = FREE_ROW_USES;
     this.work = work;
     this.uq = ui.serialQueue();
@@ -152,8 +157,6 @@ Page({
   onTS(e) { if (this.bv && !this.finished) this.bv.touchStart(e); },
   onTM(e) { if (this.bv && !this.finished) this.bv.touchMove(e); },
   onTE(e) { if (this.bv) this.bv.touchEnd(e); },
-  zoomIn() { if (this.bv) this.bv.zoomAt(1.3); },
-  zoomOut() { if (this.bv) this.bv.zoomAt(1 / 1.3); },
   zoomFit() { if (this.bv) this.bv.fit(); },
 
   /* ---------- 顶栏 ---------- */

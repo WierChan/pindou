@@ -103,6 +103,18 @@ Page({
     this.setData({ tab: e.currentTarget.dataset.tab });
   },
 
+  // 自由画布：起始 80×80，画到边上自动扩容（视觉无边），完成时在自由页裁剪成作品
+  startFree() {
+    const n = 80;
+    const work = store.create({
+      name: '自由创作',
+      w: n, h: n,
+      cells: new Array(n * n).fill(-1),
+      free: true,
+    });
+    wx.redirectTo({ url: '/pages/free/free?id=' + work.id });
+  },
+
   _buildTplThumbs() {
     if (TPL_THUMBS) {
       this.setData({ templates: this.data.templates.map((t, i) => ({ ...t, img: TPL_THUMBS[i] })) });

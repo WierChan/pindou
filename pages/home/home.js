@@ -84,16 +84,18 @@ Page({
     for (const s of works) {
       const isDone = s.completed && s.ironDone;
       const needIron = s.completed && !s.ironDone;
+      const isFree = s.free && !s.completed; // 自由画布进行中
       const pct = s.total ? Math.round(s.placedN / s.total * 100) : 0;
       const vm = {
         id: s.id,
         name: s.name,
         thumb: s.thumb || '',
-        dims: s.w + '×' + s.h + ' · ' + s.total + ' 颗',
-        st: isDone ? 'done' : needIron ? 'iron' : 'doing',
-        badgeText: isDone ? '已完成' : needIron ? '🔥 待熨烫' : '',
-        pct: needIron ? 100 : pct,
-        footText: needIron ? '豆子拼齐了 · 去熨烫 →' : pct + '%　继续拼 →',
+        dims: isFree ? ('自由画布 · 已拼 ' + s.placedN + ' 颗')
+          : (s.w + '×' + s.h + ' · ' + s.total + ' 颗'),
+        st: isDone ? 'done' : needIron ? 'iron' : isFree ? 'free' : 'doing',
+        badgeText: isDone ? '已完成' : needIron ? '🔥 待熨烫' : isFree ? '✏️ 自由' : '',
+        pct: needIron ? 100 : isFree ? 0 : pct,
+        footText: needIron ? '豆子拼齐了 · 去熨烫 →' : isFree ? '自由创作 · 继续 →' : pct + '%　继续拼 →',
       };
       (isDone ? done : doing).push(vm);
     }
@@ -222,7 +224,7 @@ Page({
 
   openWork(e) {
     const d = e.currentTarget.dataset;
-    const page = d.st === 'done' ? 'view' : d.st === 'iron' ? 'iron' : 'play';
+    const page = d.st === 'done' ? 'view' : d.st === 'iron' ? 'iron' : d.st === 'free' ? 'free' : 'play';
     wx.navigateTo({ url: '/pages/' + page + '/' + page + '?id=' + d.id });
   },
 

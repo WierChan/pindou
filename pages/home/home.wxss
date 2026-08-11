@@ -263,6 +263,7 @@
   font-weight: 700;
 }
 .wc-badge.iron { background: var(--coin); color: var(--ink); }
+.wc-badge.freeb { background: var(--blue); color: #fff; }
 .wc-body { padding: 10px 12px 12px; }
 .wc-name {
   font-weight: 700;
