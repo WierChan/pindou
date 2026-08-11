@@ -241,7 +241,7 @@ Page({
       title: '解锁滑动拼豆',
       content: '看一段广告，即可获得 ' + SWIPE_AD_SECONDS + ' 秒「划过格子连续上豆」\n（广告位接入前先免费体验）',
       confirmText: '立即解锁',
-      confirmColor: '#E8504F',
+      confirmColor: '#C9838F',
       success: r => { if (r.confirm) this._grantSwipe(); },
     });
   },
@@ -370,7 +370,7 @@ Page({
     });
     if (this.utilCanvas) {
       this.uq(() => ui.makeThumb(this, this.utilCanvas, work, false))
-        .then(path => store.update(work.id, { thumb: path, thumbV: 6, thumbShape: getBeadShape() }, true))
+        .then(path => store.update(work.id, { thumb: path, thumbV: 7, thumbShape: getBeadShape() }, true))
         .catch(() => { /* 缩略图失败不影响流程 */ });
     }
     if (this.bv) this.bv.o.mode = 'view';

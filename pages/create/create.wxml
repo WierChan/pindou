@@ -75,7 +75,7 @@
                   bindtap="setSize" data-n="{{item}}">{{item}} 豆</view>
           </view>
           <slider class="opt-slider" min="{{sizeMin}}" max="{{sizeMax}}" value="{{size}}" step="1"
-                  activeColor="#E8504F" backgroundColor="#E4E1F2" block-size="20"
+                  activeColor="#EABFC3" backgroundColor="#F0E4E0" block-size="20"
                   bindchange="onSizeSlider" />
           <view class="opt-hint">{{sizeHint}}</view>
         </view>
@@ -85,12 +85,12 @@
             <view class="opt-val">{{colorVal}} 色</view>
           </view>
           <slider class="opt-slider" min="2" max="{{colorMax}}" value="{{colorVal}}" step="1"
-                  activeColor="#E8504F" backgroundColor="#E4E1F2" block-size="20"
+                  activeColor="#EABFC3" backgroundColor="#F0E4E0" block-size="20"
                   bindchange="onColorSlider" />
         </view>
         <view class="switch-row">
           <view class="sw-label">白色背景不拼豆<text class="sw-small">适合白底图片</text></view>
-          <switch checked="{{whiteEmpty}}" color="#E8504F" bindchange="onWhiteChange" />
+          <switch checked="{{whiteEmpty}}" color="#EABFC3" bindchange="onWhiteChange" />
         </view>
       </block>
 

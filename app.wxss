@@ -1,25 +1,25 @@
-/* 指尖拼豆 · 全局样式（像素街机风：方角 + 粗描边 + 掉落式硬投影，px 布局，手机 / iPad 通用） */
+/* 指尖拼豆 · 全局样式（奶油淡彩像素风：樱粉×曦黄，玫瑰褐描边 + 方角 + 掉落式硬投影） */
 page {
-  --bg: #F3EFDF;
+  --bg: #FBF5EC;
   --card: #FFFFFF;
-  --ink: #23213A;
-  --ink2: #8B87A6;
-  --accent: #E8504F;
-  --accent-dark: #A93231;
-  --blue: #3E6FD8;
-  --blue-dark: #27499A;
-  --coin: #F8C82C;
-  --coin-dark: #C09314;
-  --chipbg: #EFEDF9;
-  --line: rgba(35, 33, 58, .14);
+  --ink: #5F4A4E;         /* 玫瑰褐（描边/主文字） */
+  --ink2: #A59795;
+  --accent: #EABFC3;      /* 樱桃粉（主按钮/进度） */
+  --accent-dark: #C9838F;
+  --blue: #F2CB8E;        /* 曦黄（激活 Tab；沿用旧变量名少改动） */
+  --blue-dark: #C29040;
+  --coin: #F5D5D9;        /* 绛羽粉（点缀/徽章） */
+  --coin-dark: #C9939F;
+  --chipbg: #F7EDE9;
+  --line: rgba(95, 74, 78, .16);
   --radius: 0px;
-  --shadow: 4px 4px 0 #C9C4E0;
+  --shadow: 4px 4px 0 #E2DAD3;
 
   background: var(--bg);
   /* 像素格子底纹 */
   background-image:
-    repeating-linear-gradient(0deg, rgba(35, 33, 58, .05) 0, rgba(35, 33, 58, .05) 1px, transparent 1px, transparent 13px),
-    repeating-linear-gradient(90deg, rgba(35, 33, 58, .05) 0, rgba(35, 33, 58, .05) 1px, transparent 1px, transparent 13px);
+    repeating-linear-gradient(0deg, rgba(95, 74, 78, .06) 0, rgba(95, 74, 78, .06) 1px, transparent 1px, transparent 13px),
+    repeating-linear-gradient(90deg, rgba(95, 74, 78, .06) 0, rgba(95, 74, 78, .06) 1px, transparent 1px, transparent 13px);
   color: var(--ink);
   font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   font-size: 15px;
@@ -70,7 +70,7 @@ view, text, image, canvas, input, scroll-view, button {
   border-radius: 0;
   background: var(--card);
   border: 3px solid var(--ink);
-  box-shadow: 3px 3px 0 #C9C4E0;
+  box-shadow: 3px 3px 0 #E2DAD3;
   font-size: 22px;
   font-weight: 700;
   line-height: 28px;
@@ -95,7 +95,7 @@ view, text, image, canvas, input, scroll-view, button {
   border-radius: 0;
   background: var(--card);
   border: 3px solid var(--ink);
-  box-shadow: 3px 3px 0 #C9C4E0;
+  box-shadow: 3px 3px 0 #E2DAD3;
   font-size: 16px;
   display: flex;
   align-items: center;
@@ -111,7 +111,7 @@ view, text, image, canvas, input, scroll-view, button {
   border-radius: 0;
   background: var(--card);
   border: 3px solid var(--ink);
-  box-shadow: 3px 3px 0 #C9C4E0;
+  box-shadow: 3px 3px 0 #E2DAD3;
   font-weight: 700;
   font-size: 15px;
   color: var(--ink2);
@@ -120,14 +120,14 @@ view, text, image, canvas, input, scroll-view, button {
 }
 .tab.active {
   background: var(--blue);
-  color: #fff;
+  color: #7A5A2E; /* 曦黄底配深蜜色字 */
   box-shadow: 3px 3px 0 var(--blue-dark);
 }
 
 .btn-primary {
   padding: 14px;
   background: var(--accent);
-  color: #fff;
+  color: #7A4A55; /* 淡彩主色配深玫瑰字，不用白字 */
   font-size: 16px;
   font-weight: 800;
   letter-spacing: 2px;
@@ -143,7 +143,7 @@ view, text, image, canvas, input, scroll-view, button {
   border-radius: 0;
   background: var(--card);
   border: 3px solid var(--ink);
-  box-shadow: 3px 3px 0 #C9C4E0;
+  box-shadow: 3px 3px 0 #E2DAD3;
   font-weight: 700;
   font-size: 14px;
   align-self: flex-start;
@@ -209,7 +209,7 @@ button.btn-reset::after { border: none; }
   height: 100%;
   width: 0;
   /* 像素分段进度条 */
-  background: repeating-linear-gradient(90deg, var(--accent) 0, var(--accent) 8px, #F3766F 8px, #F3766F 10px);
+  background: repeating-linear-gradient(90deg, var(--accent) 0, var(--accent) 8px, #F4DCDF 8px, #F4DCDF 10px);
   border-radius: 0;
   transition: width .25s;
 }
@@ -248,7 +248,7 @@ button.btn-reset::after { border: none; }
   border-radius: 0;
   background: var(--card);
   border: 2px solid var(--ink);
-  box-shadow: 3px 3px 0 #C9C4E0;
+  box-shadow: 3px 3px 0 #E2DAD3;
   font-size: 18px;
   font-weight: 700;
   color: var(--ink);
@@ -272,7 +272,7 @@ button.btn-reset::after { border: none; }
   background: var(--card);
   border-top: 3px solid var(--ink);
   border-radius: 0;
-  box-shadow: 0 -4px 0 #E9E5F5;
+  box-shadow: 0 -4px 0 #F0E5DE;
   padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
 }
 .bb-inner { max-width: 720px; margin: 0 auto; }
@@ -329,7 +329,7 @@ button.btn-reset::after { border: none; }
 .pchip.active {
   border-color: var(--ink);
   background: var(--chipbg);
-  box-shadow: 3px 3px 0 #C9C4E0;
+  box-shadow: 3px 3px 0 #E2DAD3;
 }
 .pchip.done { opacity: .38; }
 .pdot {
@@ -371,7 +371,7 @@ button.btn-reset::after { border: none; }
   right: 0;
   bottom: 0;
   z-index: 100;
-  background: rgba(35, 33, 58, .5);
+  background: rgba(95, 74, 78, .45);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -383,7 +383,7 @@ button.btn-reset::after { border: none; }
   background: var(--card);
   border: 4px solid var(--ink);
   border-radius: 0;
-  box-shadow: 6px 6px 0 rgba(14, 13, 29, .35);
+  box-shadow: 6px 6px 0 rgba(95, 74, 78, .3);
   padding: 26px 22px;
   width: 100%;
   max-width: 340px;

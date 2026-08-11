@@ -38,7 +38,7 @@
   background: var(--card);
   border: 3px solid var(--ink);
   border-radius: 0;
-  box-shadow: 3px 3px 0 #C9C4E0;
+  box-shadow: 3px 3px 0 #E2DAD3;
   transition: transform .1s;
 }
 
@@ -99,7 +99,7 @@
   width: 16px;
   height: 16px;
   border-radius: 0;
-  border: 1.5px solid rgba(35, 33, 58, .35);
+  border: 1.5px solid rgba(95, 74, 78, .35);
 }
 
 .opt-row {

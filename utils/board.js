@@ -6,7 +6,7 @@ const css = (rgb, a) => a == null || a >= 1
   ? 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')'
   : 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',' + a + ')';
 const mix = (c1, c2, t) => [0, 1, 2].map(i => Math.round(c1[i] + (c2[i] - c1[i]) * t));
-const BLACK = [35, 33, 58]; // 像素风描边靛墨
+const BLACK = [35, 33, 58]; // 豆孔/选中框的加深混色基准（豆子本体质感，不随 UI 配色变）
 
 /* ---- 豆子形状：'square' 方形像素豆 / 'round' 圆形经典豆（全局设置，持久化） ---- */
 let BEAD_SHAPE = 'square';
@@ -113,10 +113,10 @@ function drawPatternInto(ctx, p, opts) {
   const w = p.w, h = p.h, cells = p.cells;
   roundRect(ctx, 1, 1, size.width - 2, size.height - 2, Math.min(4, pad * 0.3));
   ctx.fillStyle = '#FFFFFF'; ctx.fill();
-  ctx.strokeStyle = 'rgba(35,33,58,.9)'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.strokeStyle = 'rgba(95,74,78,.85)'; ctx.lineWidth = 2; ctx.stroke();
   // 底板蒙孔（方豆=方点，圆豆=圆点）
   if (cellPx >= 5) {
-    ctx.fillStyle = 'rgba(35,33,58,.08)';
+    ctx.fillStyle = 'rgba(95,74,78,.09)';
     if (BEAD_SHAPE === 'round') {
       const pr = Math.max(0.8, cellPx * 0.07);
       for (let cy = 0; cy < h; cy++) for (let cx = 0; cx < w; cx++) {
@@ -233,7 +233,11 @@ class BoardView {
     const m = 26;
     return Math.min((this.vw - m * 2) / this.o.w, (this.vh - m * 2) / this.o.h);
   }
-  _minScale() { return clamp(this._fitScale() * 0.8, 1.5, 12); }
+  _minScale() {
+    // 自由画布：视野最多约 200 格，保证 240 格渲染窗口始终盖得住屏幕
+    if (this.o.mode === 'free') return Math.max(this.vw, this.vh) / 200;
+    return clamp(this._fitScale() * 0.8, 1.5, 12);
+  }
 
   fit() {
     this.scale = clamp(this._fitScale(), 1.5, 46);
@@ -286,7 +290,7 @@ class BoardView {
       const p = [...this.pointers.values()][0];
       this.gesture = { start: p, moved: 0, painted: false, wrongCell: -1, pinched: false };
       if (this.o.mode === 'play') this._paintAt(p, true);
-      else if (this.o.mode === 'free') this._paintFreeAt(p);
+      // free 模式按下先不落豆：等移动确认是划豆（双指随后落下则是缩放，抬起时轻点再补画）
       else if (this.o.mode === 'iron') {
         this.ironPos = this._ironPoint(p);
         this._ironAt(this.ironPos);
@@ -341,10 +345,16 @@ class BoardView {
         this._paintAt({ x: prev.x + dx * i / steps, y: prev.y + dy * i / steps }, false);
       }
     } else if (this.o.mode === 'free') {
-      // 自由画布：划到哪画到哪（橡皮时擦到哪）
-      const steps = Math.ceil(Math.hypot(dx, dy) / (this.scale * 0.4)) || 1;
-      for (let i = 1; i <= steps; i++) {
-        this._paintFreeAt({ x: prev.x + dx * i / steps, y: prev.y + dy * i / steps });
+      if (this.gesture && this.gesture.pinched) {
+        // 双指缩放后余下的单指：只平移，不落豆
+        this.ox += dx; this.oy += dy;
+        this.dirty = true;
+      } else if (this.gesture && (this.gesture.painted || this.gesture.moved >= 6)) {
+        // 移动超过阈值才开始划豆（阈值内极小抖动不落豆，避免双指落下的瞬间误画）
+        const steps = Math.ceil(Math.hypot(dx, dy) / (this.scale * 0.4)) || 1;
+        for (let i = 1; i <= steps; i++) {
+          this._paintFreeAt({ x: prev.x + dx * i / steps, y: prev.y + dy * i / steps });
+        }
       }
     } else if (this.o.mode === 'iron') {
       // 熨斗沿轨迹碾过去
@@ -378,6 +388,10 @@ class BoardView {
         this.wrongFx = { i: g.wrongCell, t0: now() };
         this.dirty = true;
         if (this.o.onWrong) this.o.onWrong(g.wrongCell);
+      }
+      // free 模式：确认是单指轻点（没变成缩放、没划动过）才补画按下的那一格
+      if (this.o.mode === 'free' && !g.pinched && !g.painted && g.moved < 8) {
+        this._paintFreeAt(g.start);
       }
     }
   }
@@ -541,7 +555,7 @@ class BoardView {
     const freeMode = this.o.mode === 'free';
     if (freeMode) {
       // 无边拼豆板：白板铺满视口，5 格虚线 / 10 格实线参考线（与实体板一致），圆钉随后逐格画
-      ctx.fillStyle = '#FCFCF8';
+      ctx.fillStyle = '#FFFDF9';
       ctx.fillRect(0, 0, this.vw, this.vh);
       const wx0 = Math.floor(-ox / s) - 1, wx1 = Math.ceil((this.vw - ox) / s) + 1;
       const wy0 = Math.floor(-oy / s) - 1, wy1 = Math.ceil((this.vh - oy) / s) + 1;
@@ -549,22 +563,22 @@ class BoardView {
         if (gx % 5 !== 0) continue;
         const X = ox + gx * s;
         ctx.beginPath();
-        if (gx % 10 !== 0) { ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(35,33,58,.10)'; ctx.lineWidth = 1; }
-        else { ctx.setLineDash([]); ctx.strokeStyle = 'rgba(35,33,58,.20)'; ctx.lineWidth = 1.5; }
+        if (gx % 10 !== 0) { ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(95,74,78,.10)'; ctx.lineWidth = 1; }
+        else { ctx.setLineDash([]); ctx.strokeStyle = 'rgba(95,74,78,.22)'; ctx.lineWidth = 1.5; }
         ctx.moveTo(X, 0); ctx.lineTo(X, this.vh); ctx.stroke();
       }
       for (let gy = wy0; gy <= wy1; gy++) {
         if (gy % 5 !== 0) continue;
         const Y = oy + gy * s;
         ctx.beginPath();
-        if (gy % 10 !== 0) { ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(35,33,58,.10)'; ctx.lineWidth = 1; }
-        else { ctx.setLineDash([]); ctx.strokeStyle = 'rgba(35,33,58,.20)'; ctx.lineWidth = 1.5; }
+        if (gy % 10 !== 0) { ctx.setLineDash([4, 4]); ctx.strokeStyle = 'rgba(95,74,78,.10)'; ctx.lineWidth = 1; }
+        else { ctx.setLineDash([]); ctx.strokeStyle = 'rgba(95,74,78,.22)'; ctx.lineWidth = 1.5; }
         ctx.moveTo(0, Y); ctx.lineTo(this.vw, Y); ctx.stroke();
       }
       ctx.setLineDash([]);
       // 凸起圆钉铺满视口（数据网格外也画，纯视觉；缩太小时省略）
       if (s >= 9) {
-        ctx.strokeStyle = 'rgba(35,33,58,.13)';
+        ctx.strokeStyle = 'rgba(95,74,78,.14)';
         ctx.lineWidth = Math.max(1, s * 0.05);
         const sq = BEAD_SHAPE !== 'round';
         for (let py2 = wy0; py2 <= wy1; py2++) {
@@ -582,10 +596,10 @@ class BoardView {
       const bx = ox - pad, by = oy - pad, bw = w * s + pad * 2, bh = h * s + pad * 2;
       const br = Math.min(4, Math.max(2, s * 0.12));
       roundRect(ctx, bx + 5, by + 5, bw, bh, br);
-      ctx.fillStyle = 'rgba(35,33,58,.16)'; ctx.fill();
+      ctx.fillStyle = 'rgba(95,74,78,.14)'; ctx.fill();
       roundRect(ctx, bx, by, bw, bh, br);
       ctx.fillStyle = '#FFFFFF'; ctx.fill();
-      ctx.strokeStyle = 'rgba(35,33,58,.9)'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.strokeStyle = 'rgba(95,74,78,.85)'; ctx.lineWidth = 2; ctx.stroke();
     }
 
     // 可见范围裁剪
@@ -618,7 +632,7 @@ class BoardView {
         const px = ox + cx * s, py = oy + cy * s;
         const mx = px + s / 2, my = py + s / 2;
         if (showPeg && !fused && !isFree) { // 自由模式的钉在背景块里铺满视口画过了
-          ctx.fillStyle = 'rgba(35,33,58,.10)';
+          ctx.fillStyle = 'rgba(95,74,78,.10)';
           if (BEAD_SHAPE === 'round') {
             ctx.beginPath(); ctx.arc(mx, my, Math.max(1, s * 0.06), 0, 7); ctx.fill();
           } else {
@@ -687,7 +701,7 @@ class BoardView {
           if (showNum) {
             const n = this.o.numbers.get(tc);
             if (n != null) {
-              ctx.fillStyle = 'rgba(35,33,58,.75)';
+              ctx.fillStyle = 'rgba(95,74,78,.8)';
               ctx.fillText(String(n), mx, my + s * 0.02);
               ctx.font = numFont;
             }
@@ -712,7 +726,7 @@ class BoardView {
       else {
         const i = this.wrongFx.i;
         const mx = ox + (i % w) * s + s / 2, my = oy + Math.floor(i / w) * s + s / 2;
-        ctx.strokeStyle = 'rgba(232,80,79,' + (1 - k) + ')';
+        ctx.strokeStyle = 'rgba(217,115,127,' + (1 - k) + ')';
         ctx.lineWidth = Math.max(1.5, s * 0.09);
         if (BEAD_SHAPE === 'round') {
           ctx.beginPath(); ctx.arc(mx, my, s * (0.42 + 0.3 * k), 0, 7); ctx.stroke();
@@ -783,15 +797,15 @@ function drawIron(ctx, x, y, s) {
   ctx.scale(0.72, 0.64);
   plate();
   const bg = ctx.createLinearGradient(-w, 0, w, 0);
-  bg.addColorStop(0, '#2E5BB8');
-  bg.addColorStop(0.5, '#5B8AE8');
-  bg.addColorStop(1, '#27499A');
+  bg.addColorStop(0, '#C9838F');
+  bg.addColorStop(0.5, '#E8B4BC');
+  bg.addColorStop(1, '#B06B77');
   ctx.fillStyle = bg;
   ctx.fill();
   ctx.restore();
   // 手柄
   roundRect(ctx, -w * 0.38, -s * 0.04, w * 0.76, s * 0.2, s * 0.1);
-  ctx.fillStyle = '#23213A';
+  ctx.fillStyle = '#5F4A4E';
   ctx.fill();
   // 蒸汽孔
   ctx.fillStyle = 'rgba(90,100,110,.65)';

@@ -144,7 +144,7 @@ Page({
     });
     if (this.utilCanvas) {
       this.uq(() => ui.makeThumb(this, this.utilCanvas, work, true))
-        .then(path => store.update(work.id, { thumb: path, thumbV: 6, thumbShape: getBeadShape() }, true))
+        .then(path => store.update(work.id, { thumb: path, thumbV: 7, thumbShape: getBeadShape() }, true))
         .catch(() => { /* 忽略 */ });
     }
     setTimeout(() => {

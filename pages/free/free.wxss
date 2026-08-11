@@ -26,10 +26,10 @@
   min-width: 0;
 }
 
-/* 完成按钮：用主色调醒目一点 */
+/* 完成按钮：用主色调醒目一点（淡彩主色配深玫瑰字） */
 .tool-chip.done-chip {
   background: var(--accent);
-  color: #fff;
+  color: #7A4A55;
   box-shadow: 3px 3px 0 var(--accent-dark);
 }
 

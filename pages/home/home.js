@@ -5,6 +5,23 @@ const { celebrate } = require('../../utils/confetti');
 const { getBeadShape } = require('../../utils/board');
 const ui = require('../../utils/ui');
 
+// 从自由画布的稀疏豆表裁出密集图纸（heal 重建缩略图用）
+function freePattern(work) {
+  const bs = work && work.freeBeads;
+  if (!Array.isArray(bs) || !bs.length) return null;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const b of bs) {
+    if (b[0] < x0) x0 = b[0];
+    if (b[0] > x1) x1 = b[0];
+    if (b[1] < y0) y0 = b[1];
+    if (b[1] > y1) y1 = b[1];
+  }
+  const w = x1 - x0 + 1, h = y1 - y0 + 1;
+  const cells = new Array(w * h).fill(-1);
+  for (const b of bs) cells[(b[1] - y0) * w + (b[0] - x0)] = b[2];
+  return { w, h, cells };
+}
+
 const EMOTES = ['♪', '★', '!', '✦', '♥'];
 const BEAD_NOTES = [523, 659, 784]; // do mi sol
 const MASCOT_X = 'calc(50% - 51px)'; // 表情泡锚点：豆豆头顶
@@ -37,15 +54,22 @@ Page({
   onHide() { this._stopFx(); },
   onUnload() { this._stopFx(); },
 
-  // 老缩略图需要重新生成：v4 之前可能只截到局部，v5 起为像素方豆，v6 起豆子去描边；
+  // 老缩略图需要重新生成：v4 之前可能只截到局部，v5 起为像素方豆，v6 去豆子描边、v7 起奶油淡彩配色；
   // 另外豆子形状设置变化后（thumbShape 与当前不一致）也重新生成。
   // 失败不写版本号（下次启动还能重试），只在本次会话内跳过，避免每次 onShow 反复重跑。
   _healThumbs() {
     if (this._healing) return;
     const shape = getBeadShape();
     const tried = this._healTried || (this._healTried = {});
-    const list = store.list().filter(s =>
-      (!s.thumbV || s.thumbV < 6 || (s.thumbShape || 'square') !== shape) && !tried[s.id + '|' + shape]);
+    const list = store.list().filter(s => {
+      if (tried[s.id + '|' + shape]) return false;
+      if (s.free && !s.completed) {
+        // 进行中的自由画布：豆子数戳记或形状对不上（或还没有图）就重建
+        return s.placedN > 0 &&
+          (!s.thumb || s.thumbBeads !== s.placedN || (s.thumbShape || 'square') !== shape);
+      }
+      return !s.thumbV || s.thumbV < 7 || (s.thumbShape || 'square') !== shape;
+    });
     if (!list.length) return;
     this._healing = true;
     ui.queryNode(this, '#util').then(r => {
@@ -55,10 +79,21 @@ Page({
         chain = chain.then(() => {
           const work = store.get(s.id);
           if (!work) return null;
-          return ui.makeThumb(this, r.node, work, !!work.ironDone)
-            .then(path => { store.update(work.id, { thumb: path, thumbV: 6, thumbShape: shape }, true); })
+          const isFreeLive = work.free && !work.completed;
+          // 自由画布进行中：从稀疏豆表裁出作品图；其余作品直接画整幅
+          const src = isFreeLive ? freePattern(work) : work;
+          if (!src) return null;
+          const target = isFreeLive
+            ? { id: work.id, thumb: work.thumb, w: src.w, h: src.h, cells: src.cells }
+            : work;
+          return ui.makeThumb(this, r.node, target, !!work.ironDone)
+            .then(path => {
+              const patch = { thumb: path, thumbV: 7, thumbShape: shape };
+              if (isFreeLive) patch.thumbBeads = work.freeBeads.length;
+              store.update(work.id, patch, true);
+            })
             // 只在失败时标记跳过（保留旧图，本次会话不再重试）；
-            // 成功后 thumbShape 已更新，来回切换形状时才能每次都重新生成
+            // 成功后戳记已更新，下次内容/形状变化时才会再生成
             .catch(() => { tried[s.id + '|' + shape] = 1; });
         });
       }
@@ -198,7 +233,7 @@ Page({
         if (!r || !r.node) { this.setData({ celebrating: false }); return; }
         const dpr = Math.min(2, ui.navInsets().dpr);
         celebrate(r.node, r.width, r.height, dpr,
-          ['#E8504F', '#3E6FD8', '#F8C82C', '#57B96A', '#F08080'],
+          ['#EABFC3', '#F2CB8E', '#F5D5D9', '#9EB995', '#C9838F'],
           () => this.setData({ celebrating: false }));
       });
     });
@@ -234,7 +269,7 @@ Page({
       title: '删除作品',
       content: '确定删除「' + d.name + '」吗？删掉就找不回来啦',
       confirmText: '删除',
-      confirmColor: '#E0453A',
+      confirmColor: '#C9838F',
       success: r => {
         if (r.confirm) {
           store.remove(d.id);

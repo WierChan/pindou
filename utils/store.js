@@ -17,10 +17,14 @@ function writeIndex(list) {
 }
 
 function summarize(work) {
-  let total = 0;
-  for (const t of work.cells) if (t >= 0) total++;
-  let placedN = 0;
-  for (const p of work.placed) if (p) placedN++;
+  let total = 0, placedN = 0;
+  if (work.free && !work.completed && Array.isArray(work.freeBeads)) {
+    // 进行中的自由画布只存稀疏豆表，数量直接取表长
+    total = placedN = work.freeBeads.length;
+  } else {
+    for (const t of work.cells) if (t >= 0) total++;
+    for (const p of work.placed) if (p) placedN++;
+  }
   return {
     id: work.id, name: work.name, w: work.w, h: work.h,
     total, placedN,
@@ -29,6 +33,7 @@ function summarize(work) {
     thumb: work.thumb || '',
     thumbV: work.thumbV || 0,
     thumbShape: work.thumbShape || '',
+    thumbBeads: work.thumbBeads || 0, // 自由画布：生成缩略图时的豆子数（过期判断用）
     createdAt: work.createdAt, updatedAt: work.updatedAt,
     completedAt: work.completedAt || 0,
   };

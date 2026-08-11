@@ -6,23 +6,23 @@ const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
 // 像素格子底纹（与 app.wxss 的页面底纹同款）
 function bgGrid(ctx, W, H) {
-  ctx.fillStyle = 'rgba(35,33,58,.05)';
+  ctx.fillStyle = 'rgba(95,74,78,.06)';
   for (let x = 0; x <= W; x += 26) ctx.fillRect(x, 0, 2, H);
   for (let y = 0; y <= H; y += 26) ctx.fillRect(0, y, W, 2);
 }
 
 // 像素风面板：右下掉落式硬投影 + 白底 + 靛墨描边
 function pixelPanel(ctx, x, y, w, h) {
-  ctx.fillStyle = 'rgba(35,33,58,.16)';
+  ctx.fillStyle = 'rgba(95,74,78,.14)';
   ctx.fillRect(x + 8, y + 8, w, h);
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(x, y, w, h);
-  ctx.strokeStyle = '#23213A';
+  ctx.strokeStyle = '#5F4A4E';
   ctx.lineWidth = 3;
   ctx.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
 }
 
-const BRAND_BEADS = [['#E8504F', '#A93231'], ['#3E6FD8', '#27499A'], ['#F8C82C', '#C09314']];
+const BRAND_BEADS = [['#EABFC3', '#C9838F'], ['#F2CB8E', '#C29040'], ['#F5D5D9', '#C9939F']];
 
 // 品牌三连豆（像素方豆：方块 + 描边 + 方孔 + 左上高光）
 function drawBrandBeads(ctx, cx, cy, r, gap) {
@@ -31,7 +31,7 @@ function drawBrandBeads(ctx, cx, cy, r, gap) {
     const s = r * 2, x = bx - r, y = cy - r;
     ctx.fillStyle = pair[0];
     ctx.fillRect(x, y, s, s);
-    ctx.strokeStyle = '#23213A';
+    ctx.strokeStyle = '#5F4A4E';
     ctx.lineWidth = Math.max(2, r * 0.2);
     ctx.strokeRect(x, y, s, s);
     ctx.fillStyle = pair[1];
@@ -81,7 +81,7 @@ function buildShareCardTo(canvas, work, scale) {
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
   // 背景 + 像素格纹
-  ctx.fillStyle = '#F3EFDF';
+  ctx.fillStyle = '#FBF5EC';
   ctx.fillRect(0, 0, W, H);
   bgGrid(ctx, W, H);
 
@@ -90,9 +90,9 @@ function buildShareCardTo(canvas, work, scale) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
   ctx.font = 'bold 40px sans-serif';
-  ctx.fillStyle = 'rgba(232,80,79,.3)';
+  ctx.fillStyle = 'rgba(201,131,143,.4)';
   ctx.fillText('指尖拼豆', W / 2 + 4, 116);
-  ctx.fillStyle = '#23213A';
+  ctx.fillStyle = '#5F4A4E';
   ctx.fillText('指尖拼豆', W / 2, 112);
 
   // 作品面板
@@ -106,10 +106,10 @@ function buildShareCardTo(canvas, work, scale) {
   // 作品信息
   const iy = py + panelH;
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#23213A';
+  ctx.fillStyle = '#5F4A4E';
   ctx.font = 'bold 34px sans-serif';
   ctx.fillText('「' + work.name + '」', W / 2, iy + 52);
-  ctx.fillStyle = '#8B87A6';
+  ctx.fillStyle = '#A59795';
   ctx.font = '24px sans-serif';
   ctx.fillText('我拼好了 ' + total + ' 颗豆子 · ' + stats.length + ' 种颜色 · ' + fmtDate(work.completedAt || work.updatedAt), W / 2, iy + 94);
 
@@ -117,15 +117,15 @@ function buildShareCardTo(canvas, work, scale) {
   const qy = iy + infoH;
   pixelPanel(ctx, M, qy, W - M * 2, inviteH - 20);
   drawBrandBeads(ctx, W / 2, qy + 46, 10, 10);
-  ctx.fillStyle = '#23213A';
+  ctx.fillStyle = '#5F4A4E';
   ctx.font = 'bold 30px sans-serif';
   ctx.fillText('微信搜索小程序「指尖拼豆」', W / 2, qy + 102);
-  ctx.fillStyle = '#8B87A6';
+  ctx.fillStyle = '#A59795';
   ctx.font = '23px sans-serif';
   ctx.fillText('把喜欢的图片，一颗一颗拼出来', W / 2, qy + 144);
 
   // 页脚
-  ctx.fillStyle = '#A29DBB';
+  ctx.fillStyle = '#B7A8A4';
   ctx.font = '21px sans-serif';
   ctx.fillText('—— 指尖拼豆 · 电子拼豆手作 ——', W / 2, qy + inviteH + 26);
 
@@ -156,7 +156,7 @@ function buildExportTo(canvas, work, fused, scale) {
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
   // 背景 + 像素格纹
-  ctx.fillStyle = '#F3EFDF';
+  ctx.fillStyle = '#FBF5EC';
   ctx.fillRect(0, 0, W, H);
   bgGrid(ctx, W, H);
 
@@ -172,10 +172,10 @@ function buildExportTo(canvas, work, fused, scale) {
   const iy = py0 + panelH;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = '#23213A';
+  ctx.fillStyle = '#5F4A4E';
   ctx.font = 'bold 36px sans-serif';
   ctx.fillText('「' + work.name + '」', W / 2, iy + 56);
-  ctx.fillStyle = '#8B87A6';
+  ctx.fillStyle = '#A59795';
   ctx.font = '23px sans-serif';
   ctx.fillText(work.w + '×' + work.h + ' · ' + total + ' 颗豆子 · ' + fmtDate(work.completedAt || work.updatedAt), W / 2, iy + 96);
 
@@ -188,7 +188,7 @@ function buildExportTo(canvas, work, fused, scale) {
   const totalW = beadsW + 16 + tw;
   drawBrandBeads(ctx, W / 2 - totalW / 2 + beadsW / 2, fy - 9, beadR, gap);
   ctx.textAlign = 'left';
-  ctx.fillStyle = '#4A4768';
+  ctx.fillStyle = '#6B5257';
   ctx.fillText(brand, W / 2 - totalW / 2 + beadsW + 16, fy);
 
   return { width: W, height: H };

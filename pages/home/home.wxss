@@ -7,7 +7,7 @@
   position: relative;
   height: 100px;
   margin: 2px 0 0;
-  border-bottom: 2.5px dashed rgba(35, 33, 58, .8); /* 地平线 */
+  border-bottom: 2.5px dashed rgba(95, 74, 78, .7); /* 地平线 */
 }
 
 /* 像素太阳（104×88 内联 PNG） */
@@ -17,7 +17,7 @@
   top: 0;
   width: 46px;
   height: 39px;
-  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGgAAABYCAYAAAAZZrIMAAABbUlEQVR4Ae3BsU0cUQBF0fufVvJEFOAMETIFrOiEwNU5oBM0BQwhInMBRONo3MEkK7R38TtncOO2Zd45MJ3XwQ0LpRZKLZRaKLVQaqHUQqmFUgulFkotlFootVBqodRCqQ0utC3zzoHpvA6+sW2Zdw5M53VwgVBqodRCqYVSC6UWSi2U2uDKHu6fdsTeP14HVxRKLZRaKLVQaqHUQqmFUjsh9/byyVd6fL7DLJRaKLVQaqHUQqmFUguldtqWeecC03kdXNGPn7848vfPb65pW+adC4RSC6UWSi2UWii1UGqh1AZX9nD/tHPg7eWTr/T4fMeR94/XwRWFUgulFkotlFootVBqodROyD0+3/E/C6UWSi2UWii1UGqh1EKpDS60LfPOgem8Dr6xbZl3DkzndXCBUGqh1EKphVILpRZKLZTa4MZty7xzYDqvgxsWSi2UWii1UGqh1EKphVILpRZKLZRaKLVQaqHUQqmFUvsH3EwxLlIKlY0AAAAASUVORK5CYII=");
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGgAAABYCAYAAAAZZrIMAAABcElEQVR4Ae3BsVHcUABF0fvf7Iwz5e7DyokJaIEKSLYBhgaUUAEtEBCTy304V+ZI7kDJDrN38TtncOO2ddk5MM3nwQ0LpRZKLZRaKLVQaqHUQqmFUgulFkotlFootVBqodRCqQ0utK3LzoFpPg++sW1ddg5M83lwgVBqodRCqYVSC6UWSi2U2uDKHu8fdsTePt4HVxRKLZRaKLVQaqHUQqmFUjsh9/pyx1d6ev7ELJRaKLVQaqHUQqmFUguldtrWZecC03weXNGPn7848vfPb65pW5edC4RSC6UWSi2UWii1UGqh1AZX9nj/sHPg9eWOr/T0/MmRt4/3wRWFUgulFkotlFootVBqodROyD09f/I/C6UWSi2UWii1UGqh1EKpDS60rcvOgWk+D76xbV12DkzzeXCBUGqh1EKphVILpRZKLZTa4MZt67JzYJrPgxsWSi2UWii1UGqh1EKphVILpRZKLZRaKLVQaqHUQqmFUvsHNzwyp1P/PaUAAAAASUVORK5CYII=");
   background-size: 100% 100%;
   background-repeat: no-repeat;
   image-rendering: pixelated;
@@ -26,7 +26,7 @@
 /* 圆包像素云（112×56 内联 PNG） */
 .cloud {
   position: absolute;
-  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHAAAAA4CAYAAAAl63xKAAAA7klEQVR4Ae3Bi42EMABDwRd3AqEKqB+q4FNKroOsdGgVeeWZwmB1WhsDXc9RMCbCmghrIqyJsCbCmghrIqwVvqxOa6PjvHdGWuaNN67nKAwkwpoIayKsibAmwpoIayKsFV6q09roOO+dX7bMG29cz1F4QYQ1EdZEWBNhTYQ1EdZEWCt8UKe10XHeO/F/y7zRcz1HoUOENRHWRFgTYU2ENRHWRFgrdVobHee9E+Ms80aPCGsirImwJsKaCGsirImwJsKaCGsirImwJsKaCGsirImwVvigTmsjhrmeo9AhwpoIayKsibAmwpoIayKs/QHA7yHoGA98eAAAAABJRU5ErkJggg==");
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAHAAAAA4CAYAAAAl63xKAAAA7klEQVR4Ae3BgYmEMABE0Z8pTyGWoKVpCQraXq6DLJwsYZZ5rzDYOtXGQMdzFYyJsCbCmghrIqyJsCbCmghrhS9bp9ro2O+TkbZ54Y3juQoDibAmwpoIayKsibAmwpoIa4WX1qk2Ovb75Jdt88Ibx3MVXhBhTYQ1EdZEWBNhTYQ1EdYKH6xTbXTs90n83zYv9BzPVegQYU2ENRHWRFgTYU2ENRHWyjrVRsd+n8Q427zQI8KaCGsirImwJsKaCGsirImwJsKaCGsirImwJsKaCGsirBU+WKfaiGGO5yp0iLAmwpoIayKsibAmwpoIa39cOCJhMoYH0gAAAABJRU5ErkJggg==");
   background-size: 100% 100%;
   background-repeat: no-repeat;
   image-rendering: pixelated;
@@ -53,14 +53,14 @@
 }
 
 /* 草丛 */
-.grass { position: absolute; bottom: 0; width: 4px; height: 4px; background: #57B96A; }
-.grass::before { content: ''; position: absolute; left: 4px; top: -4px; width: 4px; height: 8px; background: #57B96A; }
-.grass::after { content: ''; position: absolute; left: 8px; top: 0; width: 4px; height: 4px; background: #57B96A; }
+.grass { position: absolute; bottom: 0; width: 4px; height: 4px; background: #8FBF87; }
+.grass::before { content: ''; position: absolute; left: 4px; top: -4px; width: 4px; height: 8px; background: #8FBF87; }
+.grass::after { content: ''; position: absolute; left: 8px; top: 0; width: 4px; height: 4px; background: #8FBF87; }
 .g1 { left: 11%; }
 .g2 { right: 9%; }
 
 /* 落地阴影 */
-.gshadow { position: absolute; bottom: 1px; height: 3px; background: rgba(35, 33, 58, .15); }
+.gshadow { position: absolute; bottom: 1px; height: 3px; background: rgba(95, 74, 78, .14); }
 .gs-m { left: calc(50% - 73px); width: 44px; }
 .gs-b { left: calc(50% - 20px); width: 94px; }
 
@@ -164,7 +164,7 @@
 .h1c {
   font-size: 30px;
   font-weight: 800;
-  text-shadow: 3px 3px 0 rgba(232, 80, 79, .25);
+  text-shadow: 3px 3px 0 rgba(201, 131, 143, .35);
 }
 .h1.wave .h1c { animation: chb .45s ease-out both; }
 .h1.wave .h1c:nth-child(2) { animation-delay: .08s; }
@@ -183,7 +183,7 @@
   width: 100%;
   padding: 15px;
   background: var(--accent);
-  color: #fff;
+  color: #7A4A55; /* 淡彩主色配深玫瑰字 */
   font-size: 17px;
   font-weight: 800;
   letter-spacing: 3px;
@@ -210,7 +210,7 @@
   padding: 48px 20px;
   line-height: 1.9;
   font-size: 15px;
-  border: 3px dashed rgba(35, 33, 58, .3);
+  border: 3px dashed rgba(95, 74, 78, .3);
   border-radius: 0;
   margin-top: 8px;
 }
@@ -239,7 +239,7 @@
 .wc-thumb {
   width: 100%;
   padding-top: 100%; /* 1:1，兼容不支持 aspect-ratio 的旧内核 */
-  background: #F4F2FB;
+  background: #F9F0EA;
   position: relative;
 }
 .wc-thumb image {
@@ -254,7 +254,7 @@
   position: absolute;
   left: 8px;
   top: 8px;
-  background: #57B96A;
+  background: #9EB995;
   color: #fff;
   font-size: 11px;
   padding: 3px 8px;
@@ -263,7 +263,7 @@
   font-weight: 700;
 }
 .wc-badge.iron { background: var(--coin); color: var(--ink); }
-.wc-badge.freeb { background: var(--blue); color: #fff; }
+.wc-badge.freeb { background: var(--blue); color: #7A5A2E; }
 .wc-body { padding: 10px 12px 12px; }
 .wc-name {
   font-weight: 700;
@@ -285,7 +285,7 @@
   display: block;
   height: 100%;
   /* 像素分段进度条 */
-  background: repeating-linear-gradient(90deg, var(--accent) 0, var(--accent) 6px, #F3766F 6px, #F3766F 8px);
+  background: repeating-linear-gradient(90deg, var(--accent) 0, var(--accent) 6px, #F4DCDF 6px, #F4DCDF 8px);
   border-radius: 0;
 }
 .wc-del {

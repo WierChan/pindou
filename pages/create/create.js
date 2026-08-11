@@ -295,7 +295,7 @@ Page({
     store.update(work.id, { boostRow: FREE_ROW_USES });
     const go = () => wx.redirectTo({ url: '/pages/play/play?id=' + work.id });
     this.uq(() => ui.makeThumb(this, this.utilCanvas, work, false))
-      .then(path => { store.update(work.id, { thumb: path, thumbV: 6, thumbShape: getBeadShape() }, true); go(); })
+      .then(path => { store.update(work.id, { thumb: path, thumbV: 7, thumbShape: getBeadShape() }, true); go(); })
       .catch(go);
   },
 

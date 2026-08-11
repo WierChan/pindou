@@ -86,7 +86,7 @@ Page({
       title: '删除作品',
       content: '确定删除「' + this.work.name + '」吗？删掉就找不回来啦',
       confirmText: '删除',
-      confirmColor: '#E0453A',
+      confirmColor: '#C9838F',
       success: r => {
         if (r.confirm) {
           store.remove(this.work.id);
