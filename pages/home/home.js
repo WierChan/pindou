@@ -4,6 +4,7 @@ const { audio } = require('../../utils/audio');
 const { celebrate } = require('../../utils/confetti');
 const { getBeadShape } = require('../../utils/board');
 const ui = require('../../utils/ui');
+const sync = require('../../utils/sync');
 
 // 从自由画布的稀疏豆表裁出密集图纸（heal 重建缩略图用）
 function freePattern(work) {
@@ -50,10 +51,27 @@ Page({
     this.refresh();
     this._healThumbs();
     this._startBlink();
+    this._cloudSync();
   },
 
   onHide() { this._stopFx(); },
   onUnload() { this._stopFx(); },
+
+  // 作品云同步：补发挂起操作 → 拉取合并云端 → 有变化则刷新列表
+  _cloudSync() {
+    if (this._syncing) return;
+    this._syncing = true;
+    sync.syncAll().then(changed => {
+      this._syncing = false;
+      if (changed) {
+        this.refresh();
+        this._healThumbs(); // 拉下来的作品没有本地缩略图，就地重建
+      }
+    }).catch(err => {
+      this._syncing = false;
+      console.warn('云同步失败（下次进入首页重试）', err);
+    });
+  },
 
   // 老缩略图需要重新生成：v4 之前可能只截到局部，v5 起为像素方豆，v6 去豆子描边、v7 起奶油淡彩配色；
   // 另外豆子形状设置变化后（thumbShape 与当前不一致）也重新生成。

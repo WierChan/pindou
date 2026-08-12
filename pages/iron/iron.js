@@ -7,7 +7,7 @@ const { buildExportTo } = require('../../utils/share');
 const { audio } = require('../../utils/audio');
 const { celebrate } = require('../../utils/confetti');
 const ui = require('../../utils/ui');
-const { DEBUG } = require('../../utils/config');
+const { cfg } = require('../../utils/config');
 
 Page({
   data: {
@@ -18,7 +18,7 @@ Page({
     workName: '',
     pct: 0,
     muted: false,
-    debug: DEBUG,
+    debug: cfg.DEBUG,
     celebrating: false,
     modal: { show: false, img: '', imgW: 0, imgH: 0 },
     shareShow: false,

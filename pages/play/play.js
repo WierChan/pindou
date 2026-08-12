@@ -6,7 +6,7 @@ const { BoardView, renderPatternTo, getBeadShape, setBeadShape } = require('../.
 const { audio } = require('../../utils/audio');
 const { celebrate } = require('../../utils/confetti');
 const ui = require('../../utils/ui');
-const { DEBUG, FREE_ROW_USES, SWIPE_AD_SECONDS, SWIPE_AD_UNIT_ID } = require('../../utils/config');
+const { cfg } = require('../../utils/config');
 
 const SWIPE_KEY = 'pindou.swipeUntil'; // 滑动拼豆到期时间戳（跨作品/跨会话有效）
 
@@ -24,7 +24,7 @@ Page({
     swipeLeft: 0,
     beadShape: 'square',
     muted: false,
-    debug: DEBUG,
+    debug: cfg.DEBUG,
     total: 0,
     colorN: 0,
     scrollInto: '',
@@ -44,7 +44,7 @@ Page({
       wx.redirectTo({ url: '/pages/free/free?id=' + work.id });
       return;
     }
-    if (work.boostRow == null) work.boostRow = FREE_ROW_USES;
+    if (work.boostRow == null) work.boostRow = cfg.FREE_ROW_USES;
     this.work = work;
     this.uq = ui.serialQueue();
 
@@ -227,19 +227,19 @@ Page({
     this._unlockSwipe();
   },
 
-  // 广告位预留：配置 SWIPE_AD_UNIT_ID 后改用激励视频，看完发放时长——
-  //   this._swipeAd = this._swipeAd || wx.createRewardedVideoAd({ adUnitId: SWIPE_AD_UNIT_ID });
+  // 广告位预留：后台配置 SWIPE_AD_UNIT_ID 后改用激励视频，看完发放时长——
+  //   this._swipeAd = this._swipeAd || wx.createRewardedVideoAd({ adUnitId: cfg.SWIPE_AD_UNIT_ID });
   //   this._swipeAd.onClose(res => { if (res && res.isEnded) this._grantSwipe(); });
   //   this._swipeAd.show().catch(() => this._swipeAd.load().then(() => this._swipeAd.show()));
   // 接入前：弹窗说明后直接发放体验时长
   _unlockSwipe() {
-    if (SWIPE_AD_UNIT_ID) {
+    if (cfg.SWIPE_AD_UNIT_ID) {
       ui.toast('广告加载失败，稍后再试');
       return;
     }
     wx.showModal({
       title: '解锁滑动拼豆',
-      content: '看一段广告，即可获得 ' + SWIPE_AD_SECONDS + ' 秒「划过格子连续上豆」\n（广告位接入前先免费体验）',
+      content: '看一段广告，即可获得 ' + cfg.SWIPE_AD_SECONDS + ' 秒「划过格子连续上豆」\n（广告位接入前先免费体验）',
       confirmText: '立即解锁',
       confirmColor: '#C9838F',
       success: r => { if (r.confirm) this._grantSwipe(); },
@@ -248,9 +248,9 @@ Page({
 
   _grantSwipe() {
     if (this._gone) return;
-    this.swipeUntil = Date.now() + SWIPE_AD_SECONDS * 1000;
+    this.swipeUntil = Date.now() + cfg.SWIPE_AD_SECONDS * 1000;
     try { wx.setStorageSync(SWIPE_KEY, this.swipeUntil); } catch (e) { /* 忽略 */ }
-    ui.toast('滑动拼豆已开启，' + SWIPE_AD_SECONDS + ' 秒内随便划 ✨');
+    ui.toast('滑动拼豆已开启，' + cfg.SWIPE_AD_SECONDS + ' 秒内随便划 ✨');
     this._startSwipeTicker();
   },
 

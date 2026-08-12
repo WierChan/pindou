@@ -32,6 +32,7 @@
 
     <block wx:else>
       <view class="pick-label">⭐ 新手友好 · 几分钟拼完一幅</view>
+      <view wx:if="{{tplError}}" class="pick-label" bindtap="retryTemplates">⚠️ {{tplError}} · 点这里重试</view>
       <view class="tpl-grid">
         <view class="tpl-card" wx:for="{{templates}}" wx:key="name" hover-class="pressed"
               bindtap="pickTpl" data-i="{{index}}">
