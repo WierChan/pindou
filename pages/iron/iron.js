@@ -58,6 +58,7 @@ Page({
       this.bv = new BoardView(r.node, {
         w: this.work.w, h: this.work.h,
         cells: this.work.cells, placed: this.work.placed,
+        palette: this.work.palette || null,
         mode: 'iron', ironed: this.work.ironed,
         onIron: n => this._applyIron(n),
       });
@@ -162,7 +163,8 @@ Page({
       ui.queryNode(this, '#confetti').then(r => {
         if (!r || !r.node) { this.setData({ celebrating: false }); return; }
         const dpr = Math.min(2, ui.navInsets().dpr);
-        const hexes = colorStats(this.work.cells).map(s => PALETTE[s.pal].hex);
+        const w = this.work;
+        const hexes = colorStats(w.cells).map(s => (w.palette ? w.palette[s.pal] : PALETTE[s.pal].hex));
         celebrate(r.node, r.width, r.height, dpr, hexes, () => this.setData({ celebrating: false }));
       });
     });

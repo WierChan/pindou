@@ -1,0 +1,36 @@
+<view wx:if="{{show}}" class="overlay" catchtouchmove="noop" bindtap="onCancel">
+  <view class="modal cropm" catchtap="noop">
+    <view class="cm-head">
+      <view class="cm-title">{{title}}</view>
+      <view class="cm-x" hover-class="pressed" catchtap="onCancel">✕</view>
+    </view>
+
+    <!-- 手势统一在舞台层处理：单指按四角/框内/框外各有分工，双指捏合缩放 -->
+    <view class="cm-stage" id="cmStage"
+          catchtouchstart="onTouchStart" catchtouchmove="onTouchMove"
+          catchtouchend="onTouchEnd" catchtouchcancel="onTouchEnd">
+      <image wx:if="{{box}}" class="cm-img" src="{{src}}"
+             style="left:{{box.left}}px;top:{{box.top}}px;width:{{box.w}}px;height:{{box.h}}px" />
+      <view wx:if="{{crop}}" class="cm-crop"
+            style="left:{{crop.x}}px;top:{{crop.y}}px;width:{{crop.w}}px;height:{{crop.h}}px">
+        <view class="cm-hd hd-tl" />
+        <view class="cm-hd hd-tr" />
+        <view class="cm-hd hd-bl" />
+        <view class="cm-hd hd-br" />
+      </view>
+      <view wx:if="{{!box}}" class="cm-loading">图片加载中…</view>
+    </view>
+
+    <view class="cm-ratios">
+      <view class="cm-ratio {{ratio === item.k ? 'active' : ''}}" wx:for="{{ratios}}" wx:key="k"
+            hover-class="pressed" data-r="{{item.k}}" catchtap="setRatio">{{item.label}}</view>
+    </view>
+
+    <view class="cm-hint">{{hint}}</view>
+
+    <view class="modal-btns">
+      <view class="btn-ghost slim2" hover-class="pressed" catchtap="onReset">复原</view>
+      <view class="btn-primary slim" hover-class="pressed" catchtap="onConfirm">使用图片</view>
+    </view>
+  </view>
+</view>

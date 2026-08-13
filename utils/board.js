@@ -1,7 +1,11 @@
 // 画板渲染引擎（小程序版）：豆子绘制、缩放平移手势、拼豆/熨烫交互
-const { PALETTE_RGB } = require('./palette');
+// 色板：默认全局 PALETTE；作品可自带 palette（hex 数组，图纸导入的真实颜色），
+// drawPatternInto 自动认 p.palette，BoardView 走 opts.palette
+const { PALETTE_RGB, hexToRgb } = require('./palette');
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+// hex 色板 → RGB 三元组数组；没有自定义色板时用全局的
+const palRGB = hexes => (hexes && hexes.length ? hexes.map(hexToRgb) : PALETTE_RGB);
 const css = (rgb, a) => a == null || a >= 1
   ? 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')'
   : 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',' + a + ')';
@@ -31,9 +35,9 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 // 单颗豆子：方形 = 无描边方块 + 深色方孔 + 左上硬高光；圆形 = 圆片 + 径向光泽 + 圆孔
-function drawBead(ctx, cx, cy, r, palIdx, alpha) {
+// rgb 传三元组（调用方从所用色板取好）
+function drawBead(ctx, cx, cy, r, rgb, alpha) {
   if (alpha == null) alpha = 1;
-  const rgb = PALETTE_RGB[palIdx];
   if (alpha < 1) ctx.globalAlpha = alpha;
   if (r < 3) {
     // 太小画不出孔和高光，纯色块反而更清晰（缩略图 / 大图纸缩到很小时）
@@ -73,8 +77,7 @@ function drawBead(ctx, cx, cy, r, palIdx, alpha) {
 }
 
 // 熨烫后的融合豆：方形 = 方块搭接；圆形 = 圆角方块搭接
-function drawFused(ctx, x, y, s, palIdx) {
-  const rgb = PALETTE_RGB[palIdx];
+function drawFused(ctx, x, y, s, rgb) {
   const e = s * 0.06; // 外扩使相邻豆融合
   if (BEAD_SHAPE === 'round' && s >= 3.5) {
     roundRect(ctx, x - e, y - e, s + e * 2, s + e * 2, s * 0.3);
@@ -108,6 +111,7 @@ function drawPatternInto(ctx, p, opts) {
   opts = opts || {};
   const fused = !!opts.fused;
   const placed = opts.placed || null;
+  const PAL = palRGB(opts.palette || p.palette);
   const size = patternSize(p, opts);
   const cellPx = size.cellPx, pad = size.pad;
   const w = p.w, h = p.h, cells = p.cells;
@@ -137,8 +141,8 @@ function drawPatternInto(ctx, p, opts) {
       if (t < 0) continue;
       if (placed && !placed[i]) continue;
       const x = pad + cx * cellPx, y = pad + cy * cellPx;
-      if (fused) drawFused(ctx, x, y, cellPx, t);
-      else drawBead(ctx, x + cellPx / 2, y + cellPx / 2, cellPx * 0.46, t);
+      if (fused) drawFused(ctx, x, y, cellPx, PAL[t]);
+      else drawBead(ctx, x + cellPx / 2, y + cellPx / 2, cellPx * 0.46, PAL[t]);
     }
   }
   if (fused) {
@@ -188,6 +192,7 @@ class BoardView {
     this.cv = canvas;
     this.ctx = canvas.getContext('2d');
     this.o = opts;
+    this.pal = palRGB(opts.palette); // 作品自定义色板（hex 数组）或全局色板
     this.fused = !!opts.fused;
     this.scale = 20; this.ox = 0; this.oy = 0;
     this.vw = 0; this.vh = 0; this.dpr = 1;
@@ -650,30 +655,31 @@ class BoardView {
             if (k >= 1) this.anims.delete(i);
             else r *= 1 + 0.4 * (1 - k) * (1 - k);
           }
+          const rgbT = this.pal[tc];
           if (isIron) {
             if (ironed[i]) {
               const m0 = this.ironAnims.get(i);
-              if (m0 == null) drawFused(ctx, px, py, s, tc);
+              if (m0 == null) drawFused(ctx, px, py, s, rgbT);
               else {
                 const k = (t - m0) / 260;
-                if (k < 0) drawBead(ctx, mx, my, r, tc); // 级联还没轮到
-                else if (k >= 1) { this.ironAnims.delete(i); drawFused(ctx, px, py, s, tc); }
+                if (k < 0) drawBead(ctx, mx, my, r, rgbT); // 级联还没轮到
+                else if (k >= 1) { this.ironAnims.delete(i); drawFused(ctx, px, py, s, rgbT); }
                 else {
                   // 熔化：豆子摊开淡出，熔块淡入
-                  drawBead(ctx, mx, my, r * (1 + 0.12 * k), tc, 1 - k);
+                  drawBead(ctx, mx, my, r * (1 + 0.12 * k), rgbT, 1 - k);
                   ctx.globalAlpha = k;
-                  drawFused(ctx, px, py, s, tc);
+                  drawFused(ctx, px, py, s, rgbT);
                   ctx.globalAlpha = 1;
                 }
               }
-            } else drawBead(ctx, mx, my, r, tc);
+            } else drawBead(ctx, mx, my, r, rgbT);
           }
-          else if (fused) drawFused(ctx, px, py, s, tc);
-          else if (tiny) { ctx.fillStyle = css(PALETTE_RGB[tc]); ctx.fillRect(px, py, s, s); }
-          else drawBead(ctx, mx, my, r, tc);
+          else if (fused) drawFused(ctx, px, py, s, rgbT);
+          else if (tiny) { ctx.fillStyle = css(rgbT); ctx.fillRect(px, py, s, s); }
+          else drawBead(ctx, mx, my, r, rgbT);
         } else if (isPlay) {
           const isSel = tc === sel;
-          const rgb = PALETTE_RGB[tc];
+          const rgb = this.pal[tc];
           ctx.globalAlpha = isSel ? 0.5 : 0.2;
           if (tiny) {
             ctx.fillStyle = css(rgb); ctx.fillRect(px, py, s, s);

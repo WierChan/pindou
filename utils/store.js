@@ -71,6 +71,8 @@ const store = {
       completed: false, ironDone: false, thumb: '',
       createdAt: Date.now(), updatedAt: Date.now(),
     };
+    // 作品自带色板（图纸导入的真实颜色，hex 数组）；没有则各处回退全局色板
+    if (o.palette) work.palette = o.palette;
     try { wx.setStorageSync(WORK_KEY(work.id), work); }
     catch (e) { console.warn('保存失败（可能空间不足）', e); }
     syncIndex(work);

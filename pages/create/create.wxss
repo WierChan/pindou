@@ -18,6 +18,17 @@
 .uz-title { font-size: 17px; font-weight: 800; letter-spacing: 1px; margin-top: 10px; }
 .uz-sub { color: var(--ink2); font-size: 13px; margin-top: 6px; line-height: 1.5; }
 
+/* 图纸导入入口：更矮一点，与主入口区分 */
+.uz-chart { margin-top: 14px; padding: 26px 20px; }
+.uz-chart .uz-icon { font-size: 32px; }
+
+.chart-hint {
+  text-align: center;
+  color: var(--ink2);
+  font-size: 12.5px;
+  margin-top: 6px;
+}
+
 .pick-label {
   font-size: 14px;
   font-weight: 700;

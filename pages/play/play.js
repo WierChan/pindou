@@ -1,7 +1,7 @@
 // 拼豆界面
 const { store } = require('../../utils/store');
-const { PALETTE, textColorFor } = require('../../utils/palette');
-const { colorStats } = require('../../utils/convert');
+const { PALETTE, textColorFor, hexToRgb } = require('../../utils/palette');
+const { colorStats, nearestPalette } = require('../../utils/convert');
 const { BoardView, renderPatternTo, getBeadShape, setBeadShape } = require('../../utils/board');
 const { audio } = require('../../utils/audio');
 const { celebrate } = require('../../utils/confetti');
@@ -47,6 +47,13 @@ Page({
     if (work.boostRow == null) work.boostRow = FREE_ROW_USES;
     this.work = work;
     this.uq = ui.serialQueue();
+    // 作品自带色板（图纸导入）：渲染与 UI 用图纸真实颜色，色名借最近的全局色名
+    this.palHex = pal => (work.palette ? work.palette[pal] : PALETTE[pal].hex);
+    this.palName = pal => {
+      if (!work.palette) return PALETTE[pal].name;
+      const c = hexToRgb(work.palette[pal]);
+      return PALETTE[nearestPalette(c[0], c[1], c[2])].name;
+    };
 
     const stats = colorStats(work.cells);
     this.colorsUsed = stats.map(s => s.pal);
@@ -76,8 +83,8 @@ Page({
       const n = this.remaining.get(pal);
       return {
         pal, num: i + 1,
-        hex: PALETTE[pal].hex,
-        tcol: textColorFor(PALETTE[pal].hex),
+        hex: this.palHex(pal),
+        tcol: textColorFor(this.palHex(pal)),
         left: n > 0 ? n : '✓',
         done: n === 0,
         active: pal === this.sel,
@@ -129,6 +136,7 @@ Page({
       this.bv = new BoardView(r.node, {
         w: this.work.w, h: this.work.h,
         cells: this.work.cells, placed: this.work.placed,
+        palette: this.work.palette || null,
         mode: 'play',
         numbers: this.numbers,
         getSelected: () => this.sel,
@@ -330,7 +338,7 @@ Page({
       audio.colorDone();
       // 里程碑轻震：拼完一种颜色（普通上豆不震，震动语义留给错误与里程碑）
       try { wx.vibrateShort({ type: 'light' }); } catch (e) { /* 忽略 */ }
-      ui.toast('「' + PALETTE[doneNow[0]].name + '」拼完啦 ✓');
+      ui.toast('「' + this.palName(doneNow[0]) + '」拼完啦 ✓');
       if (doneNow.indexOf(this.sel) >= 0) {
         const start = this.colorsUsed.indexOf(this.sel);
         for (let k = 1; k <= this.colorsUsed.length; k++) {
@@ -390,7 +398,7 @@ Page({
       ui.queryNode(this, '#confetti').then(r => {
         if (!r || !r.node) { this.setData({ celebrating: false }); return; }
         const dpr = Math.min(2, ui.navInsets().dpr);
-        const hexes = this.colorsUsed.map(p => PALETTE[p].hex);
+        const hexes = this.colorsUsed.map(p => this.palHex(p));
         celebrate(r.node, r.width, r.height, dpr, hexes, () => this.setData({ celebrating: false }));
       });
     });

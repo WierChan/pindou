@@ -1,0 +1,101 @@
+.modal.cropm {
+  max-width: 430px;
+  padding: 16px 14px 18px;
+  gap: 12px;
+  text-align: left;
+}
+
+.cm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cm-title { font-size: 18px; font-weight: 800; letter-spacing: 2px; }
+.cm-x {
+  width: 34px;
+  height: 34px;
+  background: var(--card);
+  border: 3px solid var(--ink);
+  box-shadow: 3px 3px 0 #E2DAD3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  transition: transform .12s;
+}
+
+.cm-stage {
+  position: relative;
+  width: 100%;
+  height: 40vh;
+  max-height: 410px;
+  background: #EFE7DC;
+  border: 3px solid var(--ink);
+  overflow: hidden;
+}
+.cm-img { position: absolute; }
+.cm-loading {
+  position: absolute;
+  left: 0; right: 0; top: 45%;
+  text-align: center;
+  color: var(--ink2);
+  font-size: 13px;
+}
+
+/* 裁剪框：粗边 + 巨投影压暗框外区域 */
+.cm-crop {
+  position: absolute;
+  border: 2px solid var(--accent-dark);
+  box-shadow: 0 0 0 2000px rgba(95, 74, 78, .38);
+}
+
+/* 四角把手：40px 触摸热区（舞台四周留了边，热区完整露出），中间画 18px 曦黄方块 */
+.cm-hd { position: absolute; width: 40px; height: 40px; }
+.cm-hd::after {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 11px;
+  width: 18px;
+  height: 18px;
+  background: var(--blue);
+  border: 3px solid var(--ink);
+  box-sizing: border-box;
+}
+.hd-tl { left: -20px; top: -20px; }
+.hd-tr { right: -20px; top: -20px; }
+.hd-bl { left: -20px; bottom: -20px; }
+.hd-br { right: -20px; bottom: -20px; }
+
+/* 裁剪比例 */
+.cm-ratios {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.cm-ratio {
+  flex: 1;
+  min-width: 48px;
+  padding: 7px 0;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink2);
+  background: var(--card);
+  border: 2px solid var(--ink);
+  box-shadow: 2px 2px 0 #E2DAD3;
+  transition: transform .12s;
+}
+.cm-ratio.active {
+  background: var(--blue);
+  color: #7A5A2E;
+  box-shadow: 2px 2px 0 var(--blue-dark);
+}
+
+.cm-hint {
+  font-size: 12.5px;
+  color: var(--ink2);
+  text-align: center;
+  line-height: 1.6;
+}

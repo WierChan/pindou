@@ -54,22 +54,30 @@ function boost(r, g, b) {
 // 把图片文件解码后读出像素（借用一块 2d canvas）
 // maxSide 由调用方决定：图片转图纸用 512 —— 真机上解码/读回/重采样都快一个量级，
 // 且对 ≤256 豆的画布每格仍有 ≥2×2 采样；不大于 maxSide 的小图不缩放（像素画 1:1 还原）
-function loadImageToData(canvas, src, maxSide) {
+// rect：可选的归一化源区裁剪 {x, y, w, h}（0~1，裁剪弹窗的输出），只解码框内部分
+function loadImageToData(canvas, src, maxSide, rect) {
   maxSide = maxSide || 2048;
   return new Promise((resolve, reject) => {
     const img = canvas.createImage();
     img.onload = () => {
       try {
-        const k = Math.min(1, maxSide / Math.max(img.width, img.height));
-        const w = Math.max(1, Math.round(img.width * k));
-        const h = Math.max(1, Math.round(img.height * k));
+        let sx = 0, sy = 0, sw = img.width, sh = img.height;
+        if (rect) {
+          sx = Math.max(0, Math.round(img.width * rect.x));
+          sy = Math.max(0, Math.round(img.height * rect.y));
+          sw = Math.max(1, Math.min(img.width - sx, Math.round(img.width * rect.w)));
+          sh = Math.max(1, Math.min(img.height - sy, Math.round(img.height * rect.h)));
+        }
+        const k = Math.min(1, maxSide / Math.max(sw, sh));
+        const w = Math.max(1, Math.round(sw * k));
+        const h = Math.max(1, Math.round(sh * k));
         canvas.width = w; canvas.height = h;
         const ctx = canvas.getContext('2d');
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.imageSmoothingEnabled = true;
         try { ctx.imageSmoothingQuality = 'high'; } catch (e) { /* 部分内核不支持 */ }
         ctx.clearRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0, w, h);
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
         const d = ctx.getImageData(0, 0, w, h);
         resolve({ data: d.data, w, h });
       } catch (e) { reject(e); }

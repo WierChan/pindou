@@ -2,6 +2,7 @@
 const { store } = require('../../utils/store');
 const { PALETTE } = require('../../utils/palette');
 const { loadImageToData, emojiToData, imageToPattern, colorStats, reduceColors } = require('../../utils/convert');
+const { analyzeChart } = require('../../utils/chart');
 const { TEMPLATES, templatePattern } = require('../../utils/templates');
 const { renderPatternTo, patternSize, getBeadShape } = require('../../utils/board');
 const ui = require('../../utils/ui');
@@ -39,10 +40,15 @@ Page({
     sizeHint: '',
     sizesShown: [16, 24, 32, 48],
     showColor: false,
-    colorMax: 38,
-    colorVal: 38,
+    colorMax: 45,
+    colorVal: 45,
     whiteEmpty: false,
-    fromTpl: false,
+    fixed: false,
+    fromChart: false,
+    cropShow: false,
+    cropSrc: '',
+    cropTitle: '裁剪图片',
+    cropHint: '',
     name: '',
     dimText: '',
     total: 0,
@@ -57,6 +63,7 @@ Page({
     // 且 ≤256 豆的画布每格仍有 ≥2×2 采样，观感与全尺寸一致（小图不缩放，1:1 还原不受影响）
     this.srcData = null;
     this.pattern = null;    // {w, h, cells} 最终图纸
+    this.fromChart = false; // 图纸导入模式：pattern 按图纸 1:1 还原，不可调大小/颜色
     this.colorLimit = null; // 用户设定的颜色数量（null = 不限制）
     this._base = null;      // 未做颜色缩减的基础图纸缓存
     this._baseKey = '';
@@ -136,32 +143,96 @@ Page({
     chain.then(() => { TPL_THUMBS = paths; }).catch(() => { /* 缩略图失败不影响功能 */ });
   },
 
-  chooseImage() {
+  _pickImage(onPath) {
     const pick = wx.chooseMedia || wx.chooseImage;
     const opts = {
       count: 1,
       success: res => {
-        const path = res.tempFiles ? res.tempFiles[0].tempFilePath : res.tempFilePaths[0];
-        wx.showLoading({ title: '生成图纸中', mask: true });
-        this._loadSrc(cv => loadImageToData(cv, path, 512)).then(d => {
-          this.srcData = d;
-          this.fromTpl = false;
-          this.name = '我的拼豆';
-          this._base = null;
-          this.colorLimit = null;
-          this._renderConfig();
-          wx.hideLoading();
-        }).catch(() => { wx.hideLoading(); ui.toast('图片打开失败，换一张试试'); });
+        onPath(res.tempFiles ? res.tempFiles[0].tempFilePath : res.tempFilePaths[0]);
       },
     };
     if (wx.chooseMedia) opts.mediaType = ['image'];
     pick(opts);
   },
 
+  // 两个入口都先进裁剪弹窗：框哪里拼哪里（不裁直接「使用图片」= 整张）
+  chooseImage() {
+    this._pickImage(path => this._openCrop(path, 'image'));
+  },
+
+  chooseChart() {
+    this._pickImage(path => this._openCrop(path, 'chart'));
+  },
+
+  _openCrop(path, mode) {
+    this._cropMode = mode;
+    this.setData({
+      cropShow: true,
+      cropSrc: path,
+      cropTitle: mode === 'chart' ? '框出图纸网格' : '裁剪图片',
+      cropHint: mode === 'chart'
+        ? '双指缩放看细节，把网格框出来（标题、色号表留在框外）；识别会自动对齐格子，框得大概齐就行'
+        : '拖四角框选想拼的部分，双指缩放；不裁剪就直接点「使用图片」',
+    });
+  },
+
+  onCropCancel() { this.setData({ cropShow: false }); },
+
+  onCropConfirm(e) {
+    const rect = e.detail.rect;
+    this.setData({ cropShow: false });
+    if (this._cropMode === 'chart') this._importChart(this.data.cropSrc, rect);
+    else this._importImage(this.data.cropSrc, rect);
+  },
+
+  _importImage(path, rect) {
+    wx.showLoading({ title: '生成图纸中', mask: true });
+    this._loadSrc(cv => loadImageToData(cv, path, 512, rect)).then(d => {
+      this.srcData = d;
+      this.fromTpl = false;
+      this.fromChart = false;
+      this.name = '我的拼豆';
+      this._base = null;
+      this.colorLimit = null;
+      this._renderConfig();
+      wx.hideLoading();
+    }).catch(() => { wx.hideLoading(); ui.toast('图片打开失败，换一张试试'); });
+  },
+
+  // 导入拼豆图纸截图（小红书图纸工坊等生成的规整图纸图）：
+  // 识别网格逐格取色，1:1 还原成可拼的作品
+  _importChart(path, rect) {
+    wx.showLoading({ title: '识别图纸中', mask: true });
+    // 图纸必须高分辨率解码：上百格的图纸每格才有足够像素可采
+    this._loadSrc(cv => loadImageToData(cv, path, 2048, rect)).then(d => {
+      const r = analyzeChart(d.data, d.w, d.h);
+      wx.hideLoading();
+      if (!r.ok) {
+        // 真机排查：vConsole 里能看到失败原因和中间量（格距/置信度/主体范围）
+        console.warn('[图纸导入] 识别失败:', r.reason, r.debug || '', '图片', d.w + 'x' + d.h);
+        wx.showModal({
+          title: '没认出这张图纸',
+          content: (r.reason || '识别失败') + '。试试发原图（别经过聊天/朋友圈压缩），或把网格部分框得再准一点',
+          showCancel: false,
+          confirmText: '知道了',
+          confirmColor: '#C9838F',
+        });
+        return;
+      }
+      // palette = 图纸真实取样色（作品自带色板），预览/开拼颜色与原图纸一致
+      this.pattern = { w: r.w, h: r.h, cells: r.cells, palette: r.palette };
+      this.fromChart = true;
+      this.fromTpl = false;
+      this.name = '图纸拼豆';
+      this._renderConfig();
+    }).catch(() => { wx.hideLoading(); ui.toast('图片打开失败，换一张试试'); });
+  },
+
   pickTpl(e) {
     const t = TEMPLATES[e.currentTarget.dataset.i];
     this.pattern = templatePattern(t);
     this.fromTpl = true;
+    this.fromChart = false;
     this.name = t.name;
     this._renderConfig();
   },
@@ -171,6 +242,7 @@ Page({
     this._loadSrc(cv => emojiToData(cv, ch)).then(d => {
       this.srcData = d;
       this.fromTpl = false;
+      this.fromChart = false;
       this.name = ch + ' 拼豆';
       this._base = null;
       this.colorLimit = null;
@@ -215,8 +287,9 @@ Page({
 
   _renderConfig() {
     const extra = {};
+    const fixed = this.fromTpl || this.fromChart; // 图纸/模板：尺寸颜色都定死，1:1 还原
     let p;
-    if (this.fromTpl) {
+    if (fixed) {
       p = this.pattern;
     } else {
       if (!this.srcData) return;
@@ -256,7 +329,7 @@ Page({
     const stats = colorStats(p.cells);
     const total = stats.reduce((a, s) => a + s.count, 0);
     const chips = stats.slice().sort((a, b) => b.count - a.count).slice(0, 12)
-      .map(s => ({ hex: PALETTE[s.pal].hex, count: s.count }));
+      .map(s => ({ hex: p.palette ? p.palette[s.pal] : PALETTE[s.pal].hex, count: s.count }));
 
     const ins = ui.navInsets();
     const maxPx = Math.min(340, ins.winW - 72);
@@ -265,7 +338,8 @@ Page({
 
     this.setData(Object.assign(extra, {
       mode: 'config',
-      fromTpl: this.fromTpl,
+      fixed,
+      fromChart: !!this.fromChart,
       name: this.name,
       dimText: p.w + ' × ' + p.h + ' 板',
       total,
@@ -291,7 +365,7 @@ Page({
     const p = this.pattern;
     if (!p) return;
     const name = (this.name || '').trim() || '我的拼豆';
-    const work = store.create({ name, w: p.w, h: p.h, cells: p.cells });
+    const work = store.create({ name, w: p.w, h: p.h, cells: p.cells, palette: p.palette });
     store.update(work.id, { boostRow: FREE_ROW_USES });
     const go = () => wx.redirectTo({ url: '/pages/play/play?id=' + work.id });
     this.uq(() => ui.makeThumb(this, this.utilCanvas, work, false))

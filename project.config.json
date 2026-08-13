@@ -37,6 +37,15 @@
       "outputPath": ""
     }
   },
+  "packOptions": {
+    "ignore": [
+      {
+        "type": "folder",
+        "value": "tests"
+      }
+    ],
+    "include": []
+  },
   "condition": {},
   "editorSetting": {
     "tabIndent": "insertSpaces",

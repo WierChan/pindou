@@ -19,6 +19,12 @@
         <view class="uz-sub">照片、表情包、logo 都可以</view>
         <view class="uz-sub">转成拼豆图纸后开拼</view>
       </view>
+      <view class="upload-zone uz-chart" hover-class="uz-hover" bindtap="chooseChart">
+        <view class="uz-icon">📐</view>
+        <view class="uz-title">导入拼豆图纸</view>
+        <view class="uz-sub">小红书图纸工坊等生成的图纸截图</view>
+        <view class="uz-sub">框出网格 → 自动识别 → 按图纸 1:1 开拼</view>
+      </view>
     </block>
 
     <block wx:elif="{{tab === 'free'}}">
@@ -58,13 +64,14 @@
         <canvas type="2d" id="preview" style="width:{{pvW}}px;height:{{pvH}}px"></canvas>
       </view>
       <view class="stats-line">{{dimText}} · <text class="b">{{total}}</text> 颗豆子 · <text class="b">{{colorN}}</text> 种颜色</view>
+      <view wx:if="{{fromChart}}" class="chart-hint">📐 已识别图纸网格，按原图 1:1 还原</view>
       <view class="color-chips">
         <view class="cchip" wx:for="{{chips}}" wx:key="index">
           <view class="dot" style="background:{{item.hex}}" />{{item.count}}
         </view>
       </view>
 
-      <block wx:if="{{!fromTpl}}">
+      <block wx:if="{{!fixed}}">
         <view class="opt-col">
           <view class="opt-row">
             <view class="opt-label">画布大小</view>
@@ -107,3 +114,6 @@
 <canvas type="2d" id="util" class="util-canvas" style="width:{{capW}}px;height:{{capH}}px"></canvas>
 <!-- 图片解码专用画布：与模板缩略图的导出队列分离，选图后立即可用 -->
 <canvas type="2d" id="util2" class="util-canvas"></canvas>
+
+<crop-modal show="{{cropShow}}" src="{{cropSrc}}" title="{{cropTitle}}" hint="{{cropHint}}"
+            bind:confirm="onCropConfirm" bind:cancel="onCropCancel" />

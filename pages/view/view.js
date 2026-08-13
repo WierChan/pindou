@@ -39,6 +39,7 @@ Page({
       this.bv = new BoardView(r.node, {
         w: this.work.w, h: this.work.h,
         cells: this.work.cells, placed: this.work.placed,
+        palette: this.work.palette || null,
         mode: 'view', fused: true,
       });
       this.bv.setViewport(r.width, r.height, dpr, r.left, r.top);

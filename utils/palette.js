@@ -1,4 +1,6 @@
-// 拼豆色板：38 色，参考常见品牌豆子配色
+// 拼豆色板：45 色，参考常见品牌豆子配色
+// 末尾 7 色为莫兰迪/中间调补充档（浅卡其、暖灰、炭灰、深蓝、深青、灰绿、陶土），
+// 补齐导入图纸时的常见缺口；只能追加不能重排 —— cells 里存的是色板下标
 const PALETTE = [
   { name: '纯白', hex: '#FFFFFF' },
   { name: '米白', hex: '#F2E8D8' },
@@ -38,6 +40,13 @@ const PALETTE = [
   { name: '草绿', hex: '#4CAF50' },
   { name: '深绿', hex: '#1E7A44' },
   { name: '橄榄', hex: '#8A8F3C' },
+  { name: '浅卡其', hex: '#D8C4B8' },
+  { name: '暖灰', hex: '#AAA69E' },
+  { name: '炭灰', hex: '#383A3F' },
+  { name: '深蓝', hex: '#20549E' },
+  { name: '深青', hex: '#2C8A94' },
+  { name: '灰绿', hex: '#828C82' },
+  { name: '陶土', hex: '#C46C5A' },
 ];
 
 function hexToRgb(hex) {
