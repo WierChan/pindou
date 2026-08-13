@@ -3,6 +3,9 @@
 // 期间顺手预热云登录，让首页的云同步更快返回。
 // 分享卡直达 /pages/home/home 不走这里，只有正常冷启动会看到。
 const ui = require('../../utils/ui');
+const { audio } = require('../../utils/audio');
+
+const HOP_MS = 550; // 与 wxss 里 sphop 动画周期一致：落地声按周期对拍
 
 const STAGES = [
   [0, '擦亮豆子'],
@@ -37,12 +40,16 @@ Page({
     this._sync(0);
     this._tick();
     this._blinkLoop();
+    // 开店小曲 + 跟着弹跳周期的落地声（都走全局静音开关；个别机型不给自动播则静默）
+    audio.splashTune();
+    this._hopT = setInterval(() => audio.bounce(), HOP_MS);
   },
 
   onUnload() {
     clearTimeout(this._t);
     clearTimeout(this._bt);
     clearTimeout(this._bt2);
+    clearInterval(this._hopT);
     this._gone = true;
   },
 
@@ -69,9 +76,12 @@ Page({
     });
   },
 
-  // 到站：停跳，来一个大落地弹跳，然后进店
+  // 到站：停跳停声，来一个大落地弹跳 + 小号角，然后进店
   _land() {
+    clearInterval(this._hopT);
     this.setData({ landed: true });
+    audio.bounce();
+    audio.fanfare();
     try { wx.vibrateShort({ type: 'light' }); } catch (e) { /* 忽略 */ }
     setTimeout(() => {
       if (!this._gone) wx.redirectTo({ url: '/pages/home/home' });
