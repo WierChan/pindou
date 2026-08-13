@@ -4,7 +4,7 @@
 const ENV = 'dev'; // 'dev' | 'prod'
 
 const HOSTS = {
-  dev: 'http://127.0.0.1:7020',
+  dev: 'http://127.0.0.1:7000',
   prod: 'https://pindou-api.example.com', // TODO: 部署后替换为真实域名
 };
 
