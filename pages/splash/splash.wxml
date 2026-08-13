@@ -1,0 +1,49 @@
+<view class="splash">
+  <!-- 避开状态栏 + 胶囊（onLoad 里按真机测量，首帧即正确） -->
+  <view class="sp-safe" style="height:{{safeH}}px" />
+
+  <!-- 便利店遮阳棚 -->
+  <view class="sp-awning" />
+
+  <!-- 标题区 -->
+  <view class="sp-head">
+    <view class="sp-h1">
+      <text class="c1">拼</text><text class="c2">豆</text><text class="c3">便</text><text class="c4">利</text><text class="c5">店</text>
+    </view>
+    <view class="sp-sub">把喜欢的图片，一颗一颗拼出来</view>
+  </view>
+
+  <!-- 小场景：太阳 / 云 / 漂浮的彩色拼豆 / 便利店小房子站在虚线地平线上 / 草丛 -->
+  <view class="sp-scene">
+    <view class="sp-sun" />
+    <view class="sp-cloud" />
+    <view class="sp-cloud c2" />
+    <view class="fb fb1" />
+    <view class="fb fb2" />
+    <view class="fb fb3" />
+    <view class="fb fb4" />
+    <view class="fb fb5" />
+    <view class="fb fb6" />
+    <view class="fb fb7" />
+    <view class="sp-store" />
+    <view class="sp-grass g1" />
+    <view class="sp-grass g2" />
+    <view class="sp-grass g3" />
+    <view class="sp-grass g4" />
+    <view class="sp-grass g5" />
+  </view>
+
+  <!-- 底部：豆豆骑进度条进店 -->
+  <view class="sp-bottom">
+    <view class="sp-track">
+      <view class="sp-bean {{landed ? 'landed' : ''}}" style="left:{{leftPx}}px">
+        <view class="sprite {{blink ? 'blink' : ''}}" />
+        <view class="shadow" />
+      </view>
+      <view class="sp-bar">
+        <view class="fill" style="width:{{pct}}%" />
+      </view>
+    </view>
+    <view class="sp-txt">{{stage}}中… {{pct}}%</view>
+  </view>
+</view>

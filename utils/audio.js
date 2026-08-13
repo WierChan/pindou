@@ -112,6 +112,21 @@ const audio = {
     [659, 784, 880, 1046].forEach((f, i) =>
       beep({ freq: f, dur: 0.1, gain: 0.09, at: i * 0.09 }));
   },
+
+  /* ---- 开屏（同样走静音开关） ---- */
+  // 开店小曲：C 大调五声音阶的轻快旋律 + 简单低音，约 2.5s，一次性调度完
+  splashTune() {
+    const melody = [523, 659, 784, 880, 784, 659, 784, 1046, 880, 784, 659, 523];
+    melody.forEach((f, i) =>
+      beep({ freq: f, dur: 0.15, type: 'triangle', gain: 0.055, at: i * 0.21 }));
+    [261, 329, 392, 329].forEach((f, i) =>
+      beep({ freq: f, dur: 0.32, type: 'sine', gain: 0.045, at: i * 0.63 }));
+  },
+  // 豆豆落地"啵嘤"：短促下滑 + 回弹上滑（打击感，和旋律错开频段）
+  bounce() {
+    beep({ freq: 340, to: 180, dur: 0.07, type: 'sine', gain: 0.09 });
+    beep({ freq: 230, to: 430, dur: 0.09, type: 'sine', gain: 0.055, at: 0.07 });
+  },
 };
 
 module.exports = { audio };
