@@ -5,6 +5,7 @@ const { celebrate } = require('../../utils/confetti');
 const { getBeadShape } = require('../../utils/board');
 const ui = require('../../utils/ui');
 const sync = require('../../utils/sync');
+const { buildGuide } = require('../../utils/guidance');
 
 // 从自由画布的稀疏豆表裁出密集图纸（heal 重建缩略图用）
 function freePattern(work) {
@@ -45,6 +46,7 @@ Page({
     ctaAnim: '',      // CTA 按压回弹
     emotes: [],       // 表情泡 [{id, txt, x}]
     celebrating: false,
+    guideSteps: [],
   },
 
   onShow() {
@@ -53,6 +55,17 @@ Page({
     this._startBlink();
     this._cloudSync();
   },
+
+  onReady() {
+    // 首次进入：豆豆开场引导
+    buildGuide(this, 'home', [
+      { text: '欢迎光临拼豆便利店！我是豆豆～这里可以把喜欢的图片一颗一颗拼出来，跟你转一圈！' },
+      { sel: '.cta-new', text: '一切从这里开始：选一张图片、导入拼豆图纸，或者开一块自由画布随便画！' },
+      { sel: '.home-tabs', text: '拼到一半的作品放在「进行中」，拼完熨烫定型的收藏在「已完成」。去开你的第一个作品吧！' },
+    ]);
+  },
+
+  onGuideDone() { this.setData({ guideSteps: [] }); },
 
   onHide() { this._stopFx(); },
   onUnload() { this._stopFx(); },

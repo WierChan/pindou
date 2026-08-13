@@ -8,6 +8,7 @@ const { audio } = require('../../utils/audio');
 const { celebrate } = require('../../utils/confetti');
 const ui = require('../../utils/ui');
 const { cfg } = require('../../utils/config');
+const { buildGuide } = require('../../utils/guidance');
 
 Page({
   data: {
@@ -23,6 +24,7 @@ Page({
     modal: { show: false, img: '', imgW: 0, imgH: 0 },
     shareShow: false,
     workId: '',
+    guideSteps: [],
   },
 
   onLoad(q) {
@@ -66,7 +68,13 @@ Page({
       setTimeout(() => ui.syncBoardRect(this, this.bv), 600);
     });
     ui.queryNode(this, '#util').then(r => { if (r) this.utilCanvas = r.node; });
+    // 首次熨烫：教操作
+    buildGuide(this, 'iron', [
+      { text: '豆子拼齐啦，最后一步：按住屏幕不放，熨斗就会出现，划过豆子把它们烫平定型！全部烫完就大功告成～' },
+    ]);
   },
+
+  onGuideDone() { this.setData({ guideSteps: [] }); },
 
   onResize() {
     this.setData({ insets: ui.navInsets() });

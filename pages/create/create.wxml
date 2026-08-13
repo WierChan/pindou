@@ -118,3 +118,5 @@
 
 <crop-modal show="{{cropShow}}" src="{{cropSrc}}" title="{{cropTitle}}" hint="{{cropHint}}"
             bind:confirm="onCropConfirm" bind:cancel="onCropCancel" />
+
+<guide gid="create" steps="{{guideSteps}}" bind:done="onGuideDone" />

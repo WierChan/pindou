@@ -17,7 +17,8 @@
   },
   "resizable": true,
   "usingComponents": {
-    "share-modal": "/components/share-modal/share-modal"
+    "share-modal": "/components/share-modal/share-modal",
+    "guide": "/components/guide/guide"
   },
   "style": "v2",
   "sitemapLocation": "sitemap.json",

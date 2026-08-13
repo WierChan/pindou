@@ -50,3 +50,5 @@
 </view>
 
 <canvas type="2d" id="util" class="util-canvas" style="width:{{capW}}px;height:{{capH}}px"></canvas>
+
+<guide gid="iron" steps="{{guideSteps}}" bind:done="onGuideDone" />

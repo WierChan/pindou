@@ -7,6 +7,7 @@ const { audio } = require('../../utils/audio');
 const { celebrate } = require('../../utils/confetti');
 const ui = require('../../utils/ui');
 const { cfg } = require('../../utils/config');
+const { buildGuide } = require('../../utils/guidance');
 
 const SWIPE_KEY = 'pindou.swipeUntil'; // 滑动拼豆到期时间戳（跨作品/跨会话有效）
 
@@ -30,6 +31,7 @@ Page({
     scrollInto: '',
     celebrating: false,
     modal: { show: false, img: '', imgW: 0, imgH: 0 },
+    guideSteps: [],
   },
 
   onLoad(q) {
@@ -108,7 +110,15 @@ Page({
     if (!this.work) return;
     this._initBoard();
     ui.queryNode(this, '#util').then(r => { if (r) this.utilCanvas = r.node; });
+    // 首次拼豆：讲核心三件事（选色 → 点格子 → 工具）
+    buildGuide(this, 'play', [
+      { sel: '.palette-bar', text: '先在这里选颜色！每种颜色有编号，下面的数字是还差几颗' },
+      { text: '板上淡淡的格子就是图纸。点亮所有跟选中颜色一样的格子吧！点错了我会晃一晃提醒你。双指可以缩放看细节～' },
+      { sel: '.tools-row', text: '「整排拼豆」咔哒一下上一整排；「滑动拼豆」解锁后手指划过就能连续上豆，超解压！' },
+    ]);
   },
+
+  onGuideDone() { this.setData({ guideSteps: [] }); },
 
   onResize() {
     this.setData({ insets: ui.navInsets() });

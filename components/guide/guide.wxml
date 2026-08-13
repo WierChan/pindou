@@ -1,0 +1,18 @@
+<view wx:if="{{shown}}" class="g-ov" catchtouchmove="noop" catchtap="next">
+  <!-- 聚光灯：洞外由巨投影压暗，步骤切换时洞平滑移动；没有目标就整屏压暗 -->
+  <view wx:if="{{hole}}" class="g-hole"
+        style="left:{{hole.x}}px;top:{{hole.y}}px;width:{{hole.w}}px;height:{{hole.h}}px"></view>
+  <view wx:else class="g-dim"></view>
+
+  <view class="g-stage {{mascotRight ? 'right' : ''}} {{bubbleTop ? 'top' : ''}}">
+    <view class="g-bubble">
+      <view class="g-count" wx:if="{{total > 1}}">{{idx + 1}} / {{total}}</view>
+      <text class="g-txt">{{txt}}</text>
+      <view class="g-btns">
+        <view class="g-skip" hover-class="pressed" catchtap="skip">跳过</view>
+        <view class="g-next" hover-class="pressed" catchtap="next">{{last ? '开始吧！' : '下一步 ›'}}</view>
+      </view>
+    </view>
+    <view class="g-mascot {{blink ? 'blink' : ''}} {{talk ? 'talk' : ''}}"></view>
+  </view>
+</view>

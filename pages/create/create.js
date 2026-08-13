@@ -2,15 +2,12 @@
 const { store } = require('../../utils/store');
 const { PALETTE } = require('../../utils/palette');
 const { loadImageToData, emojiToData, imageToPattern, colorStats, reduceColors } = require('../../utils/convert');
-<<<<<<< HEAD
 const { analyzeChart } = require('../../utils/chart');
-const { TEMPLATES, templatePattern } = require('../../utils/templates');
-=======
 const { fetchTemplates, templatePattern } = require('../../utils/templates');
->>>>>>> ea4f2518108339a69bb553cb3f18109f27f62c2c
 const { renderPatternTo, patternSize, getBeadShape } = require('../../utils/board');
 const ui = require('../../utils/ui');
 const { cfg } = require('../../utils/config');
+const { buildGuide } = require('../../utils/guidance');
 
 // 表情库：每个 emoji 都是现成的拼豆图案（预先按字素拆好，❤️ 这类组合字符不被拆散）
 const EMOJIS = [
@@ -54,6 +51,7 @@ Page({
     cropSrc: '',
     cropTitle: '裁剪图片',
     cropHint: '',
+    guideSteps: [],
     name: '',
     dimText: '',
     total: 0,
@@ -110,7 +108,14 @@ Page({
     ui.queryNode(this, '#util2').then(r => {
       if (r && r.node) this.decodeCanvas = r.node;
     });
+    // 首次进入：介绍三种创建方式
+    buildGuide(this, 'create', [
+      { sel: '.tabs', text: '三种玩法任选：照片表情包转图纸、临摹图案库，或者自由画布随手画～' },
+      { sel: '.uz-chart', text: '小红书图纸工坊的图纸截图从这里导入！框住网格就能 1:1 还原，颜色和图纸一模一样' },
+    ]);
   },
+
+  onGuideDone() { this.setData({ guideSteps: [] }); },
 
   // 图片/表情解码：优先用独立画布直接执行；
   // 拿不到独立画布时退回 util 队列（会排在模板缩略图生成后面）
@@ -390,13 +395,9 @@ Page({
     const p = this.pattern;
     if (!p) return;
     const name = (this.name || '').trim() || '我的拼豆';
-<<<<<<< HEAD
+    // 两支合并：作品自带色板（图纸导入）+ 配置改走 cfg
     const work = store.create({ name, w: p.w, h: p.h, cells: p.cells, palette: p.palette });
-    store.update(work.id, { boostRow: FREE_ROW_USES });
-=======
-    const work = store.create({ name, w: p.w, h: p.h, cells: p.cells });
     store.update(work.id, { boostRow: cfg.FREE_ROW_USES });
->>>>>>> ea4f2518108339a69bb553cb3f18109f27f62c2c
     const go = () => wx.redirectTo({ url: '/pages/play/play?id=' + work.id });
     this.uq(() => ui.makeThumb(this, this.utilCanvas, work, false))
       .then(path => { store.update(work.id, { thumb: path, thumbV: 7, thumbShape: getBeadShape() }, true); go(); })

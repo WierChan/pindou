@@ -1,0 +1,109 @@
+/* 新手引导：聚光灯 + 豆豆 + 像素风气泡 */
+.g-ov {
+  position: fixed;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 200;
+}
+/* 聚光灯洞：洞外全部由巨投影压暗；换步骤时位置尺寸平滑过渡 */
+.g-hole {
+  position: absolute;
+  border: 2px dashed var(--blue);
+  border-radius: 2px;
+  box-shadow: 0 0 0 4000px rgba(63, 48, 51, .62);
+  transition: left .35s ease, top .35s ease, width .35s ease, height .35s ease;
+}
+.g-dim {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(63, 48, 51, .62);
+}
+
+/* 豆豆 + 气泡：默认站左下；洞在左半屏时整组去右边，洞在下半屏时整组去上方 */
+.g-stage {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(30px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  animation: gpop .35s cubic-bezier(.2, 1.4, .4, 1);
+}
+.g-stage.right { align-items: flex-end; }
+.g-stage.top { bottom: auto; top: 18vh; }
+@keyframes gpop { from { transform: translateY(24px); opacity: 0; } }
+
+.g-bubble {
+  background: var(--card);
+  border: 3px solid var(--ink);
+  border-radius: 0;
+  box-shadow: 4px 4px 0 rgba(95, 74, 78, .35);
+  padding: 13px 14px 10px;
+  max-width: 320px;
+  min-width: 220px;
+}
+.g-count {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--ink2);
+  margin-bottom: 4px;
+}
+.g-txt {
+  display: block;
+  font-size: 14.5px;
+  line-height: 1.65;
+  font-weight: 600;
+  min-height: 48px;
+}
+.g-btns {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+.g-skip {
+  font-size: 12.5px;
+  color: var(--ink2);
+  padding: 6px 8px;
+  transition: transform .12s;
+}
+.g-next {
+  padding: 7px 16px;
+  background: var(--accent);
+  color: #7A4A55;
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  border: 3px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--accent-dark);
+  transition: transform .12s;
+}
+
+/* 豆豆三帧：睁眼 / 眨眼 / 张嘴（16×16 像素画，内联 PNG） */
+.g-mascot {
+  width: 62px;
+  height: 62px;
+  margin: 0 10px;
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAACTElEQVR4Ae3BMW4TQQCF4X+eXKXOBTabessUGy5DwQkokbZYiZITRCKXAReUW8f4AtRuhxMwkTKyYvPe9xUu3DjMlSt2OO4LF0yENRHWRFgTYU2ENRHWRFgrnNk4zJUO21q4ZtNS6XE47gtnJMKaCGsirImwJsKaCGsirBU6jcNcadjWQrzdtFRaDsd9oYMIayKsibAmwpoIayKsibBWeMU4zJWGbS203Hz4TI/Tj2/Ev01LpeVw3BcaRFgTYU2ENRHWRFgTYU2EtR3v7PTjG/F+RFgTYU2ENRHWRFgTYU2EtTIOc6VhWwvnNC2VlpffP2m5v3ukZVsLPaal0vLy+yct93ePtGxr4ZympdIiwpoIayKsibAmwpoIayKsibAmwpoIayKsibAmwpoIayKs7bhw93ePXLL7u0eumQhrIqyJsCbCmghrIqyJsLaj082fj/T5jrObPx/pcbp9pocIayKsibAmwpoIayKsibAmwpoIayKsibAmwpoIayKsibC2o9Pp9pke21o4p69Pv+ixrQ+c04ln3pMIayKsibAmwpoIayKsibBWeMU4zJWGbS1csq9Pv+jx5dMDl2xaKi2H477QIMKaCGsirImwJsKaCGsirO34z3359ED8mwhrIqyJsCbCmghrIqyJsFboNA5zpWFbC/F201JpORz3hQ4irImwJsKaCGsirImwJsJa4czGYa502NbCNZuWSo/DcV84IxHWRFgTYU2ENRHWRFgTYa1w4cZhrlyxw3FfuGAirImwJsKaCGsirImwJsLaX5ckWtpJgT4MAAAAAElFTkSuQmCC");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  animation: gbob 2.2s ease-in-out infinite;
+}
+@keyframes gbob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.g-mascot.blink {
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAACMUlEQVR4Ae3BIU7sUACF4f+ejEKzgaa+EtG8zSBYwZMkFU2QrADBZkgFsr6ZDaDH3rcCSsLNZGbeOd9XuHJ9N1Zu2HZcCldMhDUR1kRYE2FNhDUR1kRYK5xZ342VButcuGXDVGmxHZfCGYmwJsKaCGsirImwJsKaCGuFRn03VnascyF+b5gqe7bjUmggwpoIayKsibAmwpoIayKsFX7Qd2NlxzoX9tz9+UuL08cr8b1hquzZjkthhwhrIqyJsCbCmghrIqyJsHbgwk4fr8TliLAmwpoIayKsibAmwpoIa6XvxsqOdS7E7Rqmyh4R1kRYE2FNhDUR1kRYE2FNhDUR1kRYE2FNhDUR1kRYE2HtwIUNU+Wc1rnQYpgq57TOhUsSYU2ENRHWRFgTYU2ENRHWDjS6+3qkxTq/c83WuXBOd1+PtDjdv9NChDUR1kRYE2FNhDUR1kRYE2FNhDUR1kRYE2FNhDUR1kRYO9DodP/ONXt5+6TF89MD53S6f+eSRFgTYU2ENRHWRFgTYU2EtcIP+m6s7FjnwjV7efukxfPTA9dsmCp7tuNS2CHCmghrIqyJsCbCmghrIqwd+M89Pz0Q3xNhTYQ1EdZEWBNhTYQ1EdYKjfpurOxY50L83jBV9mzHpdBAhDUR1kRYE2FNhDUR1kRYK5xZ342VButcuGXDVGmxHZfCGYmwJsKaCGsirImwJsKaCGuFK9d3Y+WGbcelcMVEWBNhTYQ1EdZEWBNhTYS1f5PTVM15acthAAAAAElFTkSuQmCC");
+}
+.g-mascot.talk {
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAABw0lEQVR42u3dsQ3CMBAFUEuIORBiC5Bo2IolWICOnpWYgjqMEJAT7my/L/06Tu4VLiynlOQ57I9Tyy0CgAAgAAgAAoAAIAAY4Nd9P05Nd3hAAAAAAAAAAAAAAAAAAAAAAHQFoPcBZgcEAAAAAAAAAAAAAAAAAAAAAACZBjy9nlWFIBgIAAAAAAAAAAAAAAAAAAAAAAAsCMAQAVAAFAAFQAFQABQA/R+A6AMdc8+fy9rrz76+aiAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAkPAixWgA2S/CBAAAAAAAAAAAAAAAAAAAAACAJQFMt3tVRwdQ+/0AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIOOBkLV7PW+r2v1FkgAAAAAAAAAAAAAAANAtgMtu81MBAGAMANn/JwBA438MAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAICWA1oG0DiB8wAAAAAAAAADQ6SbRJg8AAAAAAAAAYoD0Dqj2/UvrAQAAAAAAAAAAAAAAAAAAAGAoANGAolsEAAFAABAABAABQADIkw962YE2tM5epgAAAABJRU5ErkJggg==");
+}
