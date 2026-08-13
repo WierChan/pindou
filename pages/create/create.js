@@ -2,11 +2,15 @@
 const { store } = require('../../utils/store');
 const { PALETTE } = require('../../utils/palette');
 const { loadImageToData, emojiToData, imageToPattern, colorStats, reduceColors } = require('../../utils/convert');
+<<<<<<< HEAD
 const { analyzeChart } = require('../../utils/chart');
 const { TEMPLATES, templatePattern } = require('../../utils/templates');
+=======
+const { fetchTemplates, templatePattern } = require('../../utils/templates');
+>>>>>>> ea4f2518108339a69bb553cb3f18109f27f62c2c
 const { renderPatternTo, patternSize, getBeadShape } = require('../../utils/board');
 const ui = require('../../utils/ui');
-const { FREE_ROW_USES } = require('../../utils/config');
+const { cfg } = require('../../utils/config');
 
 // 表情库：每个 emoji 都是现成的拼豆图案（预先按字素拆好，❤️ 这类组合字符不被拆散）
 const EMOJIS = [
@@ -33,6 +37,7 @@ Page({
     tab: 'image',
     mode: 'pick',
     templates: [],
+    tplError: '',
     emojis: EMOJIS,
     size: 32,
     sizeMin: 8,
@@ -70,13 +75,30 @@ Page({
     this._pvNode = null;    // 预览 canvas 节点缓存（退出配置页时失效）
     this.name = '';
     this.uq = ui.serialQueue(); // 工具画布串行队列
-    this.setData({
-      insets: ui.navInsets(),
-      templates: TEMPLATES.map(t => {
-        const p = templatePattern(t);
-        return { name: t.name, count: p.cells.filter(x => x >= 0).length, img: '' };
-      }),
+    this.tpls = null; // 图案库数据(来自后端)
+    this.setData({ insets: ui.navInsets() });
+    this._loadTemplates();
+  },
+
+  // 图案库来自后端;失败给出提示,可点击重试(不回退本地数据)
+  _loadTemplates() {
+    this.setData({ tplError: '' });
+    fetchTemplates().then(list => {
+      this.tpls = list;
+      this.setData({
+        templates: list.map(t => {
+          const p = templatePattern(t);
+          return { name: t.name, count: p.cells.filter(x => x >= 0).length, img: '' };
+        }),
+      });
+      this._buildTplThumbs();
+    }).catch(e => {
+      this.setData({ tplError: (e && e.message) || '图案库加载失败' });
     });
+  },
+
+  retryTemplates() {
+    this._loadTemplates();
   },
 
   onReady() {
@@ -123,13 +145,15 @@ Page({
   },
 
   _buildTplThumbs() {
+    // 需要图案数据(后端)与工具画布(onReady)都就绪,两个入口各调一次,后到者执行
+    if (!this.tpls || !this.utilCanvas) return;
     if (TPL_THUMBS) {
       this.setData({ templates: this.data.templates.map((t, i) => ({ ...t, img: TPL_THUMBS[i] })) });
       return;
     }
     const paths = [];
     let chain = Promise.resolve();
-    TEMPLATES.forEach((t, i) => {
+    this.tpls.forEach((t, i) => {
       chain = chain.then(() => this.uq(() => {
         const p = templatePattern(t);
         const cellPx = ui.clamp(Math.floor(120 / Math.max(p.w, p.h)), 6, 12);
@@ -229,7 +253,8 @@ Page({
   },
 
   pickTpl(e) {
-    const t = TEMPLATES[e.currentTarget.dataset.i];
+    const t = this.tpls && this.tpls[e.currentTarget.dataset.i];
+    if (!t) return;
     this.pattern = templatePattern(t);
     this.fromTpl = true;
     this.fromChart = false;
@@ -365,8 +390,13 @@ Page({
     const p = this.pattern;
     if (!p) return;
     const name = (this.name || '').trim() || '我的拼豆';
+<<<<<<< HEAD
     const work = store.create({ name, w: p.w, h: p.h, cells: p.cells, palette: p.palette });
     store.update(work.id, { boostRow: FREE_ROW_USES });
+=======
+    const work = store.create({ name, w: p.w, h: p.h, cells: p.cells });
+    store.update(work.id, { boostRow: cfg.FREE_ROW_USES });
+>>>>>>> ea4f2518108339a69bb553cb3f18109f27f62c2c
     const go = () => wx.redirectTo({ url: '/pages/play/play?id=' + work.id });
     this.uq(() => ui.makeThumb(this, this.utilCanvas, work, false))
       .then(path => { store.update(work.id, { thumb: path, thumbV: 7, thumbShape: getBeadShape() }, true); go(); })
