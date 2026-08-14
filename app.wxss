@@ -394,6 +394,8 @@ button.btn-reset::after { border: none; }
   animation: popUp .35s cubic-bezier(.2, 1.4, .4, 1);
 }
 @keyframes popUp { from { transform: scale(.7); opacity: 0; } }
+/* 含原生 input 的弹窗用：transform 动画会让真机上的输入框焦点错位/文字裁切 */
+.modal.no-anim { animation: none; }
 .modal-title { font-size: 22px; font-weight: 800; letter-spacing: 2px; }
 .modal-art { display: flex; justify-content: center; }
 .modal-sub { color: var(--ink2); font-size: 14px; line-height: 1.7; }

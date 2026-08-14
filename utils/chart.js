@@ -16,7 +16,9 @@ const { rgb2oklab } = require('./convert');
 
 const MIN_PITCH = 5.5;   // 每格最少像素：再小取色就不可靠了，让用户换清晰截图
 const MAX_CELLS = 256;   // 与创建页 SIZE_CAP 一致（storage / 渲染性能约束）
-const MIN_CELLS = 6;
+// 裁剪后图案的最小边长。别设太高：自由画布的小作品（5×5 爱心）走
+// 图纸样式导出→再导入是合法路径；照片误识别由 conf/ratio 门槛拦
+const MIN_CELLS = 4;
 const MAX_COLORS = 48;   // 自带色板上限：正常图纸 ≤ 40 色，超出的并入最近色
 
 function lab2(a, b) {
@@ -235,7 +237,8 @@ function refineAt(g, p, baseline) {
 // 整数倍候选虽然每齿都强但格距偏大，减半候选弱齿过半被否，真格距恰好全对齐
 function detectPitch(g) {
   const len = g.length;
-  const pMax = Math.min(220, Math.floor(len / 4));
+  // 除数 3.5：4 格边长的小图纸也够放下真格距的自相关滞后
+  const pMax = Math.min(220, Math.floor(len / 3.5));
   if (pMax < Math.ceil(MIN_PITCH) + 2) return null;
   const R = new Float64Array(pMax + 2);
   for (let p = Math.floor(MIN_PITCH); p <= pMax + 1; p++) {
@@ -550,6 +553,15 @@ function analyzeChart(data, iw, ih) {
     ok: true, w, h, cells, palette, colorN: palette.length, total,
     pitch: Math.round(pitch * 10) / 10,
     conf: Math.round(Math.min(px.conf, py.conf) * 100) / 100,
+    // 网格几何（输入图片像素坐标系）：裁剪弹窗用它做格线磁吸；
+    // rectPx = 最终保留图案的像素范围，可作为裁剪框的初始位置
+    grid: { px: px.pitch, py: py.pitch, offX, offY },
+    rectPx: {
+      x: offX + (k0x + c0) * pitch,
+      y: offY + (k0y + r0) * pitch,
+      w: w * pitch,
+      h: h * pitch,
+    },
   };
 }
 

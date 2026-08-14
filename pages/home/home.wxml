@@ -50,7 +50,7 @@
             bindtap="openWork" data-id="{{item.id}}" data-st="{{item.st}}">
         <view class="wc-thumb">
           <image wx:if="{{item.thumb}}" src="{{item.thumb}}" mode="aspectFit" />
-          <view wx:if="{{item.badgeText}}" class="wc-badge {{item.st === 'iron' ? 'iron' : item.st === 'free' ? 'freeb' : ''}}">{{item.badgeText}}</view>
+          <view wx:if="{{item.badgeText}}" class="wc-badge {{item.badgeClass}}">{{item.badgeText}}</view>
         </view>
         <view class="wc-body">
           <view class="wc-name">{{item.name}}</view>
@@ -69,4 +69,4 @@
 <canvas wx:if="{{celebrating}}" type="2d" id="confetti" class="confetti"></canvas>
 <canvas type="2d" id="util" class="util-canvas" style="width:{{capW}}px;height:{{capH}}px"></canvas>
 
-<guide gid="home" steps="{{guideSteps}}" bind:done="onGuideDone" />
+<guide gid="{{guideId}}" steps="{{guideSteps}}" bind:done="onGuideDone" />

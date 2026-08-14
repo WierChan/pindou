@@ -3,7 +3,7 @@
 // 离开窗口的豆子保留在稀疏表里，回来时重新出现。完成后裁剪进熨烫→查看流水线。
 const { store } = require('../../utils/store');
 const { PALETTE, textColorFor } = require('../../utils/palette');
-const { BoardView, getBeadShape, setBeadShape } = require('../../utils/board');
+const { BoardView, renderPatternTo, getBeadShape, setBeadShape } = require('../../utils/board');
 const { audio } = require('../../utils/audio');
 const ui = require('../../utils/ui');
 
@@ -24,6 +24,8 @@ Page({
     beadShape: 'square',
     muted: false,
     scrollInto: '',
+    exportShow: false,
+    exportSrc: '',
   },
 
   onLoad(q) {
@@ -312,6 +314,61 @@ Page({
     this.tool = this.tool === 'erase' ? null : 'erase';
     this.setData({ eraser: !!this.tool });
     if (this.tool) ui.toast('橡皮：点或划格子擦掉豆子');
+  },
+
+  /* ---------- 区域导出 ---------- */
+  // 📤：整幅渲染成预览图 → 裁剪弹窗框选区域 → 框到的格子高清重渲 → 存相册。
+  // 预览 pad=0：图片边缘与格子矩阵严格对齐，框选矩形可直接按比例换算成格子范围
+  exportRegion() {
+    if (!this.count) { ui.toast('先拼几颗豆子呀 ✨'); return; }
+    if (!this.utilCanvas) { ui.toast('画布还没就绪，再试一次'); return; }
+    const cp = this._croppedPattern();
+    if (!cp) return;
+    this._exportCp = cp;
+    wx.showLoading({ title: '生成预览', mask: true });
+    const cellPx = ui.clamp(Math.floor(1400 / Math.max(cp.w, cp.h)), 2, 20);
+    const draw = () => renderPatternTo(this.utilCanvas, cp, { cellPx, pad: 0, scale: 1 });
+    this.uq(() => ui.captureCanvas(this, this.utilCanvas, draw))
+      .then(path => {
+        wx.hideLoading();
+        // 传网格 → 裁剪弹窗按格磁吸，框到哪格是哪格
+        this.setData({ exportShow: true, exportSrc: path, exportGrid: { cols: cp.w, rows: cp.h } });
+      })
+      .catch(() => { wx.hideLoading(); ui.toast('预览生成失败，再试一次'); });
+  },
+
+  onExportCancel() { this.setData({ exportShow: false }); },
+
+  onExportConfirm(e) {
+    this.setData({ exportShow: false });
+    const cp = this._exportCp;
+    if (!cp) return;
+    const r = e.detail.rect;
+    // 弹窗已按格磁吸，矩形恰好落在格线上：四舍五入消掉浮点毛刺即得格子范围
+    const x0 = ui.clamp(Math.round(r.x * cp.w), 0, cp.w - 1);
+    const y0 = ui.clamp(Math.round(r.y * cp.h), 0, cp.h - 1);
+    const x1 = ui.clamp(Math.round((r.x + r.w) * cp.w) - 1, x0, cp.w - 1);
+    const y1 = ui.clamp(Math.round((r.y + r.h) * cp.h) - 1, y0, cp.h - 1);
+    const w = x1 - x0 + 1, h = y1 - y0 + 1;
+    const cells = new Array(w * h).fill(-1);
+    let n = 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const v = cp.cells[(y0 + y) * cp.w + (x0 + x)];
+        if (v >= 0) { cells[y * w + x] = v; n++; }
+      }
+    }
+    if (!n) { ui.toast('框里没有豆子哦'); return; }
+    wx.showLoading({ title: '导出中', mask: true });
+    const sub = { w, h, cells };
+    const cellPx = ui.clamp(Math.floor(1600 / Math.max(w, h)), 3, 24);
+    const draw = () => renderPatternTo(this.utilCanvas, sub, { cellPx, scale: 2 });
+    this.uq(() => ui.captureCanvas(this, this.utilCanvas, draw))
+      .then(path => {
+        wx.hideLoading();
+        return ui.saveToAlbum(path); // 内部有成功 toast 与权限引导
+      })
+      .catch(() => { wx.hideLoading(); ui.toast('导出失败，再试一次'); });
   },
 
   /* ---------- 完成 ---------- */

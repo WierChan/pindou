@@ -3,7 +3,7 @@ const { store } = require('../../utils/store');
 const { PALETTE } = require('../../utils/palette');
 const { colorStats } = require('../../utils/convert');
 const { BoardView, renderPatternTo, getBeadShape } = require('../../utils/board');
-const { buildExportTo } = require('../../utils/share');
+const { buildExportTo, buildChartExportTo } = require('../../utils/share');
 const { audio } = require('../../utils/audio');
 const { celebrate } = require('../../utils/confetti');
 const ui = require('../../utils/ui');
@@ -198,12 +198,22 @@ Page({
   closeShare() { this.setData({ shareShow: false }); },
   onCardBuilt(e) { this.shareImg = e.detail.path; },
 
+  // 两种导出：效果图（熨烫质感）/ 图纸（平色格+格线，保存后可再导入识别）
   exportImage() {
     if (!this.utilCanvas || !this.work) return;
-    this.uq(() => {
-      const draw = () => buildExportTo(this.utilCanvas, this.work, true);
-      return ui.captureCanvas(this, this.utilCanvas, draw).then(path => ui.saveToAlbum(path));
-    }).catch(() => ui.toast('导出失败，再试一次'));
+    wx.showActionSheet({
+      itemList: ['效果图（熨烫质感）', '拼豆图纸（可再导入）'],
+      success: r => {
+        const asChart = r.tapIndex === 1;
+        this.uq(() => {
+          const draw = asChart
+            ? () => buildChartExportTo(this.utilCanvas, this.work)
+            : () => buildExportTo(this.utilCanvas, this.work, true);
+          return ui.captureCanvas(this, this.utilCanvas, draw).then(path => ui.saveToAlbum(path));
+        }).catch(() => ui.toast('导出失败，再试一次'));
+      },
+      fail: () => { /* 取消 */ },
+    });
   },
 
   goHome() { ui.backHome(); },

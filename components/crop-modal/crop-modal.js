@@ -23,10 +23,19 @@ Component({
     src: { type: String, value: '' },
     title: { type: String, value: '裁剪图片' },
     hint: { type: String, value: '拖四角调整范围，双指缩放看细节' },
+    // 网格磁吸，两种形态：
+    //   {cols, rows} —— 图片即整片格子矩阵（自由画布导出，pad=0 渲染）；
+    //   {px, py, ox, oy} —— 归一化格距+相位（图纸导入预识别的真实格线，
+    //     格线位于 ox + k*px，覆盖整张图）。
+    // 传了它：框的四边实时吸附到格线、显示已框格数、最小框 = 1 格、隐藏比例档
+    grid: { type: Object, value: null },
+    // 初始框（归一化图片坐标 {x,y,w,h}）：图纸导入预识别出的图案范围，开门即框好
+    initRect: { type: Object, value: null },
   },
   data: {
     box: null,  // 图片在舞台里的展示区 {left, top, w, h}（随缩放平移变化）
     crop: null, // 裁剪框（舞台坐标）{x, y, w, h}
+    selText: '',
     ratio: 'free',
     ratios: [
       { k: 'free', label: '自由' },
@@ -44,7 +53,7 @@ Component({
       this.pointers = new Map();
       this.drag = null;
       this.pinch = null;
-      this.setData({ box: null, crop: null, ratio: 'free' });
+      this.setData({ box: null, crop: null, ratio: 'free', selText: '' });
       wx.getImageInfo({
         src,
         success: info => {
@@ -59,7 +68,12 @@ Component({
               const w = info.width * k, h = info.height * k;
               this.fitW = w; this.fitH = h;
               const box = { left: (r.width - w) / 2, top: (r.height - h) / 2, w, h };
-              this.setData({ box, crop: { x: box.left, y: box.top, w: box.w, h: box.h } });
+              // 初始框：有预识别范围就直接框上（微调即可），否则整图
+              const ir = this.properties.initRect;
+              const c0 = ir && ir.w > 0 && ir.h > 0
+                ? { x: box.left + ir.x * box.w, y: box.top + ir.y * box.h, w: ir.w * box.w, h: ir.h * box.h }
+                : { x: box.left, y: box.top, w: box.w, h: box.h };
+              this.setData({ box }, () => this._setCrop(c0));
             });
           }, 360);
         },
@@ -75,6 +89,57 @@ Component({
       if (!r || r === 'free') return 0;
       const p = r.split(':');
       return (+p[0]) / (+p[1]);
+    },
+
+    /* ---- 网格磁吸 ---- */
+
+    // 把 grid 属性统一成舞台坐标下的「格距 + 相位」：
+    // 格线位于 ox + k*px（x 向）/ oy + k*py（y 向），k 为任意整数
+    _gridSpec() {
+      const g = this.properties.grid, b = this.data.box;
+      if (!g || !b) return null;
+      if (g.cols && g.rows) {
+        return { px: b.w / g.cols, py: b.h / g.rows, ox: b.left, oy: b.top };
+      }
+      if (g.px > 0 && g.py > 0) {
+        return { px: g.px * b.w, py: g.py * b.h, ox: b.left + (g.ox || 0) * b.w, oy: b.top + (g.oy || 0) * b.h };
+      }
+      return null;
+    },
+
+    // 最小框：有网格 = 1 格（配合放大可以精确到单格），无网格 = MIN_CROP
+    _minCrop() {
+      const s = this._gridSpec();
+      if (s) return Math.max(6, Math.min(s.px, s.py));
+      return MIN_CROP;
+    },
+
+    // 四边吸附到最近的格线（按格线下标取整；限制在图片范围内、至少 1 格）
+    _snappedRect(c) {
+      const s = this._gridSpec(), b = this.data.box;
+      if (!s || !b) return c;
+      const eps = 0.01;
+      const kLoX = Math.ceil((b.left - s.ox) / s.px - eps);
+      const kHiX = Math.floor((b.left + b.w - s.ox) / s.px + eps);
+      const kLoY = Math.ceil((b.top - s.oy) / s.py - eps);
+      const kHiY = Math.floor((b.top + b.h - s.oy) / s.py + eps);
+      if (kHiX - kLoX < 1 || kHiY - kLoY < 1) return c; // 格距异常大，放弃吸附
+      const i0 = ui.clamp(Math.round((c.x - s.ox) / s.px), kLoX, kHiX - 1);
+      const j0 = ui.clamp(Math.round((c.y - s.oy) / s.py), kLoY, kHiY - 1);
+      const i1 = ui.clamp(Math.round((c.x + c.w - s.ox) / s.px), i0 + 1, kHiX);
+      const j1 = ui.clamp(Math.round((c.y + c.h - s.oy) / s.py), j0 + 1, kHiY);
+      this._sel = { w: i1 - i0, h: j1 - j0 };
+      return { x: s.ox + i0 * s.px, y: s.oy + j0 * s.py, w: (i1 - i0) * s.px, h: (j1 - j0) * s.py };
+    },
+
+    // 所有改框操作的统一出口：有网格先吸附，并刷新「几 × 几 格」角标
+    _setCrop(c) {
+      if (this._gridSpec()) {
+        c = this._snappedRect(c);
+        this.setData({ crop: c, selText: this._sel ? this._sel.w + ' × ' + this._sel.h + ' 格' : '' });
+      } else {
+        this.setData({ crop: c });
+      }
     },
 
     // 取景框的活动范围：图片显示区 ∩ 舞台（留一点边）
@@ -99,7 +164,7 @@ Component({
       const w = Math.min(B.x1 - B.x0, (B.y1 - B.y0) * r), h = w / r;
       const x = ui.clamp(c.x + c.w / 2 - w / 2, B.x0, B.x1 - w);
       const y = ui.clamp(c.y + c.h / 2 - h / 2, B.y0, B.y1 - h);
-      this.setData({ crop: { x, y, w, h } });
+      this._setCrop({ x, y, w, h });
     },
 
     /* ---- 手势 ---- */
@@ -171,30 +236,35 @@ Component({
       if (role === 'pan') { this._panImage(dx, dy); return; }
       const B = this._frameBounds(), c0 = this.drag.crop0;
       if (role === 'move') {
-        this.setData({
-          crop: {
-            x: ui.clamp(c0.x + dx, B.x0, B.x1 - c0.w),
-            y: ui.clamp(c0.y + dy, B.y0, B.y1 - c0.h),
-            w: c0.w, h: c0.h,
-          },
+        this._setCrop({
+          x: ui.clamp(c0.x + dx, B.x0, B.x1 - c0.w),
+          y: ui.clamp(c0.y + dy, B.y0, B.y1 - c0.h),
+          w: c0.w, h: c0.h,
         });
         return;
       }
       const r = this._ratioVal();
-      if (r) { this.setData({ crop: this._cornerWithRatio(role, dx, dy, B, c0, r) }); return; }
-      // 自由比例：对应边跟手，另一边不动
+      if (r) { this._setCrop(this._cornerWithRatio(role, dx, dy, B, c0, r)); return; }
+      // 自由比例：对应边跟手，另一边不动（有网格时最小框 = 1 格）
+      const MC = this._minCrop();
       let x = c0.x, y = c0.y, x1 = c0.x + c0.w, y1 = c0.y + c0.h;
-      if (role.indexOf('l') >= 0) x = ui.clamp(c0.x + dx, B.x0, x1 - MIN_CROP);
-      if (role.indexOf('r') >= 0) x1 = ui.clamp(x1 + dx, c0.x + MIN_CROP, B.x1);
-      if (role.indexOf('t') >= 0) y = ui.clamp(c0.y + dy, B.y0, y1 - MIN_CROP);
-      if (role.indexOf('b') >= 0) y1 = ui.clamp(y1 + dy, c0.y + MIN_CROP, B.y1);
-      this.setData({ crop: { x, y, w: x1 - x, h: y1 - y } });
+      if (role.indexOf('l') >= 0) x = ui.clamp(c0.x + dx, B.x0, x1 - MC);
+      if (role.indexOf('r') >= 0) x1 = ui.clamp(x1 + dx, c0.x + MC, B.x1);
+      if (role.indexOf('t') >= 0) y = ui.clamp(c0.y + dy, B.y0, y1 - MC);
+      if (role.indexOf('b') >= 0) y1 = ui.clamp(y1 + dy, c0.y + MC, B.y1);
+      this._setCrop({ x, y, w: x1 - x, h: y1 - y });
     },
 
     onTouchEnd(e) {
       for (const t of e.changedTouches) this.pointers.delete(t.identifier);
+      const pinchEnded = this.pinch && this.pointers.size < 2;
       if (this.pointers.size < 2) this.pinch = null;
-      if (this.pointers.size === 0) this.drag = null;
+      if (this.pointers.size === 0) {
+        const wasPan = this.drag && this.drag.role === 'pan';
+        this.drag = null;
+        // 图片在框下面移动过（缩放/平移）：手势结束后把框重新吸回格线
+        if ((pinchEnded || wasPan) && this.data.crop) this._setCrop(this.data.crop);
+      }
     },
 
     // 捏合：围绕双指中点缩放图片 + 跟随中点平移，取景框不动。
@@ -255,7 +325,8 @@ Component({
         top: (this.stage.h - this.fitH) / 2,
         w: this.fitW, h: this.fitH,
       };
-      this.setData({ ratio: 'free', box, crop: { x: box.left, y: box.top, w: box.w, h: box.h } });
+      this.setData({ ratio: 'free', box }, () =>
+        this._setCrop({ x: box.left, y: box.top, w: box.w, h: box.h }));
     },
 
     onConfirm() {

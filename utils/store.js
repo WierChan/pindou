@@ -29,6 +29,7 @@ function summarize(work) {
     id: work.id, name: work.name, w: work.w, h: work.h,
     total, placedN,
     free: !!work.free,
+    fromCode: work.fromCode || '',
     completed: !!work.completed, ironDone: !!work.ironDone,
     thumb: work.thumb || '',
     thumbV: work.thumbV || 0,
@@ -79,6 +80,8 @@ const store = {
     };
     // 作品自带色板（图纸导入的真实颜色，hex 数组）；没有则各处回退全局色板
     if (o.palette) work.palette = o.palette;
+    // 来源标记：口令导入的作品记下码（首页角标 / 溯源用）
+    if (o.fromCode) work.fromCode = o.fromCode;
     try { wx.setStorageSync(WORK_KEY(work.id), work); }
     catch (e) { console.warn('保存失败（可能空间不足）', e); }
     syncIndex(work);

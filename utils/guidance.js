@@ -20,7 +20,9 @@ function measure(page, sel) {
 }
 
 // defs: [{ sel?, text }]；sel 测不到（元素不存在/宽为 0）时该步退化为纯气泡。
-// delay 等页面布局与入场动画稳定后再测矩形、弹引导
+// delay 等页面布局与入场动画稳定后再测矩形、弹引导。
+// guideId 一并写入 data：同一页面可以有多段引导（如 create 的选择阶段/配置阶段），
+// 页面的 <guide gid="{{guideId}}"> 据此把"看过"记到正确的 key 上
 function buildGuide(page, id, defs, delay) {
   if (guideSeen(id)) return;
   setTimeout(() => {
@@ -33,7 +35,7 @@ function buildGuide(page, id, defs, delay) {
             width: rects[i].width, height: rects[i].height,
           } : null,
         }));
-        page.setData({ guideSteps: steps });
+        page.setData({ guideSteps: steps, guideId: id });
       });
   }, delay == null ? 700 : delay);
 }

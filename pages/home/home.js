@@ -160,7 +160,11 @@ Page({
         dims: isFree ? ('自由画布 · 已拼 ' + s.placedN + ' 颗')
           : (s.w + '×' + s.h + ' · ' + s.total + ' 颗'),
         st: isDone ? 'done' : needIron ? 'iron' : isFree ? 'free' : 'doing',
-        badgeText: isDone ? '已完成' : needIron ? '🔥 待熨烫' : isFree ? '✏️ 自由' : '',
+        // 状态角标优先（待熨烫/自由），其次来源角标（口令导入）；
+        // 已完成 tab 里「已完成」本就冗余，让位给口令标
+        badgeText: needIron ? '🔥 待熨烫' : isFree ? '✏️ 自由'
+          : s.fromCode ? '🔑 口令' : isDone ? '已完成' : '',
+        badgeClass: needIron ? 'iron' : isFree ? 'freeb' : s.fromCode ? 'codeb' : '',
         pct: needIron ? 100 : isFree ? 0 : pct,
         footText: needIron ? '豆子拼齐了 · 去熨烫 →' : isFree ? '自由创作 · 继续 →' : pct + '%　继续拼 →',
       };

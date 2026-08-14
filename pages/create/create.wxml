@@ -25,6 +25,9 @@
         <view class="uz-sub">小红书图纸工坊等生成的图纸截图</view>
         <view class="uz-sub">框出网格 → 自动识别 → 按图纸 1:1 开拼</view>
       </view>
+      <view class="code-entry" hover-class="pressed" bindtap="openCodeInput">
+        🔑 有导入码？<text class="ce-b">输入口令拼同款</text>
+      </view>
     </block>
 
     <block wx:elif="{{tab === 'free'}}">
@@ -65,7 +68,8 @@
         <canvas type="2d" id="preview" style="width:{{pvW}}px;height:{{pvH}}px"></canvas>
       </view>
       <view class="stats-line">{{dimText}} · <text class="b">{{total}}</text> 颗豆子 · <text class="b">{{colorN}}</text> 种颜色</view>
-      <view wx:if="{{fromChart}}" class="chart-hint">📐 已识别图纸网格，按原图 1:1 还原</view>
+      <view wx:if="{{fromChart}}" class="chart-hint">📐 图纸 1:1 还原，颜色与原图纸一致</view>
+      <view wx:if="{{importedCode}}" class="code-report" bindtap="reportCode">对这幅图纸有疑问？举报</view>
       <view class="color-chips">
         <view class="cchip" wx:for="{{chips}}" wx:key="index">
           <view class="dot" style="background:{{item.hex}}" />{{item.count}}
@@ -73,7 +77,7 @@
       </view>
 
       <block wx:if="{{!fixed}}">
-        <view class="opt-col">
+        <view class="opt-col sz-opt">
           <view class="opt-row">
             <view class="opt-label">画布大小</view>
             <view class="opt-val">{{size}} 豆</view>
@@ -87,7 +91,7 @@
                   bindchange="onSizeSlider" />
           <view class="opt-hint">{{sizeHint}}</view>
         </view>
-        <view class="opt-col" wx:if="{{showColor}}">
+        <view class="opt-col cl-opt" wx:if="{{showColor}}">
           <view class="opt-row">
             <view class="opt-label">颜色数量</view>
             <view class="opt-val">{{colorVal}} 色</view>
@@ -116,7 +120,29 @@
 <!-- 图片解码专用画布：与模板缩略图的导出队列分离，选图后立即可用 -->
 <canvas type="2d" id="util2" class="util-canvas"></canvas>
 
-<crop-modal show="{{cropShow}}" src="{{cropSrc}}" title="{{cropTitle}}" hint="{{cropHint}}"
+<crop-modal show="{{cropShow}}" src="{{cropSrc}}" grid="{{cropGrid}}" init-rect="{{cropInit}}"
+            title="{{cropTitle}}" hint="{{cropHint}}"
             bind:confirm="onCropConfirm" bind:cancel="onCropCancel" />
 
-<guide gid="create" steps="{{guideSteps}}" bind:done="onGuideDone" />
+<guide gid="{{guideId}}" steps="{{guideSteps}}" bind:done="onGuideDone" />
+
+<!-- 导入码输入弹窗 -->
+<view wx:if="{{codeShow}}" class="overlay" bindtap="closeCodeInput">
+  <!-- no-anim：原生 input 在带 transform 动画的容器里真机会焦点错位 -->
+  <view class="modal no-anim" catchtap="noop">
+    <view class="modal-title">🔑 输入导入码</view>
+    <view class="modal-sub">
+      <view>粘贴好友分享的口令（形如 PD-3K7F-9QWW）</view>
+    </view>
+    <view class="code-input-row">
+      <input class="code-input" value="{{codeInput}}" maxlength="14" confirm-type="done"
+             focus="{{codeFocus}}" adjust-position cursor-spacing="24"
+             placeholder="PD-XXXX-XXXX" bindinput="onCodeInput" bindconfirm="confirmCode" />
+      <view class="code-paste" hover-class="pressed" bindtap="pasteCode">粘贴</view>
+    </view>
+    <view class="modal-btns">
+      <view class="btn-primary" hover-class="pressed" bindtap="confirmCode">导入图纸</view>
+    </view>
+    <view class="btn-link" hover-class="pressed" bindtap="closeCodeInput">取消</view>
+  </view>
+</view>

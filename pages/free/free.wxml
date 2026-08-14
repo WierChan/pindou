@@ -26,6 +26,7 @@
     <view class="bb-inner">
       <view class="tools-row">
         <view class="tool-chip {{eraser ? 'active' : ''}}" bindtap="tapEraser">🧽 橡皮</view>
+        <view class="tool-chip" bindtap="exportRegion">📤 导出</view>
         <view class="tool-chip done-chip" bindtap="finishWork">✅ 完成创作</view>
         <view class="tools-hint">{{eraser ? '点或划格子擦掉豆子' : '选颜色，点或划格子上豆'}}</view>
       </view>
@@ -42,3 +43,7 @@
 </view>
 
 <canvas type="2d" id="util" class="util-canvas" style="width:{{capW}}px;height:{{capH}}px"></canvas>
+
+<crop-modal show="{{exportShow}}" src="{{exportSrc}}" grid="{{exportGrid}}" title="框选导出区域"
+            hint="框会自动吸附到格线，框到哪格是哪格；双指放大更精准，不框 = 整幅导出"
+            bind:confirm="onExportConfirm" bind:cancel="onExportCancel" />

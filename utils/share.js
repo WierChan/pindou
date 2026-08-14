@@ -1,6 +1,7 @@
 // 分享卡片 / 导出图片：直接绘制到传入的 canvas 上
 const { drawPatternInto, patternSize } = require('./board');
 const { colorStats } = require('./convert');
+const { PALETTE } = require('./palette');
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
@@ -173,67 +174,57 @@ function buildShareCardTo(canvas, work, scale) {
   return { width: W, height: H };
 }
 
-// 导出用的作品图：暖底 + 白色画框 + 作品名 + 底部品牌落款（纯收藏版）
-function buildExportTo(canvas, work, fused, scale) {
-  scale = scale || 1;
-  if (fused == null) fused = true;
-  const stats = colorStats(work.cells);
-  const total = stats.reduce((a, s) => a + s.count, 0);
-  const cellPx = clamp(Math.floor(1100 / Math.max(work.w, work.h)), 10, 28);
-  const artPad = Math.round(cellPx * 1.1);
-  const artSize = patternSize(work, { cellPx, pad: artPad });
-
-  const M = 64;
-  const panelPad = 30;
-  const panelW = artSize.width + panelPad * 2;
-  const panelH = artSize.height + panelPad * 2;
-  const W = Math.max(640, panelW + M * 2);
-  const topM = 56, infoH = 118, footH = 100;
-  const H = topM + panelH + infoH + footH;
-
+// 图纸样式导出：纯白底 + 细格线（每格淡灰、5 格淡青参考线）+ 平色格。
+// 没有豆孔/高光/蒙孔点 —— 保存的图片可以再从「导入拼豆图纸」识别回来（往返闭环），
+// 颜色用色板原值（PNG 无损），识别后逐格逐色还原
+function buildChartExportTo(canvas, work, scale) {
+  scale = scale || 2;
+  const w = work.w, h = work.h, cells = work.cells;
+  const cellPx = clamp(Math.floor(1600 / Math.max(w, h)), 8, 24);
+  const pad = Math.round(cellPx * 1.2);
+  const W = w * cellPx + pad * 2, H = h * cellPx + pad * 2;
   canvas.width = Math.round(W * scale);
   canvas.height = Math.round(H * scale);
   const ctx = canvas.getContext('2d');
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
-
-  // 背景 + 像素格纹 + 遮阳棚
-  ctx.fillStyle = '#FBF5EC';
+  ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, W, H);
-  bgGrid(ctx, W, H);
-  awning(ctx, W);
-
-  // 白色画框
-  const px0 = W / 2 - panelW / 2, py0 = topM;
-  pixelPanel(ctx, px0, py0, panelW, panelH);
-  ctx.save();
-  ctx.translate(W / 2 - artSize.width / 2, py0 + panelPad);
-  drawPatternInto(ctx, work, { cellPx, pad: artPad, fused });
-  ctx.restore();
-
-  // 作品名 + 信息
-  const iy = py0 + panelH;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillStyle = '#5F4A4E';
-  ctx.font = 'bold 36px sans-serif';
-  ctx.fillText('「' + work.name + '」', W / 2, iy + 56);
-  ctx.fillStyle = '#A59795';
-  ctx.font = '23px sans-serif';
-  ctx.fillText(work.w + '×' + work.h + ' · ' + total + ' 颗豆子 · ' + fmtDate(work.completedAt || work.updatedAt), W / 2, iy + 96);
-
-  // 底部品牌落款：三颗小方豆 + 应用名
-  const fy = iy + infoH + 34;
-  ctx.font = 'bold 26px sans-serif';
-  const brand = '拼豆便利店';
-  const tw = ctx.measureText(brand).width;
-  const beadR = 8, gap = 8, beadsW = beadR * 2 * 3 + gap * 2;
-  const totalW = beadsW + 16 + tw;
-  drawBrandBeads(ctx, W / 2 - totalW / 2 + beadsW / 2, fy - 9, beadR, gap);
-  ctx.textAlign = 'left';
-  ctx.fillStyle = '#6B5257';
-  ctx.fillText(brand, W / 2 - totalW / 2 + beadsW + 16, fy);
-
+  // 格线铺满网格区（色格随后覆盖，空格处露出格线 —— 和真图纸一致）
+  for (let k = 0; k <= w; k++) {
+    ctx.fillStyle = k % 5 === 0 ? '#C9E4DE' : '#E6E9EB';
+    ctx.fillRect(pad + k * cellPx, pad, 1, h * cellPx);
+  }
+  for (let k = 0; k <= h; k++) {
+    ctx.fillStyle = k % 5 === 0 ? '#C9E4DE' : '#E6E9EB';
+    ctx.fillRect(pad, pad + k * cellPx, w * cellPx, 1);
+  }
+  // 平色格（无孔无高光）
+  const hexOf = t => (work.palette ? work.palette[t] : PALETTE[t].hex);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const t = cells[y * w + x];
+      if (t < 0) continue;
+      ctx.fillStyle = hexOf(t);
+      ctx.fillRect(pad + x * cellPx, pad + y * cellPx, cellPx, cellPx);
+    }
+  }
   return { width: W, height: H };
 }
 
-module.exports = { buildShareCardTo, buildExportTo, loadShareAssets };
+// 导出用的作品图：纯图纸本体（白板 + 豆子），不带背景/标题/日期/品牌落款
+// —— 要装饰收藏版走「分享卡片」（buildShareCardTo）
+function buildExportTo(canvas, work, fused, scale) {
+  scale = scale || 2; // 高清导出
+  if (fused == null) fused = true;
+  const cellPx = clamp(Math.floor(1600 / Math.max(work.w, work.h)), 6, 32);
+  const size = patternSize(work, { cellPx });
+  canvas.width = Math.round(size.width * scale);
+  canvas.height = Math.round(size.height * scale);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(scale, 0, 0, scale, 0, 0);
+  ctx.clearRect(0, 0, size.width, size.height);
+  drawPatternInto(ctx, work, { cellPx, fused });
+  return { width: size.width, height: size.height };
+}
+
+module.exports = { buildShareCardTo, buildExportTo, buildChartExportTo, loadShareAssets };

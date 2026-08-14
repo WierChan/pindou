@@ -13,6 +13,7 @@
              style="left:{{box.left}}px;top:{{box.top}}px;width:{{box.w}}px;height:{{box.h}}px" />
       <view wx:if="{{crop}}" class="cm-crop"
             style="left:{{crop.x}}px;top:{{crop.y}}px;width:{{crop.w}}px;height:{{crop.h}}px">
+        <view wx:if="{{selText}}" class="cm-sel">{{selText}}</view>
         <view class="cm-hd hd-tl" />
         <view class="cm-hd hd-tr" />
         <view class="cm-hd hd-bl" />
@@ -21,7 +22,8 @@
       <view wx:if="{{!box}}" class="cm-loading">图片加载中…</view>
     </view>
 
-    <view class="cm-ratios">
+    <!-- 网格磁吸模式（自由画布导出）按格吸附，比例档没有意义，隐藏 -->
+    <view class="cm-ratios" wx:if="{{!grid}}">
       <view class="cm-ratio {{ratio === item.k ? 'active' : ''}}" wx:for="{{ratios}}" wx:key="k"
             hover-class="pressed" data-r="{{item.k}}" catchtap="setRatio">{{item.label}}</view>
     </view>

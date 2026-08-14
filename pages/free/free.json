@@ -1,4 +1,6 @@
 {
-  "usingComponents": {},
+  "usingComponents": {
+    "crop-modal": "/components/crop-modal/crop-modal"
+  },
   "disableScroll": true
 }
