@@ -28,27 +28,27 @@
 
   <canvas wx:if="{{celebrating}}" type="2d" id="confetti" class="confetti"></canvas>
 
-  <view wx:if="{{modal.show}}" class="overlay">
-    <view class="modal">
-      <view class="modal-title">✨ 大功告成！</view>
-      <view class="modal-art" wx:if="{{modal.img}}">
-        <image src="{{modal.img}}" style="width:{{modal.imgW}}px;height:{{modal.imgH}}px" />
-      </view>
-      <view class="modal-sub">
-        <view>「{{workName}}」熨烫定型完毕</view>
-        <view>这就是你亲手拼出来的作品！</view>
-      </view>
-      <view class="modal-btns">
-        <view class="btn-primary" hover-class="pressed" bindtap="openShare">分享卡片</view>
-        <view class="btn-ghost center" hover-class="pressed" bindtap="exportImage">导出图片</view>
-      </view>
-      <view class="btn-link" hover-class="pressed" bindtap="goHome">回到首页</view>
-    </view>
-  </view>
-
   <share-modal workId="{{workId}}" show="{{shareShow}}" bind:close="closeShare" bind:built="onCardBuilt" />
 </view>
 
 <canvas type="2d" id="util" class="util-canvas" style="width:{{capW}}px;height:{{capH}}px"></canvas>
+
+<!-- 完成弹窗：页面顶层 + 提升层级，确保盖住画板 canvas -->
+<view wx:if="{{modal.show}}" class="overlay hi">
+  <view class="modal">
+    <view class="modal-title">✨ 大功告成！</view>
+    <view class="modal-art" wx:if="{{modal.img}}">
+      <image src="{{modal.img}}" style="width:{{modal.imgW}}px;height:{{modal.imgH}}px" />
+    </view>
+    <view class="modal-sub">
+      <view>「{{workName}}」熨烫定型完毕</view>
+      <view>这就是你亲手拼出来的作品！</view>
+    </view>
+    <view class="modal-btns">
+      <view class="btn-primary" hover-class="pressed" bindtap="openShare">分享</view>
+    </view>
+    <view class="btn-link" hover-class="pressed" bindtap="goHome">回到首页</view>
+  </view>
+</view>
 
 <guide gid="{{guideId}}" steps="{{guideSteps}}" bind:done="onGuideDone" />

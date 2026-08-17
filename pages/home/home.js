@@ -86,7 +86,9 @@ Page({
     });
   },
 
-  // 老缩略图需要重新生成：v4 之前可能只截到局部，v5 起为像素方豆，v6 去豆子描边、v7 起奶油淡彩配色；
+  // 老缩略图需要重新生成：v4 之前可能只截到局部，v5 起为像素方豆，v6 去豆子描边、
+  // v7 起奶油淡彩配色，v9 回归详情画板质感（白底板 + 蒙孔 + 颗颗豆，熨烫作品熔合），
+  // v11 豆子改纯色块（去高光去豆孔，靠豆缝出颗粒感）；
   // 另外豆子形状设置变化后（thumbShape 与当前不一致）也重新生成。
   // 失败不写版本号（下次启动还能重试），只在本次会话内跳过，避免每次 onShow 反复重跑。
   _healThumbs() {
@@ -95,12 +97,12 @@ Page({
     const tried = this._healTried || (this._healTried = {});
     const list = store.list().filter(s => {
       if (tried[s.id + '|' + shape]) return false;
+      const stale = !s.thumbV || s.thumbV < ui.THUMB_V || (s.thumbShape || 'square') !== shape;
       if (s.free && !s.completed) {
-        // 进行中的自由画布：豆子数戳记或形状对不上（或还没有图）就重建
-        return s.placedN > 0 &&
-          (!s.thumb || s.thumbBeads !== s.placedN || (s.thumbShape || 'square') !== shape);
+        // 进行中的自由画布：样式版本、豆子数戳记或形状对不上（或还没有图）就重建
+        return s.placedN > 0 && (!s.thumb || stale || s.thumbBeads !== s.placedN);
       }
-      return !s.thumbV || s.thumbV < 7 || (s.thumbShape || 'square') !== shape;
+      return stale;
     });
     if (!list.length) return;
     this._healing = true;
@@ -120,7 +122,7 @@ Page({
             : work;
           return ui.makeThumb(this, r.node, target, !!work.ironDone)
             .then(path => {
-              const patch = { thumb: path, thumbV: 7, thumbShape: shape };
+              const patch = { thumb: path, thumbV: ui.THUMB_V, thumbShape: shape };
               if (isFreeLive) patch.thumbBeads = work.freeBeads.length;
               store.update(work.id, patch, true);
             })

@@ -36,7 +36,8 @@ function roundRect(ctx, x, y, w, h, r) {
 
 // 单颗豆子：方形 = 无描边方块 + 深色方孔 + 左上硬高光；圆形 = 圆片 + 径向光泽 + 圆孔
 // rgb 传三元组（调用方从所用色板取好）
-function drawBead(ctx, cx, cy, r, rgb, alpha) {
+// matte = 纯色豆，不画高光/光泽也不画豆孔（缩略图用：小尺寸下满屏细节显得杂乱）
+function drawBead(ctx, cx, cy, r, rgb, alpha, matte) {
   if (alpha == null) alpha = 1;
   if (alpha < 1) ctx.globalAlpha = alpha;
   if (r < 3) {
@@ -55,23 +56,27 @@ function drawBead(ctx, cx, cy, r, rgb, alpha) {
   if (BEAD_SHAPE === 'round') {
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7);
     ctx.fillStyle = css(rgb); ctx.fill();
-    const g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r);
-    g.addColorStop(0, 'rgba(255,255,255,.5)');
-    g.addColorStop(0.5, 'rgba(255,255,255,0)');
-    g.addColorStop(1, 'rgba(0,0,0,.22)');
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7);
-    ctx.fillStyle = g; ctx.fill();
-    ctx.beginPath(); ctx.arc(cx, cy, r * 0.32, 0, 7);
-    ctx.fillStyle = css(mix(rgb, BLACK, 0.45)); ctx.fill();
+    if (!matte) {
+      const g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.4, r * 0.1, cx, cy, r);
+      g.addColorStop(0, 'rgba(255,255,255,.5)');
+      g.addColorStop(0.5, 'rgba(255,255,255,0)');
+      g.addColorStop(1, 'rgba(0,0,0,.22)');
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7);
+      ctx.fillStyle = g; ctx.fill();
+      ctx.beginPath(); ctx.arc(cx, cy, r * 0.32, 0, 7);
+      ctx.fillStyle = css(mix(rgb, BLACK, 0.45)); ctx.fill();
+    }
   } else {
     const side = r * 1.9;
     const x = cx - side / 2, y = cy - side / 2;
     ctx.fillStyle = css(rgb);
     ctx.fillRect(x, y, side, side);
-    ctx.fillStyle = css(mix(rgb, BLACK, 0.45));
-    ctx.fillRect(cx - side * 0.18, cy - side * 0.18, side * 0.36, side * 0.36);
-    ctx.fillStyle = 'rgba(255,255,255,.75)';
-    ctx.fillRect(x + side * 0.1, y + side * 0.1, side * 0.2, side * 0.2);
+    if (!matte) {
+      ctx.fillStyle = css(mix(rgb, BLACK, 0.45));
+      ctx.fillRect(cx - side * 0.18, cy - side * 0.18, side * 0.36, side * 0.36);
+      ctx.fillStyle = 'rgba(255,255,255,.75)';
+      ctx.fillRect(x + side * 0.1, y + side * 0.1, side * 0.2, side * 0.2);
+    }
   }
   if (alpha < 1) ctx.globalAlpha = 1;
 }
@@ -86,16 +91,6 @@ function drawFused(ctx, x, y, s, rgb) {
   }
   ctx.fillStyle = css(rgb);
   ctx.fillRect(x - e, y - e, s + e * 2, s + e * 2);
-}
-function drawFusedGloss(ctx, x, y, s) {
-  if (s < 3.5) return; // 太小看不见高光
-  ctx.fillStyle = 'rgba(255,255,255,.18)';
-  if (BEAD_SHAPE === 'round') {
-    roundRect(ctx, x + s * 0.14, y + s * 0.1, s * 0.5, s * 0.22, s * 0.11);
-    ctx.fill();
-  } else {
-    ctx.fillRect(x + s * 0.14, y + s * 0.1, s * 0.5, s * 0.22);
-  }
 }
 
 // 图纸的逻辑尺寸
@@ -142,14 +137,7 @@ function drawPatternInto(ctx, p, opts) {
       if (placed && !placed[i]) continue;
       const x = pad + cx * cellPx, y = pad + cy * cellPx;
       if (fused) drawFused(ctx, x, y, cellPx, PAL[t]);
-      else drawBead(ctx, x + cellPx / 2, y + cellPx / 2, cellPx * 0.46, PAL[t]);
-    }
-  }
-  if (fused) {
-    for (let cy = 0; cy < h; cy++) for (let cx = 0; cx < w; cx++) {
-      const i = cy * w + cx;
-      if (cells[i] < 0 || (placed && !placed[i])) continue;
-      drawFusedGloss(ctx, pad + cx * cellPx, pad + cy * cellPx, cellPx);
+      else drawBead(ctx, x + cellPx / 2, y + cellPx / 2, cellPx * 0.46, PAL[t], 1, !!opts.matte);
     }
   }
   return size;
@@ -194,6 +182,7 @@ class BoardView {
     this.o = opts;
     this.pal = palRGB(opts.palette); // 作品自定义色板（hex 数组）或全局色板
     this.fused = !!opts.fused;
+    this.chart = !!opts.chart; // 图纸显示模式（view）
     this.scale = 20; this.ox = 0; this.oy = 0;
     this.vw = 0; this.vh = 0; this.dpr = 1;
     this.rl = 0; this.rt = 0; // canvas 在视口中的位置（把 clientX/Y 换算成画布坐标）
@@ -221,6 +210,8 @@ class BoardView {
   destroy() { this.alive = false; }
   requestRender() { this.dirty = true; }
   setFused(v) { this.fused = v; this.dirty = true; }
+  // 图纸显示模式（view 模式用）：平色格 + 网格线，与分享/导出图纸同款观感
+  setChart(v) { this.chart = !!v; this.dirty = true; }
 
   // 页面布局完成 / 窗口尺寸变化（iPad 分屏、转屏）时调用
   setViewport(w, h, dpr, left, top) {
@@ -616,12 +607,13 @@ class BoardView {
     const isPlay = this.o.mode === 'play';
     const isIron = this.o.mode === 'iron';
     const isFree = this.o.mode === 'free';
+    const chartView = this.chart && !isPlay && !isIron && !isFree; // 图纸显示（view 模式）
     const ironed = this.o.ironed;
     const sel = isPlay ? this.o.getSelected() : -2;
     const showNum = isPlay && s >= 15 && this.o.numbers;
     const showPeg = s >= 9;
     const tiny = s < 3.5; // 大画布缩到很小时改用方块填充，绕开圆弧/渐变的开销
-    const fused = this.fused && !isPlay && !isIron;
+    const fused = this.fused && !isPlay && !isIron && !chartView;
     const numFont = 'bold ' + Math.round(s * 0.4) + 'px sans-serif';
 
     if (showNum) {
@@ -630,13 +622,25 @@ class BoardView {
       ctx.textBaseline = 'middle';
     }
 
+    // 图纸显示：网格线铺满整板（每 5 格一条浅青参考线），空格露线、色格覆盖
+    if (chartView) {
+      for (let k = 0; k <= w; k++) {
+        ctx.fillStyle = k % 5 === 0 ? '#C9E4DE' : '#E6E9EB';
+        ctx.fillRect(ox + k * s - 0.5, oy, 1, h * s);
+      }
+      for (let k = 0; k <= h; k++) {
+        ctx.fillStyle = k % 5 === 0 ? '#C9E4DE' : '#E6E9EB';
+        ctx.fillRect(ox, oy + k * s - 0.5, w * s, 1);
+      }
+    }
+
     for (let cy = y0; cy <= y1; cy++) {
       for (let cx = x0; cx <= x1; cx++) {
         const i = cy * w + cx;
         const tc = cells[i];
         const px = ox + cx * s, py = oy + cy * s;
         const mx = px + s / 2, my = py + s / 2;
-        if (showPeg && !fused && !isFree) { // 自由模式的钉在背景块里铺满视口画过了
+        if (showPeg && !fused && !isFree && !chartView) { // 自由模式的钉在背景块里铺满视口画过了；图纸模式无蒙孔
           ctx.fillStyle = 'rgba(95,74,78,.10)';
           if (BEAD_SHAPE === 'round') {
             ctx.beginPath(); ctx.arc(mx, my, Math.max(1, s * 0.06), 0, 7); ctx.fill();
@@ -656,7 +660,12 @@ class BoardView {
             else r *= 1 + 0.4 * (1 - k) * (1 - k);
           }
           const rgbT = this.pal[tc];
-          if (isIron) {
+          if (chartView) {
+            // 图纸显示：平色格（无孔无高光），与分享/导出图纸同款
+            ctx.fillStyle = css(rgbT);
+            ctx.fillRect(px, py, s, s);
+          }
+          else if (isIron) {
             if (ironed[i]) {
               const m0 = this.ironAnims.get(i);
               if (m0 == null) drawFused(ctx, px, py, s, rgbT);
@@ -713,15 +722,6 @@ class BoardView {
             }
           }
         }
-      }
-    }
-
-    if (fused || isIron) {
-      for (let cy = y0; cy <= y1; cy++) for (let cx = x0; cx <= x1; cx++) {
-        const i = cy * w + cx;
-        if (cells[i] < 0 || !placed[i]) continue;
-        if (isIron && (!ironed[i] || this.ironAnims.has(i))) continue;
-        drawFusedGloss(ctx, ox + cx * s, oy + cy * s, s);
       }
     }
 

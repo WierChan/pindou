@@ -439,7 +439,7 @@ Page({
     this.uq(() => ui.makeThumb(this, this.utilCanvas, clone, false))
       .then(path => {
         work.thumb = path;
-        store.update(work.id, { thumb: path, thumbV: 7, thumbShape: getBeadShape(), thumbBeads: n }, true);
+        store.update(work.id, { thumb: path, thumbV: ui.THUMB_V, thumbShape: getBeadShape(), thumbBeads: n }, true);
       })
       .catch(() => { /* 缩略图失败不影响流程 */ });
   },

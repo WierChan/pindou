@@ -7,8 +7,8 @@ const { fetchTemplates, templatePattern } = require('../../utils/templates');
 const { renderPatternTo, patternSize, getBeadShape } = require('../../utils/board');
 const ui = require('../../utils/ui');
 const { cfg } = require('../../utils/config');
-const { buildGuide } = require('../../utils/guidance');
-const { normalize, format, fetchByCode, reportCode: reportImportCode } = require('../../utils/importcode');
+const { buildGuide, guideSeen, markGuideSeen } = require('../../utils/guidance');
+const { normalize, format, fetchByCode, markCodePrompted, reportCode: reportImportCode } = require('../../utils/importcode');
 
 // 表情库：每个 emoji 都是现成的拼豆图案（预先按字素拆好，❤️ 这类组合字符不被拆散）
 const EMOJIS = [
@@ -67,7 +67,7 @@ Page({
     pvH: 0,
   },
 
-  onLoad() {
+  onLoad(q) {
     // {data, w, h} 图片像素。解码时就缩到 ≤512：解码/读回/重采样都快，
     // 且 ≤256 豆的画布每格仍有 ≥2×2 采样，观感与全尺寸一致（小图不缩放，1:1 还原不受影响）
     this.srcData = null;
@@ -82,6 +82,12 @@ Page({
     this.tpls = null; // 图案库数据(来自后端)
     this.setData({ insets: ui.navInsets() });
     this._loadTemplates();
+    // 剪贴板口令弹窗「拼同款」直达：带 code 参数进来就自动取图纸进配置页
+    const auto = q && normalize(q.code);
+    if (auto) {
+      this._autoCode = true; // 本次直奔配置页，选择页引导这轮不弹（未标记看过，下次正常进入再出）
+      this._importByCode(auto);
+    }
   },
 
   // 图案库来自后端;失败给出提示,可点击重试(不回退本地数据)
@@ -114,14 +120,29 @@ Page({
     ui.queryNode(this, '#util2').then(r => {
       if (r && r.node) this.decodeCanvas = r.node;
     });
-    // 首次进入：介绍三种创建方式
-    buildGuide(this, 'create', [
-      { sel: '.tabs', text: '三种玩法任选：照片表情包转图纸、临摹图案库，或者自由画布随手画～' },
-      { sel: '.uz-chart', text: '小红书图纸工坊的图纸截图从这里导入！框住网格就能 1:1 还原，颜色和图纸一模一样' },
-    ]);
+    // 首次进入：介绍三种创建方式 + 导入码入口；口令直达（马上跳配置页）这轮不弹。
+    // 看过老两步版 create 引导的用户，只补看导入码这一步（记在 create-code 上）
+    if (this._autoCode) return;
+    const codeStep = {
+      sel: '.code-entry',
+      text: '收到好友的拼豆口令？复制整段文案打开小程序会自动识别；也可以点这里手动输入，拼个同款～',
+    };
+    if (guideSeen('create')) {
+      buildGuide(this, 'create-code', [codeStep]);
+    } else {
+      buildGuide(this, 'create', [
+        { sel: '.tabs', text: '三种玩法任选：照片表情包转图纸、临摹图案库，或者自由画布随手画～' },
+        { sel: '.uz-chart', text: '小红书图纸工坊的图纸截图从这里导入！框住网格就能 1:1 还原，颜色和图纸一模一样' },
+        codeStep,
+      ]);
+    }
   },
 
-  onGuideDone() { this.setData({ guideSteps: [] }); },
+  onGuideDone() {
+    // 完整版 create 引导已包含导入码一步，不用再补看单步版
+    if (this.data.guideId === 'create') markGuideSeen('create-code');
+    this.setData({ guideSteps: [] });
+  },
 
   // 图片/表情解码：优先用独立画布直接执行；
   // 拿不到独立画布时退回 util 队列（会排在模板缩略图生成后面）
@@ -245,9 +266,14 @@ Page({
     const code = normalize(this.data.codeInput);
     if (!code) { ui.toast('口令不对哦，应是 8 位字符'); return; }
     this.setData({ codeShow: false });
+    this._importByCode(code);
+  },
+  // 凭码取图纸进配置页：手动输入与剪贴板自动识别（onLoad ?code=）共用
+  _importByCode(code) {
     wx.showLoading({ title: '取图纸中', mask: true });
     fetchByCode(code).then(p => {
       wx.hideLoading();
+      markCodePrompted(code); // 导入过的码不再被剪贴板识别弹窗打扰
       // 复用「外来固定图纸」配置路径：1:1 还原、自带色板
       this.pattern = { w: p.w, h: p.h, cells: p.cells, palette: p.palette };
       this.fromChart = true;
@@ -510,7 +536,7 @@ Page({
     store.update(work.id, { boostRow: cfg.FREE_ROW_USES });
     const go = () => wx.redirectTo({ url: '/pages/play/play?id=' + work.id });
     this.uq(() => ui.makeThumb(this, this.utilCanvas, work, false))
-      .then(path => { store.update(work.id, { thumb: path, thumbV: 7, thumbShape: getBeadShape() }, true); go(); })
+      .then(path => { store.update(work.id, { thumb: path, thumbV: ui.THUMB_V, thumbShape: getBeadShape() }, true); go(); })
       .catch(go);
   },
 

@@ -1,3 +1,6 @@
+/* 分享弹窗永远盖在页面级弹窗（含 .overlay.hi 的完成弹窗，z-index 200）之上 */
+.share-overlay { z-index: 300; }
+
 .modal.share { max-width: 380px; max-height: 92vh; overflow-y: auto; }
 .share-img {
   width: 100%;

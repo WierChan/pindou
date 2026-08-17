@@ -1,17 +1,14 @@
-// 作品查看：完成后的展示、分享、导出
+// 作品查看：完成后的展示与分享
 const { store } = require('../../utils/store');
 const { BoardView } = require('../../utils/board');
-const { buildExportTo, buildChartExportTo } = require('../../utils/share');
-const { createCode, format } = require('../../utils/importcode');
+const { createCode, format, markCodePrompted } = require('../../utils/importcode');
 const ui = require('../../utils/ui');
 
 Page({
   data: {
     insets: { top: 24, h: 44, right: 8 },
-    capW: 700,
-    capH: 900,
     title: '',
-    fusedOn: true,
+    fusedOn: false, // 默认图纸显示；点「熨烫效果」切到质感图
     shareShow: false,
     workId: '',
     codeShow: false,
@@ -26,7 +23,6 @@ Page({
       return;
     }
     this.work = work;
-    this.uq = ui.serialQueue();
     this.setData({
       insets: ui.navInsets(),
       title: work.name,
@@ -44,11 +40,11 @@ Page({
         cells: this.work.cells, placed: this.work.placed,
         palette: this.work.palette || null,
         mode: 'view', fused: true,
+        chart: true, // 默认网格图纸显示，与分享图纸一致
       });
       this.bv.setViewport(r.width, r.height, dpr, r.left, r.top);
       setTimeout(() => ui.syncBoardRect(this, this.bv), 600);
     });
-    ui.queryNode(this, '#util').then(r => { if (r) this.utilCanvas = r.node; });
   },
 
   onResize() {
@@ -66,10 +62,12 @@ Page({
 
   goBack() { ui.backHome(); },
 
+  // 图纸显示 ↔ 熨烫效果 切换
   toggleFused() {
     if (!this.bv) return;
-    this.bv.setFused(!this.bv.fused);
-    this.setData({ fusedOn: this.bv.fused });
+    const showEffect = this.bv.chart; // 当前是图纸 → 切到熨烫效果
+    this.bv.setChart(!showEffect);
+    this.setData({ fusedOn: showEffect });
   },
 
   openShare() { this.setData({ shareShow: true }); },
@@ -108,33 +106,16 @@ Page({
     });
   },
   copyCode() {
+    // 预标记自家口令：复制后回到前台，不被剪贴板自动识别弹窗打扰
+    markCodePrompted(this.work.shareCode);
     wx.setClipboardData({
-      data: '我在拼豆便利店拼了「' + this.work.name + '」！复制口令 ' + this.data.codeText +
-        '，打开小程序 → 新作品 → 输入导入码，拼同款～',
+      data: '我在拼豆便利店拼了「' + this.work.name + '」！复制这段话打开「拼豆便利店」小程序，' +
+        '自动识别口令 ' + this.data.codeText + '，一键拼同款；也可以在 新作品 → 输入导入码 里粘贴～',
       success: () => ui.toast('口令已复制，去粘贴给好友吧 ✨'),
     });
   },
   closeCode() { this.setData({ codeShow: false }); },
   noop() {},
-
-  // 两种导出：效果图（豆豆质感）/ 图纸（平色格+格线，保存后可再导入识别）
-  exportImage() {
-    if (!this.utilCanvas || !this.work) return;
-    wx.showActionSheet({
-      itemList: ['效果图（豆豆质感）', '拼豆图纸（可再导入）'],
-      success: r => this._doExport(r.tapIndex === 1),
-      fail: () => { /* 取消 */ },
-    });
-  },
-  _doExport(asChart) {
-    const fused = this.bv ? this.bv.fused : true;
-    this.uq(() => {
-      const draw = asChart
-        ? () => buildChartExportTo(this.utilCanvas, this.work)
-        : () => buildExportTo(this.utilCanvas, this.work, fused);
-      return ui.captureCanvas(this, this.utilCanvas, draw).then(path => ui.saveToAlbum(path));
-    }).catch(() => ui.toast('导出失败，再试一次'));
-  },
 
   delWork() {
     wx.showModal({

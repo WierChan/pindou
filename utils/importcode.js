@@ -16,6 +16,24 @@ function normalize(text) {
   return m ? m[0] : '';
 }
 
+// 聊天文案 → 口令，只认完整展示形态（PD-XXXX-XXXX，容忍空格和各种连字符）。
+// 剪贴板自动识别专用：normalize 太宽松，作品名里的字母数字会被拼进码里造成误弹窗
+const STRICT_RE = new RegExp('PD\\s*[-‐–—－]?\\s*([' + CHARSET + ']{4})\\s*[-‐–—－]?\\s*([' + CHARSET + ']{4})(?![' + CHARSET + '])');
+function extractCode(text) {
+  const m = String(text || '').toUpperCase().match(STRICT_RE);
+  return m ? m[1] + m[2] : '';
+}
+
+// 剪贴板自动识别的去重：同一个码只弹一次「拼同款」提示
+// （复制自家口令、已经导入过、点过「先不了」的都不再打扰）
+const PROMPTED_KEY = 'pindou.codePrompted';
+function markCodePrompted(code) {
+  try { wx.setStorageSync(PROMPTED_KEY, code); } catch (e) { /* 忽略 */ }
+}
+function wasCodePrompted(code) {
+  try { return wx.getStorageSync(PROMPTED_KEY) === code; } catch (e) { return true; }
+}
+
 function format(code) {
   return code ? 'PD-' + code.slice(0, 4) + '-' + code.slice(4, 8) : '';
 }
@@ -71,4 +89,7 @@ function reportCode(code, reason) {
   return api.post('/api/patterns/code/' + code + '/report', { reason: reason || 'user' });
 }
 
-module.exports = { normalize, format, validatePattern, createCode, fetchByCode, reportCode };
+module.exports = {
+  normalize, format, extractCode, markCodePrompted, wasCodePrompted,
+  validatePattern, createCode, fetchByCode, reportCode,
+};

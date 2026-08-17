@@ -48,25 +48,26 @@
   </view>
 
   <canvas wx:if="{{celebrating}}" type="2d" id="confetti" class="confetti"></canvas>
-
-  <view wx:if="{{modal.show}}" class="overlay">
-    <view class="modal">
-      <view class="modal-title">🎉 豆子拼齐啦！</view>
-      <view class="modal-art" wx:if="{{modal.img}}">
-        <image src="{{modal.img}}" style="width:{{modal.imgW}}px;height:{{modal.imgH}}px" />
-      </view>
-      <view class="modal-sub">
-        <view>「{{title}}」 · {{total}} 颗豆子 · {{colorN}} 种颜色</view>
-        <view>最后一步：亲手把它熨烫定型！</view>
-      </view>
-      <view class="modal-btns">
-        <view class="btn-primary" hover-class="pressed" bindtap="goIron">🔥 去熨烫</view>
-      </view>
-      <view class="btn-link" hover-class="pressed" bindtap="goHomeLater">稍后再烫，先回首页</view>
-    </view>
-  </view>
 </view>
 
 <canvas type="2d" id="util" class="util-canvas" style="width:{{capW}}px;height:{{capH}}px"></canvas>
+
+<!-- 完成弹窗：页面顶层 + 提升层级，确保盖住画板 canvas -->
+<view wx:if="{{modal.show}}" class="overlay hi">
+  <view class="modal">
+    <view class="modal-title">🎉 豆子拼齐啦！</view>
+    <view class="modal-art" wx:if="{{modal.img}}">
+      <image src="{{modal.img}}" style="width:{{modal.imgW}}px;height:{{modal.imgH}}px" />
+    </view>
+    <view class="modal-sub">
+      <view>「{{title}}」 · {{total}} 颗豆子 · {{colorN}} 种颜色</view>
+      <view>最后一步：亲手把它熨烫定型！</view>
+    </view>
+    <view class="modal-btns">
+      <view class="btn-primary" hover-class="pressed" bindtap="goIron">🔥 去熨烫</view>
+    </view>
+    <view class="btn-link" hover-class="pressed" bindtap="goHomeLater">稍后再烫，先回首页</view>
+  </view>
+</view>
 
 <guide gid="{{guideId}}" steps="{{guideSteps}}" bind:done="onGuideDone" />

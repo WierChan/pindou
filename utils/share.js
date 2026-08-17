@@ -81,7 +81,8 @@ function fitCell(work, maxW, maxH, minC, maxC) {
   return clamp(Math.floor(Math.min(cw, ch)), minC, maxC);
 }
 
-// 分享卡片：作品图 + 品牌邀请区，返回逻辑尺寸 {width, height}
+// 品牌分享卡（作品图 + 邀请区 + 小程序码）：当前未接入——分享弹窗已改为纯网格图纸；
+// 保留本函数作为将来"朋友圈海报"之类玩法的备选
 function buildShareCardTo(canvas, work, scale) {
   scale = scale || 2;
   const W = 750, M = 48;
@@ -177,10 +178,12 @@ function buildShareCardTo(canvas, work, scale) {
 // 图纸样式导出：纯白底 + 细格线（每格淡灰、5 格淡青参考线）+ 平色格。
 // 没有豆孔/高光/蒙孔点 —— 保存的图片可以再从「导入拼豆图纸」识别回来（往返闭环），
 // 颜色用色板原值（PNG 无损），识别后逐格逐色还原
-function buildChartExportTo(canvas, work, scale) {
-  scale = scale || 2;
+function buildChartExportTo(canvas, work, opts) {
+  opts = opts || {};
+  const scale = opts.scale || 2;
+  const maxSide = opts.maxSide || 1600;
   const w = work.w, h = work.h, cells = work.cells;
-  const cellPx = clamp(Math.floor(1600 / Math.max(w, h)), 8, 24);
+  const cellPx = clamp(Math.floor(maxSide / Math.max(w, h)), opts.minCell || 8, opts.maxCell || 24);
   const pad = Math.round(cellPx * 1.2);
   const W = w * cellPx + pad * 2, H = h * cellPx + pad * 2;
   canvas.width = Math.round(W * scale);
@@ -189,14 +192,16 @@ function buildChartExportTo(canvas, work, scale) {
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, W, H);
-  // 格线铺满网格区（色格随后覆盖，空格处露出格线 —— 和真图纸一致）
-  for (let k = 0; k <= w; k++) {
-    ctx.fillStyle = k % 5 === 0 ? '#C9E4DE' : '#E6E9EB';
-    ctx.fillRect(pad + k * cellPx, pad, 1, h * cellPx);
-  }
-  for (let k = 0; k <= h; k++) {
-    ctx.fillStyle = k % 5 === 0 ? '#C9E4DE' : '#E6E9EB';
-    ctx.fillRect(pad, pad + k * cellPx, w * cellPx, 1);
+  // 格线铺满网格区（色格随后覆盖，空格处露出格线 —— 和真图纸一致）；格子太小就不画线
+  if (cellPx >= 5) {
+    for (let k = 0; k <= w; k++) {
+      ctx.fillStyle = k % 5 === 0 ? '#C9E4DE' : '#E6E9EB';
+      ctx.fillRect(pad + k * cellPx, pad, 1, h * cellPx);
+    }
+    for (let k = 0; k <= h; k++) {
+      ctx.fillStyle = k % 5 === 0 ? '#C9E4DE' : '#E6E9EB';
+      ctx.fillRect(pad, pad + k * cellPx, w * cellPx, 1);
+    }
   }
   // 平色格（无孔无高光）
   const hexOf = t => (work.palette ? work.palette[t] : PALETTE[t].hex);

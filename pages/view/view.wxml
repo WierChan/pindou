@@ -15,28 +15,25 @@
 
   <view class="bottom-bar view-bottom">
     <view class="tool-chip {{fusedOn ? 'active' : ''}}" bindtap="toggleFused">🔥 熨烫效果</view>
-    <view class="btn-primary slim" hover-class="pressed" bindtap="openShare">分享卡片</view>
+    <view class="btn-primary slim" hover-class="pressed" bindtap="openShare">分享</view>
     <view class="tool-chip" bindtap="shareCode">🔑 导入码</view>
-    <view class="btn-ghost slim2" hover-class="pressed" bindtap="exportImage">导出图片</view>
   </view>
 
   <share-modal workId="{{workId}}" show="{{shareShow}}" bind:close="closeShare" bind:built="onCardBuilt" />
-
-  <!-- 导入码弹窗 -->
-  <view wx:if="{{codeShow}}" class="overlay" bindtap="closeCode">
-    <view class="modal" catchtap="noop">
-      <view class="modal-title">🔑 图纸导入码</view>
-      <view class="code-big">{{codeText}}</view>
-      <view class="modal-sub">
-        <view>好友打开小程序：新作品 → 输入导入码</view>
-        <view>输入这串口令，就能拼同款图纸</view>
-      </view>
-      <view class="modal-btns">
-        <view class="btn-primary" hover-class="pressed" bindtap="copyCode">复制口令</view>
-      </view>
-      <view class="btn-link" hover-class="pressed" bindtap="closeCode">关闭</view>
-    </view>
-  </view>
 </view>
 
-<canvas type="2d" id="util" class="util-canvas" style="width:{{capW}}px;height:{{capH}}px"></canvas>
+<!-- 导入码弹窗：放页面顶层 + 提升层级，确保盖住画板 canvas -->
+<view wx:if="{{codeShow}}" class="overlay hi" bindtap="closeCode">
+  <view class="modal" catchtap="noop">
+    <view class="modal-title">🔑 图纸导入码</view>
+    <view class="code-big">{{codeText}}</view>
+    <view class="modal-sub">
+      <view>复制整段文案发给好友，打开小程序自动识别口令</view>
+      <view>也可以手动：新作品 → 输入导入码</view>
+    </view>
+    <view class="modal-btns">
+      <view class="btn-primary" hover-class="pressed" bindtap="copyCode">复制口令</view>
+    </view>
+    <view class="btn-link" hover-class="pressed" bindtap="closeCode">关闭</view>
+  </view>
+</view>

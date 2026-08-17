@@ -127,7 +127,7 @@
 <guide gid="{{guideId}}" steps="{{guideSteps}}" bind:done="onGuideDone" />
 
 <!-- 导入码输入弹窗 -->
-<view wx:if="{{codeShow}}" class="overlay" bindtap="closeCodeInput">
+<view wx:if="{{codeShow}}" class="overlay hi" bindtap="closeCodeInput">
   <!-- no-anim：原生 input 在带 transform 动画的容器里真机会焦点错位 -->
   <view class="modal no-anim" catchtap="noop">
     <view class="modal-title">🔑 输入导入码</view>

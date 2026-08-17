@@ -3,7 +3,6 @@ const { store } = require('../../utils/store');
 const { PALETTE } = require('../../utils/palette');
 const { colorStats } = require('../../utils/convert');
 const { BoardView, renderPatternTo, getBeadShape } = require('../../utils/board');
-const { buildExportTo, buildChartExportTo } = require('../../utils/share');
 const { audio } = require('../../utils/audio');
 const { celebrate } = require('../../utils/confetti');
 const ui = require('../../utils/ui');
@@ -153,7 +152,7 @@ Page({
     });
     if (this.utilCanvas) {
       this.uq(() => ui.makeThumb(this, this.utilCanvas, work, true))
-        .then(path => store.update(work.id, { thumb: path, thumbV: 7, thumbShape: getBeadShape() }, true))
+        .then(path => store.update(work.id, { thumb: path, thumbV: ui.THUMB_V, thumbShape: getBeadShape() }, true))
         .catch(() => { /* 忽略 */ });
     }
     setTimeout(() => {
@@ -193,28 +192,10 @@ Page({
     }).catch(() => show('', 0, 0));
   },
 
-  /* ---------- 完成后的分享 / 导出 ---------- */
+  /* ---------- 完成后的分享 ---------- */
   openShare() { this.setData({ shareShow: true }); },
   closeShare() { this.setData({ shareShow: false }); },
   onCardBuilt(e) { this.shareImg = e.detail.path; },
-
-  // 两种导出：效果图（熨烫质感）/ 图纸（平色格+格线，保存后可再导入识别）
-  exportImage() {
-    if (!this.utilCanvas || !this.work) return;
-    wx.showActionSheet({
-      itemList: ['效果图（熨烫质感）', '拼豆图纸（可再导入）'],
-      success: r => {
-        const asChart = r.tapIndex === 1;
-        this.uq(() => {
-          const draw = asChart
-            ? () => buildChartExportTo(this.utilCanvas, this.work)
-            : () => buildExportTo(this.utilCanvas, this.work, true);
-          return ui.captureCanvas(this, this.utilCanvas, draw).then(path => ui.saveToAlbum(path));
-        }).catch(() => ui.toast('导出失败，再试一次'));
-      },
-      fail: () => { /* 取消 */ },
-    });
-  },
 
   goHome() { ui.backHome(); },
 

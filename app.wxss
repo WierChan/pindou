@@ -151,6 +151,7 @@ view, text, image, canvas, input, scroll-view, button {
   transition: transform .12s;
 }
 .btn-ghost.slim2 { padding: 10px 18px; align-self: auto; }
+.btn-ghost.slim3 { padding: 14px; font-size: 16px; box-shadow: 4px 4px 0 #E2DAD3;}
 .btn-link {
   color: var(--ink2);
   font-size: 13px;
@@ -377,6 +378,11 @@ button.btn-reset::after { border: none; }
   justify-content: center;
   animation: fadeIn .3s;
   padding: 24px;
+}
+/* 盖在画板 canvas 上方的弹窗用（参照引导遮罩的层级）；
+   同时建议放到页面根节点最外层，别嵌在带画布的容器里 */
+.overlay.hi {
+  z-index: 200;
 }
 @keyframes fadeIn { from { opacity: 0; } }
 .modal {
