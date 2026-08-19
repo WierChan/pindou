@@ -221,23 +221,34 @@ Page({
   chooseChart() {
     this._pickImage(path => {
       wx.showLoading({ title: '识别网格中', mask: true });
-      this._loadSrc(cv => loadImageToData(cv, path, 2048)).then(d => {
-        wx.hideLoading();
-        const r = analyzeChart(d.data, d.w, d.h);
-        const extra = {};
-        if (r.ok && r.grid) {
-          extra.cropGrid = {
-            px: r.grid.px / d.w, py: r.grid.py / d.h,
-            ox: r.grid.offX / d.w, oy: r.grid.offY / d.h,
-          };
-          extra.cropInit = r.rectPx ? {
-            x: r.rectPx.x / d.w, y: r.rectPx.y / d.h,
-            w: r.rectPx.w / d.w, h: r.rectPx.h / d.h,
-          } : null;
-        }
-        this._openCrop(path, 'chart', extra);
-      }).catch(() => { wx.hideLoading(); this._openCrop(path, 'chart', {}); });
+      // 预识别只为「裁剪框吸附格线」：gridOnly 跳过最贵的逐格取色/聚色，
+      // 把开弹窗前的等待压到 1/4。不降分辨率 —— 实测降采样的重采样模糊会让
+      // 压缩过的淡格线更难测（1024/1600 都会失败），原生尺寸反而又快又稳
+      this._loadSrc(cv => loadImageToData(cv, path, 2048))
+        .then(d => this._yield().then(() => {
+          const r = analyzeChart(d.data, d.w, d.h, { gridOnly: true });
+          const extra = {};
+          if (r.ok && r.grid) {
+            extra.cropGrid = {
+              px: r.grid.px / d.w, py: r.grid.py / d.h,
+              ox: r.grid.offX / d.w, oy: r.grid.offY / d.h,
+            };
+            extra.cropInit = r.rectPx ? {
+              x: r.rectPx.x / d.w, y: r.rectPx.y / d.h,
+              w: r.rectPx.w / d.w, h: r.rectPx.h / d.h,
+            } : null;
+          }
+          wx.hideLoading();
+          this._openCrop(path, 'chart', extra);
+        }))
+        .catch(() => { wx.hideLoading(); this._openCrop(path, 'chart', {}); });
     });
+  },
+
+  // 让出一帧：showLoading 之后必须先渲染，才能开始跑同步的重活，
+  // 否则加载框要么不显示、要么一闪而过，用户看到的是「页面卡死」
+  _yield() {
+    return new Promise(resolve => setTimeout(resolve, 40));
   },
 
   /* ---------- 导入码 ---------- */
@@ -351,29 +362,42 @@ Page({
   // 识别网格逐格取色，1:1 还原成可拼的作品
   _importChart(path, rect) {
     wx.showLoading({ title: '识别图纸中', mask: true });
-    // 图纸必须高分辨率解码：上百格的图纸每格才有足够像素可采
-    this._loadSrc(cv => loadImageToData(cv, path, 2048, rect)).then(d => {
+    // 图纸必须高分辨率解码：上百格的图纸每格才有足够像素可采。
+    // _yield 先让加载框渲染出来，再开始跑同步的识别（否则真机上是「无反馈卡顿」）
+    this._loadSrc(cv => loadImageToData(cv, path, 2048, rect)).then(d => this._yield().then(() => {
       const r = analyzeChart(d.data, d.w, d.h);
       wx.hideLoading();
       if (!r.ok) {
-        // 真机排查：vConsole 里能看到失败原因和中间量（格距/置信度/主体范围）
+        // 真机排查：中间量（格距/置信度/格线支撑率/主体范围）直接放进弹窗，
+        // 不依赖 vConsole；console 里也留一份完整的
         console.warn('[图纸导入] 识别失败:', r.reason, r.debug || '', '图片', d.w + 'x' + d.h);
+        const dg = r.debug || {};
+        const dbgLine = [
+          d.w + '×' + d.h,
+          dg.body ? '体' + (dg.body.x1 - dg.body.x0) + '×' + (dg.body.y1 - dg.body.y0) : '',
+          dg.px != null ? '距' + dg.px + '/' + dg.py : '',
+          dg.confX != null ? '信' + dg.confX + '/' + dg.confY : '',
+          dg.lineX != null ? '线' + dg.lineX + '/' + dg.lineY : '',
+        ].filter(Boolean).join(' ');
         wx.showModal({
           title: '没认出这张图纸',
-          content: (r.reason || '识别失败') + '。试试发原图（别经过聊天/朋友圈压缩），或把网格部分框得再准一点',
+          content: (r.reason || '识别失败') + '。试试发原图（别经过聊天/朋友圈压缩），或把网格部分框得再准一点' +
+            '\n（调试 ' + dbgLine + '）',
           showCancel: false,
           confirmText: '知道了',
           confirmColor: '#C9838F',
         });
         return;
       }
+      // 识别参数留档：结果不对时（比如格距锁错谐波）对照排查
+      console.log('[图纸导入] ok', r.w + '×' + r.h, 'pitch', r.pitch, 'conf', r.conf, '色', r.colorN, '豆', r.total, '图片', d.w + 'x' + d.h);
       // palette = 图纸真实取样色（作品自带色板），预览/开拼颜色与原图纸一致
       this.pattern = { w: r.w, h: r.h, cells: r.cells, palette: r.palette };
       this.fromChart = true;
       this.fromTpl = false;
       this.name = '图纸拼豆';
       this._renderConfig();
-    }).catch(() => { wx.hideLoading(); ui.toast('图片打开失败，换一张试试'); });
+    })).catch(() => { wx.hideLoading(); ui.toast('图片打开失败，换一张试试'); });
   },
 
   pickTpl(e) {

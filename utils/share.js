@@ -1,5 +1,5 @@
 // 分享卡片 / 导出图片：直接绘制到传入的 canvas 上
-const { drawPatternInto, patternSize } = require('./board');
+const { drawPatternInto, patternSize, workFinish } = require('./board');
 const { colorStats } = require('./convert');
 const { PALETTE } = require('./palette');
 
@@ -81,18 +81,47 @@ function fitCell(work, maxW, maxH, minC, maxC) {
   return clamp(Math.floor(Math.min(cw, ch)), minC, maxC);
 }
 
-// 品牌分享卡（作品图 + 邀请区 + 小程序码）：当前未接入——分享弹窗已改为纯网格图纸；
-// 保留本函数作为将来"朋友圈海报"之类玩法的备选
+// 保证作品四周至少有 margin 圈空白格再上卡片：完成时按包围盒紧裁的作品（豆子贴边）
+// 也能有拼豆板的留白感；本身留白充足的（照片 / 图纸导入）原样返回。仅用于展示，不改存档
+function withMargin(work, margin) {
+  const w = work.w, h = work.h, cells = work.cells;
+  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (cells[y * w + x] >= 0) {
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    }
+  }
+  if (x1 < 0) return work; // 空作品
+  const L = Math.max(0, margin - x0), T = Math.max(0, margin - y0);
+  const R = Math.max(0, margin - (w - 1 - x1)), B = Math.max(0, margin - (h - 1 - y1));
+  if (!L && !T && !R && !B) return work;
+  const nw = w + L + R, nh = h + T + B;
+  const nc = new Array(nw * nh).fill(-1);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      nc[(y + T) * nw + (x + L)] = cells[y * w + x];
+    }
+  }
+  return { w: nw, h: nh, cells: nc, palette: work.palette };
+}
+
+// 品牌分享卡（便利店门头 + 作品图 + 邀请区 + 小程序码）：分享弹窗（share-modal）的主图
 function buildShareCardTo(canvas, work, scale) {
   scale = scale || 2;
   const W = 750, M = 48;
   const stats = colorStats(work.cells);
   const total = stats.reduce((a, s) => a + s.count, 0);
+  const view = withMargin(work, 2); // 展示用视图：贴边作品补出板上留白
 
   // 作品图（熨烫后的质感）；min 2 保证 256 豆的大画布也能放进卡片
-  const artCell = fitCell(work, W - M * 2 - 64, 620, 2, 26);
+  const artCell = fitCell(view, W - M * 2 - 64, 700, 2, 40);
   const artPad = Math.round(artCell * 1.1);
-  const artSize = patternSize(work, { cellPx: artCell, pad: artPad });
+  const artSize = patternSize(view, { cellPx: artCell, pad: artPad });
   const artW = artSize.width, artH = artSize.height;
 
   const headerH = 146;
@@ -128,7 +157,10 @@ function buildShareCardTo(canvas, work, scale) {
   pixelPanel(ctx, M, py, W - M * 2, panelH);
   ctx.save();
   ctx.translate(W / 2 - artW / 2, py + 32);
-  drawPatternInto(ctx, work, { cellPx: artCell, pad: artPad, fused: true });
+  // finish：作品在熨烫前选的质感（withMargin 产出的是展示用副本，显式传进去）
+  drawPatternInto(ctx, view, {
+    cellPx: artCell, pad: artPad, fused: true, finish: workFinish(work),
+  });
   ctx.restore();
 
   // 作品信息
@@ -175,7 +207,7 @@ function buildShareCardTo(canvas, work, scale) {
   return { width: W, height: H };
 }
 
-// 图纸样式导出：纯白底 + 细格线（每格淡灰、5 格淡青参考线）+ 平色格。
+// 图纸样式导出（分享弹窗「保存图纸」）：纯白底 + 细格线（每格淡灰、5 格淡青参考线）+ 平色格。
 // 没有豆孔/高光/蒙孔点 —— 保存的图片可以再从「导入拼豆图纸」识别回来（往返闭环），
 // 颜色用色板原值（PNG 无损），识别后逐格逐色还原
 function buildChartExportTo(canvas, work, opts) {
@@ -228,7 +260,7 @@ function buildExportTo(canvas, work, fused, scale) {
   const ctx = canvas.getContext('2d');
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   ctx.clearRect(0, 0, size.width, size.height);
-  drawPatternInto(ctx, work, { cellPx, fused });
+  drawPatternInto(ctx, work, { cellPx, fused, finish: fused ? workFinish(work) : 'smooth' });
   return { width: size.width, height: size.height };
 }
 

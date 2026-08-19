@@ -93,6 +93,135 @@ function drawFused(ctx, x, y, s, rgb) {
   ctx.fillRect(x - e, y - e, s + e * 2, s + e * 2);
 }
 
+/* ---------- 熨烫质感 ----------
+   照片实测（tests/done.jpg）：底纹是灰度型噪声，强度约亮度 8%、脊线波长约
+   1/5 颗豆（屏幕上取实测的 0.2 倍更耐看）。逐像素画代价太高 —— 生成无缝贴片
+   用 pattern 铺；贴片只生成一次，缩放靠绘制端 ctx.scale 适配，捏合过程中不重算 */
+const GRAIN_AMP = 0.048;  // 底纹峰值 alpha
+const GRAIN_MIN_PX = 6;   // 格子小于这个尺寸就不铺（看不见，纯浪费）
+const GRAIN_UNIT = 16;    // 贴片里「一颗豆」占多少像素（绘制端据此换算缩放）
+const GRAIN_BEADS = 8;    // 贴片边长（豆数）
+
+// 两档质感。存档里可能出现三种历史值，都在 workFinish 里归一：
+// 首版是布尔 texture；中途试过 'bling' 闪粉烫（效果不好已撤），按细腻纹理渲染
+const SMOOTH = 'smooth', GRAIN = 'grain';
+function workFinish(work) {
+  if (!work) return GRAIN;
+  if (work.finish === SMOOTH) return SMOOTH;
+  if (work.finish) return GRAIN;                 // grain / 已撤的 bling 都按 grain
+  return work.texture === false ? SMOOTH : GRAIN; // 兼容：老作品无字段 = 细腻纹理
+}
+
+function makeOffscreen(w, h) {
+  try {
+    if (typeof wx !== 'undefined' && wx.createOffscreenCanvas) {
+      return wx.createOffscreenCanvas({ type: '2d', width: w, height: h });
+    }
+  } catch (e) { /* 基础库不支持，下面回退 */ }
+  try {
+    if (typeof document !== 'undefined') {
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      return c;
+    }
+  } catch (e) { /* 忽略 */ }
+  return null;
+}
+
+// 周期性格点 + 平滑插值的值噪声（格点环绕 → 贴片四边无缝）。
+// nx/ny 可以不等：拉长格点就得到有方向的条纹
+function lattice(nx, ny, seed) {
+  const a = new Float64Array(nx * ny);
+  let s = seed >>> 0;
+  for (let i = 0; i < a.length; i++) {
+    s = (s * 1664525 + 1013904223) >>> 0; // LCG：不依赖 Math.random，贴片可复现
+    a[i] = s / 4294967296 * 2 - 1;
+  }
+  return a;
+}
+function valueAt(lat, nx, ny, u, v) {
+  const fx = u * nx, fy = v * ny;
+  const x0 = Math.floor(fx), y0 = Math.floor(fy);
+  const tx = fx - x0, ty = fy - y0;
+  const ix0 = ((x0 % nx) + nx) % nx, iy0 = ((y0 % ny) + ny) % ny;
+  const x1 = (ix0 + 1) % nx, y1 = (iy0 + 1) % ny;
+  const sx = tx * tx * (3 - 2 * tx), sy = ty * ty * (3 - 2 * ty); // smoothstep
+  const a = lat[iy0 * nx + ix0], b = lat[iy0 * nx + x1];
+  const c = lat[y1 * nx + ix0], d = lat[y1 * nx + x1];
+  const top = a + (b - a) * sx, bot = c + (d - c) * sx;
+  return top + (bot - top) * sy;
+}
+
+let grainCv = null, grainTried = false;
+const patCache = { ctx: null, pat: null };
+
+// 生成底纹贴片（只生成一次）
+function grainTile() {
+  if (grainTried) return grainCv;
+  grainTried = true;
+  const B = GRAIN_BEADS, T = B * GRAIN_UNIT;
+  const cv = makeOffscreen(T, T);
+  if (!cv) return null;
+  try {
+    const c2 = cv.getContext('2d');
+    const img = c2.createImageData(T, T);
+    const d = img.data;
+    // 「域扭曲 + 脊线噪声」——对着照片试出来的形态：
+    //   脊线 n = 1-2|noise|：噪声过零处连成蜿蜒的亮脊，正是熨烫面那种褶皱，
+    //     普通值噪声只会得到一片雪花点；
+    //   域扭曲：先用低频噪声偏移采样坐标，脊线才不会沿方格排列（不扭曲时
+    //     整片纹理呈方块状，像电路板）。扭曲场本身也是周期的，贴片仍然无缝。
+    const N1 = B * 5, N2 = B * 10, NW = Math.round(B * 1.5);
+    const WARP = 0.05, DET = 0.15;
+    const l1 = lattice(N1, N1, 0x9E3779B9);
+    const l2 = lattice(N2, N2, 0x85EBCA6B);
+    const w1 = lattice(NW, NW, 0xC2B2AE35);
+    const w2 = lattice(NW, NW, 0x27D4EB2F);
+    const buf = new Float64Array(T * T);
+    let sum = 0;
+    for (let y = 0; y < T; y++) {
+      for (let x = 0; x < T; x++) {
+        const u = x / T, v = y / T;
+        const uu = u + valueAt(w1, NW, NW, u, v) * WARP;
+        const vv = v + valueAt(w2, NW, NW, u, v) * WARP;
+        const r1 = 1 - 2 * Math.abs(valueAt(l1, N1, N1, uu, vv));
+        const r2 = 1 - 2 * Math.abs(valueAt(l2, N2, N2, uu, vv));
+        const n = r1 * (1 - DET) + r2 * DET;
+        buf[y * T + x] = n;
+        sum += n;
+      }
+    }
+    const mean = sum / (T * T); // 脊线噪声整体偏亮，去均值才是纯粹的明暗调制
+    for (let i = 0; i < T * T; i++) {
+      let n = (buf[i] - mean) * 1.35;
+      if (n > 1) n = 1; else if (n < -1) n = -1;
+      const o = i * 4;
+      const light = n > 0;
+      d[o] = d[o + 1] = d[o + 2] = light ? 255 : 0;
+      d[o + 3] = Math.round((light ? n : -n) * GRAIN_AMP * 255);
+    }
+    c2.putImageData(img, 0, 0);
+    grainCv = cv;
+  } catch (e) {
+    grainCv = null; // 老基础库不支持离屏画布：退回无纹理
+  }
+  return grainCv;
+}
+
+// 拿到贴片 pattern（按 ctx 记忆，正常一帧只创建一次）
+function grainPattern(ctx) {
+  const cv = grainTile();
+  if (!cv) return null;
+  if (patCache.ctx === ctx && patCache.pat) return patCache.pat;
+  try {
+    patCache.pat = ctx.createPattern(cv, 'repeat');
+    patCache.ctx = ctx;
+  } catch (e) {
+    patCache.pat = null;
+  }
+  return patCache.pat;
+}
+
 // 图纸的逻辑尺寸
 function patternSize(p, opts) {
   opts = opts || {};
@@ -140,6 +269,32 @@ function drawPatternInto(ctx, p, opts) {
       else drawBead(ctx, x + cellPx / 2, y + cellPx / 2, cellPx * 0.46, PAL[t], 1, !!opts.matte);
     }
   }
+  // 熨烫质感：贴片铺一遍（只盖在豆子上，底板保持干净）。
+  // opts.finish 是作品的质感档位（熨烫前选的），缩略图/分享/导出都跟着走
+  const finish = opts.finish || SMOOTH;
+  if (fused && finish !== SMOOTH && cellPx >= GRAIN_MIN_PX) {
+    const pat = grainPattern(ctx);
+    if (pat) {
+      const e = cellPx * 0.06;
+      // 贴片按「一颗豆 = 该档位的 unit 像素」缩放，并跟着图纸原点平移：
+      // 颗粒/闪点的尺寸永远与豆同比例
+      const k = cellPx / GRAIN_UNIT;
+      ctx.save();
+      ctx.translate(pad, pad);
+      ctx.scale(k, k);
+      ctx.fillStyle = pat;
+      const cs = cellPx / k, es = e / k;
+      for (let cy = 0; cy < h; cy++) {
+        for (let cx = 0; cx < w; cx++) {
+          const i = cy * w + cx;
+          if (cells[i] < 0) continue;
+          if (placed && !placed[i]) continue;
+          ctx.fillRect(cx * cs - es, cy * cs - es, cs + es * 2, cs + es * 2);
+        }
+      }
+      ctx.restore();
+    }
+  }
   return size;
 }
 
@@ -182,6 +337,7 @@ class BoardView {
     this.o = opts;
     this.pal = palRGB(opts.palette); // 作品自定义色板（hex 数组）或全局色板
     this.fused = !!opts.fused;
+    this.finish = opts.finish || SMOOTH; // 熨烫质感：grain 细腻纹理 / smooth 光滑平面
     this.chart = !!opts.chart; // 图纸显示模式（view）
     this.scale = 20; this.ox = 0; this.oy = 0;
     this.vw = 0; this.vh = 0; this.dpr = 1;
@@ -210,6 +366,8 @@ class BoardView {
   destroy() { this.alive = false; }
   requestRender() { this.dirty = true; }
   setFused(v) { this.fused = v; this.dirty = true; }
+  // 熨烫质感切换（熨烫页可在开烫前后随时换，画面即时反映）
+  setFinish(v) { this.finish = v || SMOOTH; this.dirty = true; }
   // 图纸显示模式（view 模式用）：平色格 + 网格线，与分享/导出图纸同款观感
   setChart(v) { this.chart = !!v; this.dirty = true; }
 
@@ -615,6 +773,10 @@ class BoardView {
     const tiny = s < 3.5; // 大画布缩到很小时改用方块填充，绕开圆弧/渐变的开销
     const fused = this.fused && !isPlay && !isIron && !chartView;
     const numFont = 'bold ' + Math.round(s * 0.4) + 'px sans-serif';
+    // 熨好的格子先记下来，主循环跑完统一铺一遍质感贴片（一帧只设一次 fillStyle）
+    const grainOn = this.finish !== SMOOTH && s >= GRAIN_MIN_PX && (fused || isIron);
+    const gxs = this._gxs || (this._gxs = []); // 复用数组，避免每帧新建
+    let gn = 0;
 
     if (showNum) {
       ctx.font = numFont;
@@ -668,13 +830,16 @@ class BoardView {
           else if (isIron) {
             if (ironed[i]) {
               const m0 = this.ironAnims.get(i);
-              if (m0 == null) drawFused(ctx, px, py, s, rgbT);
+              if (m0 == null) { drawFused(ctx, px, py, s, rgbT); if (grainOn) { gxs[gn++] = px; gxs[gn++] = py; } }
               else {
                 const k = (t - m0) / 260;
                 if (k < 0) drawBead(ctx, mx, my, r, rgbT); // 级联还没轮到
-                else if (k >= 1) { this.ironAnims.delete(i); drawFused(ctx, px, py, s, rgbT); }
-                else {
-                  // 熔化：豆子摊开淡出，熔块淡入
+                else if (k >= 1) {
+                  this.ironAnims.delete(i);
+                  drawFused(ctx, px, py, s, rgbT);
+                  if (grainOn) { gxs[gn++] = px; gxs[gn++] = py; }
+                } else {
+                  // 熔化：豆子摊开淡出，熔块淡入（纹理随熔块一起淡入）
                   drawBead(ctx, mx, my, r * (1 + 0.12 * k), rgbT, 1 - k);
                   ctx.globalAlpha = k;
                   drawFused(ctx, px, py, s, rgbT);
@@ -683,7 +848,7 @@ class BoardView {
               }
             } else drawBead(ctx, mx, my, r, rgbT);
           }
-          else if (fused) drawFused(ctx, px, py, s, rgbT);
+          else if (fused) { drawFused(ctx, px, py, s, rgbT); if (grainOn) { gxs[gn++] = px; gxs[gn++] = py; } }
           else if (tiny) { ctx.fillStyle = css(rgbT); ctx.fillRect(px, py, s, s); }
           else drawBead(ctx, mx, my, r, rgbT);
         } else if (isPlay) {
@@ -722,6 +887,25 @@ class BoardView {
             }
           }
         }
+      }
+    }
+
+    // 熨烫质感：给已熔合的格子统一铺颗粒纹理。
+    // 贴片跟着图纸原点平移，平移/缩放时纹理不会在画面上"游"
+    if (grainOn && gn) {
+      const pat = grainPattern(ctx);
+      if (pat) {
+        const e = s * 0.06;
+        const kk = s / GRAIN_UNIT;
+        ctx.save();
+        ctx.translate(ox, oy);
+        ctx.scale(kk, kk);
+        ctx.fillStyle = pat;
+        const cs = s / kk, es = e / kk;
+        for (let k = 0; k < gn; k += 2) {
+          ctx.fillRect((gxs[k] - ox) / kk - es, (gxs[k + 1] - oy) / kk - es, cs + es * 2, cs + es * 2);
+        }
+        ctx.restore();
       }
     }
 
@@ -823,4 +1007,7 @@ function drawIron(ctx, x, y, s) {
   ctx.restore();
 }
 
-module.exports = { drawBead, patternSize, drawPatternInto, renderPatternTo, BoardView, getBeadShape, setBeadShape };
+module.exports = {
+  drawBead, patternSize, drawPatternInto, renderPatternTo, BoardView,
+  getBeadShape, setBeadShape, workFinish,
+};

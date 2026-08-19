@@ -1,18 +1,22 @@
 // 作品查看：完成后的展示与分享
 const { store } = require('../../utils/store');
-const { BoardView } = require('../../utils/board');
+const { BoardView, workFinish } = require('../../utils/board');
 const { createCode, format, markCodePrompted } = require('../../utils/importcode');
 const ui = require('../../utils/ui');
+const { buildGuide } = require('../../utils/guidance');
 
 Page({
   data: {
     insets: { top: 24, h: 44, right: 8 },
     title: '',
-    fusedOn: false, // 默认图纸显示；点「熨烫效果」切到质感图
+    // 能进到这一页的都是熨烫定型完的作品，默认就展示成品的样子（熨烫质感，
+    // 含熨烫时选的纹理）；点一下「熨烫效果」可切回网格图纸看格子
+    fusedOn: true,
     shareShow: false,
     workId: '',
     codeShow: false,
     codeText: '',
+    guideSteps: [],
   },
 
   onLoad(q) {
@@ -40,12 +44,21 @@ Page({
         cells: this.work.cells, placed: this.work.placed,
         palette: this.work.palette || null,
         mode: 'view', fused: true,
-        chart: true, // 默认网格图纸显示，与分享图纸一致
+        finish: workFinish(this.work), // 熨烫时选的质感档位
+        chart: false, // 默认成品效果（与首页缩略图、分享卡一致）
       });
       this.bv.setViewport(r.width, r.height, dpr, r.left, r.top);
       setTimeout(() => ui.syncBoardRect(this, this.bv), 600);
     });
+    // 首次看成品：讲清这页能做的三件事（切图纸 / 分享 / 导入码）
+    buildGuide(this, 'view', [
+      { text: '这里收着你烫好的成品～双指放大能细看每一颗豆子的质感。' },
+      { sel: '.vt-effect', text: '想看每格的颜色和位置？点这里切回「图纸」模式，再点一下切回成品。' },
+      { sel: '.vt-share', text: '「分享」生成一张带小程序码的作品卡片，发好友或朋友圈都行；「🔑 导入码」是给好友拼同款用的口令。' },
+    ]);
   },
+
+  onGuideDone() { this.setData({ guideSteps: [] }); },
 
   onResize() {
     this.setData({ insets: ui.navInsets() });

@@ -18,8 +18,11 @@ const REAL_COLORS = [
 // 仿真实版式生成整页图纸；整个版式随 pitch 等比缩放（基准 14.16 对应 1284 宽）。
 // opts.style2：仿工坊小程序预览页截屏 —— 整页米黄底铺浅色网格纹理、
 // 没有白面板（白底只垫在网格正下方）、坐标数字/说明/图例都在米黄底上
+// opts.colors：色板覆盖（满铺场景要加纯白豆）；opts.cellLabels：每格印色号
+// 笔画（真实 RED 导出图逐格有 C21/M1 等标签；同色号文字相同 → 笔画跨格对齐）
 function makeRealChart(truth, cols, rows, opts) {
   opts = opts || {};
+  const COLORS = opts.colors || REAL_COLORS;
   const rnd = mulberry32(opts.seed || 21);
   const pitch = opts.pitch || 14.16;
   const s = pitch / 14.16 * (cols / 78);
@@ -69,7 +72,38 @@ function makeRealChart(truth, cols, rows, opts) {
       if (ci < 0) continue;
       const x0 = Math.round(gx0 + c * pitch), x1 = Math.round(gx0 + (c + 1) * pitch);
       const y0 = Math.round(gy0 + r * pitch), y1 = Math.round(gy0 + (r + 1) * pitch);
-      fill(im, x0, y0, x1 - x0, y1 - y0, REAL_COLORS[ci]);
+      fill(im, x0, y0, x1 - x0, y1 - y0, COLORS[ci]);
+      if (opts.cellLabels) {
+        // 逐格色号：浅格印深字（同色系压暗）、深格印白字；
+        // 同色号用固定种子 → 笔画布局逐格相同，跨格严格对齐（周期检测的干扰源）
+        const rgb = COLORS[ci];
+        const luma = (rgb[0] * 77 + rgb[1] * 150 + rgb[2] * 29) >> 8;
+        const tcol = luma > 140
+          ? [Math.max(0, rgb[0] - 96), Math.max(0, rgb[1] - 96), Math.max(0, rgb[2] - 80)]
+          : [252, 252, 252];
+        const lr = mulberry32(7000 + ci);
+        const bw = x1 - x0, bh = y1 - y0;
+        const n = (opts.labelN || 3) + (ci % 3); // labelN 拉高 = 更密的色号文字（压力测试用）
+        for (let k = 0; k < n; k++) {
+          const sx = x0 + bw * 0.14 + lr() * bw * 0.58;
+          const sy = y0 + bh * 0.3 + lr() * bh * 0.26;
+          if (lr() < 0.6) fill(im, sx, sy, 1, 1 + lr() * bh * 0.3, tcol);
+          else fill(im, sx, sy, 1 + lr() * bw * 0.28, 1, tcol);
+        }
+      }
+    }
+  }
+
+  // 满铺图纸的格间分隔线：真实 RED 导出图在豆色上层还有一遍细格线
+  // （天空/地面等同色区域靠它区分格子）—— 画完豆子再重描一遍
+  if (opts.cellSep) {
+    for (let k = 0; k <= cols; k++) {
+      const x = Math.round(gx0 + k * pitch);
+      fill(im, x, gy0, 1, gridH, k % 5 === 0 ? TEAL : LINE);
+    }
+    for (let k = 0; k <= rows; k++) {
+      const y = Math.round(gy0 + k * pitch);
+      fill(im, gx0, y, gridW, 1, k % 5 === 0 ? TEAL : LINE);
     }
   }
 

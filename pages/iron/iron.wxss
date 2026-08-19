@@ -1,2 +1,27 @@
 /* 熨烫界面：主体样式在 app.wxss 的 playpage 骨架里 */
 .btn-ghost.center { align-self: stretch; text-align: center; padding: 12px 18px; }
+
+/* 质感选择条：底栏里、操作提示之上（原 .view-bottom 的居中/换行在这里接管） */
+.tex-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 4px 0 10px;
+}
+.tex-label {
+  font-size: 12px;
+  color: var(--ink2);
+  flex-shrink: 0;
+}
+.tex-row .tool-chip { padding: 6px 12px; font-size: 12px; }
+.iron-hint {
+  white-space: normal;
+  text-align: center;
+  line-height: 1.6;
+  max-width: 720px;
+  margin: 0 auto;
+}

@@ -3,14 +3,15 @@
 // （标题/四边坐标数字/5格参考线/底部图例/JPEG噪声/缩放模糊），
 // 与 ground truth 逐格比对。tests 目录已在 project.config.json 里排除出小程序包。
 const { analyzeChart } = require('../utils/chart.js');
-const { mulberry32, img, resize, CHART_COLORS, makeTruth, makeChart } = require('./chart-synth.js');
+const { mulberry32, img, crop, resize, CHART_COLORS, makeTruth, makeChart } = require('./chart-synth.js');
 
 /* ---------- 校验 ---------- */
 const { rgb2oklab } = require('../utils/convert.js');
 const { hexToRgb } = require('../utils/palette.js');
 const lab2 = (a, b) => (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
 
-function verify(name, truth, cols, rows, out, expectInjective) {
+function verify(name, truth, cols, rows, out, expectInjective, palette) {
+  palette = palette || CHART_COLORS;
   if (!out.ok) { console.log(`✗ ${name}: 识别失败 - ${out.reason}`); return false; }
   // truth 的非空 bbox
   let r0 = rows, r1 = -1, c0 = cols, c1 = -1;
@@ -57,7 +58,7 @@ function verify(name, truth, cols, rows, out, expectInjective) {
   let maxD = 0;
   for (const [tc, palIdx] of majOf) {
     if (palIdx == null || palIdx < 0 || !out.palette || !out.palette[palIdx]) continue;
-    const t = CHART_COLORS[tc];
+    const t = palette[tc];
     const c = hexToRgb(out.palette[palIdx]);
     const d = Math.sqrt(lab2(rgb2oklab(t[0], t[1], t[2]), rgb2oklab(c[0], c[1], c[2])));
     if (d > maxD) maxD = d;
@@ -73,11 +74,11 @@ function verify(name, truth, cols, rows, out, expectInjective) {
 
 /* ---------- 用例 ---------- */
 let allPass = true;
-function run(name, im, truth, cols, rows, expectInjective) {
+function run(name, im, truth, cols, rows, expectInjective, palette) {
   const t0 = Date.now();
   const out = analyzeChart(im.data, im.w, im.h);
   const ms = Date.now() - t0;
-  const ok = verify(`${name} (${im.w}×${im.h}, ${ms}ms)`, truth, cols, rows, out, expectInjective);
+  const ok = verify(`${name} (${im.w}×${im.h}, ${ms}ms)`, truth, cols, rows, out, expectInjective, palette);
   if (!ok) allPass = false;
   return out;
 }
@@ -178,6 +179,39 @@ const rnd0 = mulberry32(42);
   run('L2 纹理页面压缩1080', resize(makeRealChart(truth, cols, rows, { seed: 32, style2: true }), 1080 / 1284), truth, cols, rows, false);
   const hi2 = makeRealChart(truth, cols, rows, { seed: 33, style2: true, pitch: 28.32 });
   run('L3 纹理页面2568→2048', resize(hi2, 2048 / hi2.w), truth, cols, rows, false);
+}
+
+// O. 满铺图纸（RED 导出的风景/背景类：每格都有颜色、没有白底、逐格色号标签、
+// 豆色上层有格间分隔线）：整页 + 紧贴网格的裁剪。真机踩过（2026-08-19）：
+// 白底区定位用白标签/白豆拼碎带把天空整段裁掉；裁剪图的 pageBg 落在天空色上
+// 把 1/4 张图当页面底色剔了；纯白 H2 豆被判空；标签把格子中间的能量填出来，
+// 半格距候选骗过弱齿判别（靠格线支撑率否决）
+{
+  const { makeRealChart, REAL_COLORS } = require('./chart-real.js');
+  const FB_COLORS = REAL_COLORS.concat([[254, 254, 254]]);
+  const cols = 78, rows = 78;
+  const truth = makeTruth(cols, rows, mulberry32(1));
+  const rF = mulberry32(99);
+  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
+    const i = y * cols + x;
+    if (truth[i] < 0) truth[i] = y < rows * 0.32 ? 4 : y < rows * 0.44 ? 19 : 23; // 天空/远山/地面
+  }
+  for (let k = 0; k < 45; k++) { // 白云：纯白豆（H2），不能被当空格吞掉
+    const x = Math.floor(rF() * cols), y = Math.floor(rF() * rows * 0.28);
+    if (truth[y * cols + x] === 4) truth[y * cols + x] = 24;
+  }
+  const im = makeRealChart(truth, cols, rows, { seed: 41, colors: FB_COLORS, cellLabels: true, cellSep: true });
+  run('O1 满铺整页(标签)', im, truth, cols, rows, false, FB_COLORS);
+  // 紧贴网格裁剪：四边分别落在天空/地面豆子上，没有统一页面底色
+  const pitch = 14.16, gx0 = 90.5, gy0 = 168;
+  const cim = crop(im, Math.round(gx0) - 4, Math.round(gy0) - 4,
+    Math.round(cols * pitch) + 8, Math.round(rows * pitch) + 8);
+  run('O2 满铺裁剪(标签)', cim, truth, cols, rows, false, FB_COLORS);
+  // 微信传图两种常见形态：压缩到 1080 / 高清 2568 缩到解码上限 2048
+  // （高清版曾在底部多出一整行幻影白豆 —— 坐标数字撑大主体后外推格采到面板白）
+  run('O3 满铺压缩1080', resize(im, 1080 / 1284), truth, cols, rows, false, FB_COLORS);
+  const hiF = makeRealChart(truth, cols, rows, { seed: 42, colors: FB_COLORS, cellLabels: true, cellSep: true, pitch: 28.32 });
+  run('O4 满铺2568→2048', resize(hiF, 2048 / hiF.w), truth, cols, rows, false, FB_COLORS);
 }
 
 // M. 往返闭环：buildChartExportTo（图纸样式导出）的像素复刻 → analyzeChart 全量还原。

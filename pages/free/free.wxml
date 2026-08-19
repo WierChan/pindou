@@ -47,3 +47,5 @@
 <crop-modal show="{{exportShow}}" src="{{exportSrc}}" grid="{{exportGrid}}" title="框选导出区域"
             hint="框会自动吸附到格线，框到哪格是哪格；双指放大更精准，不框 = 整幅导出"
             bind:confirm="onExportConfirm" bind:cancel="onExportCancel" />
+
+<guide gid="{{guideId}}" steps="{{guideSteps}}" bind:done="onGuideDone" />

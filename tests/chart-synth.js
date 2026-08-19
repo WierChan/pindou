@@ -45,6 +45,19 @@ function addNoise(im, amp, rnd) {
     }
   }
 }
+// 裁剪（模拟用户在裁剪弹窗里框选局部）
+function crop(im, x0, y0, w, h) {
+  const out = img(w, h, [0, 0, 0]);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const so = ((y + y0) * im.w + (x + x0)) * 4, to = (y * w + x) * 4;
+      out.data[to] = im.data[so]; out.data[to + 1] = im.data[so + 1];
+      out.data[to + 2] = im.data[so + 2]; out.data[to + 3] = 255;
+    }
+  }
+  return out;
+}
+
 // 双线性缩放（模拟转发/二次截图后的非整数格距 + 模糊）
 function resize(im, k) {
   const w = Math.round(im.w * k), h = Math.round(im.h * k);
@@ -219,4 +232,4 @@ function makeChart(truth, cols, rows, pitch, opts) {
 }
 
 
-module.exports = { mulberry32, img, fill, fakeText, addNoise, resize, CHART_COLORS, makeTruth, makeChart };
+module.exports = { mulberry32, img, fill, fakeText, addNoise, crop, resize, CHART_COLORS, makeTruth, makeChart };

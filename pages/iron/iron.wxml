@@ -22,8 +22,16 @@
     </view>
   </view>
 
-  <view class="bottom-bar view-bottom">
-    <view class="tools-hint">🔥 按住熨斗，慢慢划过每一颗豆子，把它们烫平定型</view>
+  <view class="bottom-bar">
+    <!-- 熨烫质感：开烫前先选，烫的过程中也能随时换（已烫的格子即时变） -->
+    <view class="tex-row">
+      <view class="tex-label">质感</view>
+      <view class="tool-chip {{finish === 'grain' ? 'active' : ''}}" hover-class="pressed"
+            data-f="grain" bindtap="pickFinish">✨ 细腻纹理</view>
+      <view class="tool-chip {{finish === 'smooth' ? 'active' : ''}}" hover-class="pressed"
+            data-f="smooth" bindtap="pickFinish">◻️ 光滑平面</view>
+    </view>
+    <view class="tools-hint iron-hint">🔥 按住熨斗，慢慢划过每一颗豆子，把它们烫平定型</view>
   </view>
 
   <canvas wx:if="{{celebrating}}" type="2d" id="confetti" class="confetti"></canvas>

@@ -14,12 +14,13 @@
   </view>
 
   <view class="bottom-bar view-bottom">
-    <view class="tool-chip {{fusedOn ? 'active' : ''}}" bindtap="toggleFused">🔥 熨烫效果</view>
-    <view class="btn-primary slim" hover-class="pressed" bindtap="openShare">分享</view>
-    <view class="tool-chip" bindtap="shareCode">🔑 导入码</view>
+    <view class="tool-chip vt-effect {{fusedOn ? 'active' : ''}}" bindtap="toggleFused">🔥 熨烫效果</view>
+    <view class="btn-primary slim vt-share" hover-class="pressed" bindtap="openShare">分享</view>
+    <view class="tool-chip vt-code" bindtap="shareCode">🔑 导入码</view>
   </view>
 
   <share-modal workId="{{workId}}" show="{{shareShow}}" bind:close="closeShare" bind:built="onCardBuilt" />
+  <guide gid="{{guideId}}" steps="{{guideSteps}}" bind:done="onGuideDone" />
 </view>
 
 <!-- 导入码弹窗：放页面顶层 + 提升层级，确保盖住画板 canvas -->

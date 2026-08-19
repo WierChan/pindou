@@ -6,11 +6,13 @@ const { PALETTE, textColorFor } = require('../../utils/palette');
 const { BoardView, renderPatternTo, getBeadShape, setBeadShape } = require('../../utils/board');
 const { audio } = require('../../utils/audio');
 const ui = require('../../utils/ui');
+const { buildGuide } = require('../../utils/guidance');
 
 const WIN = 240;      // 渲染窗口边长（格）
 const CH = 40;        // 窗口位移对齐步长（10 的倍数，保证参考线不错位）
 const MARGIN = 20;    // 视野距窗口边缘的最小余量，低于则滑动窗口
 const MAX_SPAN = 240; // 完成定型时单幅作品的最大跨度（熨烫/分享按密集图处理）
+const FIN_MARGIN = 2; // 完成定型时四周补的空白格：板不贴豆边，熨烫/查看/分享有留白（240+4 仍在画布上限 256 内）
 
 Page({
   data: {
@@ -26,6 +28,7 @@ Page({
     scrollInto: '',
     exportShow: false,
     exportSrc: '',
+    guideSteps: [],
   },
 
   onLoad(q) {
@@ -106,7 +109,15 @@ Page({
       setTimeout(() => ui.syncBoardRect(this, this.bv), 600);
     });
     ui.queryNode(this, '#util').then(r => { if (r) this.utilCanvas = r.node; });
+    // 首次自由创作：无边画布的玩法不讲不容易发现
+    buildGuide(this, 'free', [
+      { sel: '.palette-bar', text: '先挑个颜色，然后点板子上豆；按住划过去能连着画一串～' },
+      { text: '这是块无边的板子：画到边上它会自己跟着延展，想画多大画多大。双指缩放看细节，点右下角 ⛶ 一键回到作品范围。' },
+      { sel: '.tools-row', text: '画错了用「🧽 橡皮」擦掉；「📤 导出」可以框一块存成图片；画完点「✅ 完成创作」，会自动裁掉多余空白去熨烫定型。' },
+    ]);
   },
+
+  onGuideDone() { this.setData({ guideSteps: [] }); },
 
   /* ---------- 渲染窗口管理 ---------- */
 
@@ -388,15 +399,26 @@ Page({
         if (!r.confirm || this._gone) return;
         const cp = this._croppedPattern();
         if (!cp) return;
-        // 裁剪成作品实际范围，熨烫/查看/分享都用小图
+        // 裁到作品实际范围后四周再补一圈空白格定型（真实拼豆板也有余量，展示不贴边）
+        const m = FIN_MARGIN, w = cp.w + m * 2, h = cp.h + m * 2;
+        const cells = new Array(w * h).fill(-1);
+        const placed = new Array(w * h).fill(0);
+        for (let y = 0; y < cp.h; y++) {
+          for (let x = 0; x < cp.w; x++) {
+            const v = cp.cells[y * cp.w + x];
+            if (v < 0) continue;
+            const i = (y + m) * w + (x + m);
+            cells[i] = v; placed[i] = 1;
+          }
+        }
         const work = this.work;
-        work.w = cp.w; work.h = cp.h;
-        work.cells = cp.cells; work.placed = cp.placed;
+        work.w = w; work.h = h;
+        work.cells = cells; work.placed = placed;
         work.completed = true;
-        work.ironed = new Array(cp.cells.length).fill(0);
+        work.ironed = new Array(cells.length).fill(0);
         clearTimeout(this.saveTimer); this.saveTimer = 0;
         store.update(work.id, {
-          w: cp.w, h: cp.h, cells: cp.cells, placed: cp.placed,
+          w: w, h: h, cells: cells, placed: placed,
           completed: true, ironDone: false, ironed: work.ironed,
           freeBeads: null, freeX0: 0, freeY0: 0, // 完成后回归密集存档
         });

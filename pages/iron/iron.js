@@ -2,12 +2,12 @@
 const { store } = require('../../utils/store');
 const { PALETTE } = require('../../utils/palette');
 const { colorStats } = require('../../utils/convert');
-const { BoardView, renderPatternTo, getBeadShape } = require('../../utils/board');
+const { BoardView, renderPatternTo, getBeadShape, workFinish } = require('../../utils/board');
 const { audio } = require('../../utils/audio');
 const { celebrate } = require('../../utils/confetti');
 const ui = require('../../utils/ui');
 const { cfg } = require('../../utils/config');
-const { buildGuide } = require('../../utils/guidance');
+const { buildGuide, guideSeen, markGuideSeen } = require('../../utils/guidance');
 
 Page({
   data: {
@@ -24,6 +24,7 @@ Page({
     shareShow: false,
     workId: '',
     guideSteps: [],
+    finish: 'grain', // 熨烫质感：grain 细腻纹理 / smooth 光滑平面
   },
 
   onLoad(q) {
@@ -48,6 +49,7 @@ Page({
       workId: work.id,
       muted: audio.muted,
       pct: this._pct(),
+      finish: workFinish(work), // 老作品没这个字段：默认细腻纹理
     });
   },
 
@@ -61,6 +63,7 @@ Page({
         cells: this.work.cells, placed: this.work.placed,
         palette: this.work.palette || null,
         mode: 'iron', ironed: this.work.ironed,
+        finish: this.data.finish,
         onIron: n => this._applyIron(n),
       });
       this.bv.setViewport(r.width, r.height, dpr, r.left, r.top);
@@ -68,12 +71,26 @@ Page({
     });
     ui.queryNode(this, '#util').then(r => { if (r) this.utilCanvas = r.node; });
     // 首次熨烫：教操作
-    buildGuide(this, 'iron', [
-      { text: '豆子拼齐啦，最后一步：按住屏幕不放，熨斗就会出现，划过豆子把它们烫平定型！全部烫完就大功告成～' },
-    ]);
+    // 质感选择是后加的：看过老版 iron 引导的用户只补看这一步（记在 iron-texture 上）
+    const texStep = {
+      sel: '.tex-row',
+      text: '烫之前先挑个质感：「细腻纹理」有真实拼豆的手作颗粒感，「光滑平面」干净利落。烫的过程中也能随时换～',
+    };
+    if (guideSeen('iron')) {
+      buildGuide(this, 'iron-texture', [texStep]);
+    } else {
+      buildGuide(this, 'iron', [
+        { text: '豆子拼齐啦，最后一步：按住屏幕不放，熨斗就会出现，划过豆子把它们烫平定型！全部烫完就大功告成～' },
+        texStep,
+      ]);
+    }
   },
 
-  onGuideDone() { this.setData({ guideSteps: [] }); },
+  onGuideDone() {
+    // 完整版 iron 引导已包含质感这一步，不用再补看单步版
+    if (this.data.guideId === 'iron') markGuideSeen('iron-texture');
+    this.setData({ guideSteps: [] });
+  },
 
   onResize() {
     this.setData({ insets: ui.navInsets() });
@@ -106,6 +123,19 @@ Page({
   toggleMute() {
     audio.setMuted(!audio.muted);
     this.setData({ muted: audio.muted });
+  },
+
+  // 熨烫质感三选一。随时可切（已烫的格子即时变），选择随作品持久化 ——
+  // 之后的查看页、首页缩略图、分享卡都按它渲染
+  pickFinish(e) {
+    const f = e.currentTarget.dataset.f;
+    if (!f || f === this.data.finish) return;
+    this.setData({ finish: f });
+    if (this.work) {
+      this.work.finish = f;
+      store.update(this.work.id, { finish: f });
+    }
+    if (this.bv) this.bv.setFinish(f);
   },
   debugFill() {
     if (this.finished || !this.bv) return;
@@ -148,6 +178,7 @@ Page({
     work.ironDone = true;
     store.update(work.id, {
       ironed: work.ironed, ironDone: true,
+      finish: this.data.finish, // 定型时把质感选择一并落盘（缩略图/分享按它渲染）
       completedAt: Date.now(),
     });
     if (this.utilCanvas) {
@@ -179,15 +210,18 @@ Page({
 
   _showDoneModal() {
     const work = this.work;
+    // 预览尽量占满弹窗内宽（.modal max-width 340 - 边框内距 ≈ 285），高度限 300 防长图撑爆弹窗
     const show = (img, w, h) => {
-      const k = Math.min(1, 240 / (h || 240), 250 / (w || 250));
+      const k = Math.min(1, 300 / (h || 300), 285 / (w || 285));
       this.setData({ modal: { show: true, img: img || '', imgW: Math.round((w || 0) * k), imgH: Math.round((h || 0) * k) } });
     };
     if (!this.utilCanvas) { show('', 0, 0); return; }
     this.uq(() => {
-      const cellPx = ui.clamp(Math.floor(240 / Math.max(work.w, work.h)), 4, 16);
+      const cellPx = ui.clamp(Math.floor(300 / Math.max(work.w, work.h)), 4, 20);
       let size = null; // captureCanvas 内部会先调 draw() 再导出
-      const draw = () => (size = renderPatternTo(this.utilCanvas, work, { cellPx, fused: true, scale: 2 }));
+      const draw = () => (size = renderPatternTo(this.utilCanvas, work, {
+        cellPx, fused: true, finish: this.data.finish, scale: 2,
+      }));
       return ui.captureCanvas(this, this.utilCanvas, draw).then(path => show(path, size.width, size.height));
     }).catch(() => show('', 0, 0));
   },

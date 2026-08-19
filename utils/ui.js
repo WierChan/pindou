@@ -1,5 +1,5 @@
 // 页面通用工具：导航安全区、canvas 出图、相册保存、串行队列
-const { renderPatternTo, patternSize } = require('./board');
+const { renderPatternTo, patternSize, workFinish } = require('./board');
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
@@ -120,18 +120,21 @@ function persistFile(tempPath, name, oldPath) {
 }
 
 // 缩略图样式版本：画法变了就 +1，首页 _healThumbs 会为旧版本号的缩略图重新生成
-const THUMB_V = 11;
+// v12：熨烫作品按质感选择铺颗粒纹理
+const THUMB_V = 12;
 
 // 生成作品缩略图（持久化文件），并清掉旧图。
 // 与详情画板「拼好的样子」同款布局：白底板 + 蒙孔 + 颗颗豆，熨烫过的作品用熔合质感（fused）；
 // 豆子走纯色块（matte：不画高光也不画豆孔——缩略图尺寸下满屏细节显得杂乱），靠豆缝出颗粒感。
+// 熨烫作品若选了纹理质感，缩略图也铺（与分享卡、详情页保持一致）。
 // 格子至少给 7 逻辑像素，豆缝和底板蒙孔（要求 ≥5）才画得清楚；
 // 清晰度用 scale 补（输出 2 倍），特大作品已经够大就不再翻倍，避免画布过大
 function makeThumb(host, canvas, work, fused) {
   const cellPx = clamp(Math.floor(340 / Math.max(work.w, work.h)), 7, 20);
   const size = patternSize(work, { cellPx });
   const scale = Math.max(size.width, size.height) > 900 ? 1 : 2;
-  const draw = () => renderPatternTo(canvas, work, { cellPx, fused: !!fused, matte: true, scale });
+  const finish = fused ? workFinish(work) : 'smooth';
+  const draw = () => renderPatternTo(canvas, work, { cellPx, fused: !!fused, matte: true, finish, scale });
   return captureCanvas(host, canvas, draw).then(tmp =>
     persistFile(tmp, 'thumb-' + work.id + '-' + Date.now() + '.png', work.thumb));
 }

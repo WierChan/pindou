@@ -1,13 +1,16 @@
 <view wx:if="{{show}}" class="overlay share-overlay" bindtap="close">
   <view class="modal share" catchtap="noop">
     <image wx:if="{{img}}" class="share-img" src="{{img}}" mode="widthFix" show-menu-by-longpress />
-    <view wx:else class="share-loading">图纸生成中…</view>
-    <view class="share-tip">分享图纸：可发好友、朋友圈，也能保存到相册</view>
+    <view wx:else class="share-loading">卡片生成中…</view>
+    <view class="share-tip">可发好友、朋友圈，也能保存到相册</view>
     <view class="modal-btns">
-      <view class="btn-primary" hover-class="pressed" bindtap="sendImage">分享图纸</view>
+      <view class="btn-primary" hover-class="pressed" bindtap="sendImage">分享卡片</view>
       <button class="btn-ghost slim2 slim3" hover-class="pressed" open-type="share">分享小程序</button>
     </view>
-    <view class="btn-link" hover-class="pressed" bindtap="close">关闭</view>
+    <view class="share-links">
+      <!-- <view class="btn-link" hover-class="pressed" bindtap="saveChart">保存图纸</view> -->
+      <view class="btn-link" hover-class="pressed" bindtap="close">关闭</view>
+    </view>
   </view>
 </view>
 <canvas type="2d" id="card" class="card-canvas" style="width:{{capW}}px;height:{{capH}}px"></canvas>
