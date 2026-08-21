@@ -5,6 +5,7 @@ const { celebrate } = require('../../utils/confetti');
 const { getBeadShape } = require('../../utils/board');
 const ui = require('../../utils/ui');
 const sync = require('../../utils/sync');
+const ads = require('../../utils/ads');
 const { buildGuide } = require('../../utils/guidance');
 
 // 从自由画布的稀疏豆表裁出密集图纸（heal 重建缩略图用）
@@ -47,6 +48,7 @@ Page({
     emotes: [],       // 表情泡 [{id, txt, x}]
     celebrating: false,
     guideSteps: [],
+    adHome: '',       // 流量主 banner 位 ID（空 = 不渲染）
   },
 
   onShow() {
@@ -54,6 +56,18 @@ Page({
     this._healThumbs();
     this._startBlink();
     this._cloudSync();
+    this._refreshAd();
+  },
+
+  // banner 位 ID 可能在启动配置拉到后才有值，每次回首页补一次；
+  // binderror 清空后下次 onShow 重新取值，相当于自然重试
+  _refreshAd() {
+    const id = ads.unit('bannerHome');
+    if (id !== this.data.adHome) this.setData({ adHome: id });
+  },
+  onAdError(e) {
+    console.warn('首页 banner 加载失败', e && e.detail);
+    this.setData({ adHome: '' });
   },
 
   onReady() {
@@ -164,9 +178,11 @@ Page({
           : (s.w + '×' + s.h + ' · ' + s.total + ' 颗'),
         st: isDone ? 'done' : needIron ? 'iron' : isFree ? 'free' : 'doing',
         // 状态角标优先（待熨烫/自由），其次来源角标（口令导入）；
-        // 已完成 tab 里「已完成」本就冗余，让位给口令标
-        badgeText: needIron ? '🔥 待熨烫' : isFree ? '✏️ 自由'
-          : s.fromCode ? '🔑 口令' : isDone ? '已完成' : '',
+        // 已完成 tab 里「已完成」本就冗余，让位给口令标。图标用自绘像素图（不用系统 emoji）
+        badgeText: needIron ? '待熨烫' : isFree ? '自由'
+          : s.fromCode ? '口令' : isDone ? '已完成' : '',
+        badgeIcon: needIron ? '/assets/icons/flame.png' : isFree ? '/assets/icons/pencil.png'
+          : s.fromCode ? '/assets/icons/key.png' : '',
         badgeClass: needIron ? 'iron' : isFree ? 'freeb' : s.fromCode ? 'codeb' : '',
         pct: needIron ? 100 : isFree ? 0 : pct,
         footText: needIron ? '豆子拼齐了 · 去熨烫 →' : isFree ? '自由创作 · 继续 →' : pct + '%　继续拼 →',

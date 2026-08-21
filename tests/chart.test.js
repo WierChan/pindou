@@ -214,10 +214,11 @@ const rnd0 = mulberry32(42);
   run('O4 满铺2568→2048', resize(hiF, 2048 / hiF.w), truth, cols, rows, false, FB_COLORS);
 }
 
-// M. 往返闭环：buildChartExportTo（图纸样式导出）的像素复刻 → analyzeChart 全量还原。
-// 渲染参数必须与 utils/share.js 的 buildChartExportTo 保持一致（scale=2 的输出）：
-// 白底、每格 1px #E6E9EB 线、5 格 #C9E4DE 线、平色格、pad=cellPx*1.2
+// M. 往返闭环：buildChartExportTo（图纸样式导出）的像素镜像 → analyzeChart 全量还原。
+// 版式镜像在 tests/export-synth.js（米黄页 + 白卡片 + 逐格色号 + 坐标数字 + 图例），
+// 与 utils/share.js 的版式常量保持逐项一致；share.js 改版式必须同步镜像
 {
+  const { makeAppExport } = require('./export-synth.js');
   const W0 = 40, H0 = 30;
   const palette = ['#F0EBE2', '#F0A034', '#1E1E20', '#2C9EE7', '#D8C4B8', '#F7C52D', '#C4986C', '#CED0D2'];
   const cells = new Int16Array(W0 * H0).fill(-1);
@@ -229,16 +230,7 @@ const rnd0 = mulberry32(42);
     }
   }
   const hex2rgb = hx => [parseInt(hx.slice(1, 3), 16), parseInt(hx.slice(3, 5), 16), parseInt(hx.slice(5, 7), 16)];
-  const scale = 2, cellPx = Math.min(24, Math.floor(1600 / W0)) * scale, pad = Math.round((cellPx / scale) * 1.2) * scale;
-  const IW = W0 * cellPx + pad * 2, IH = H0 * cellPx + pad * 2;
-  const im = img(IW, IH, [255, 255, 255]);
-  const fillR = (x, y, w2, h2, rgb) => { for (let yy = y; yy < y + h2; yy++) for (let xx = x; xx < x + w2; xx++) { const o = (yy * IW + xx) * 4; im.data[o] = rgb[0]; im.data[o + 1] = rgb[1]; im.data[o + 2] = rgb[2]; } };
-  for (let k = 0; k <= W0; k++) fillR(pad + k * cellPx, pad, scale, H0 * cellPx, k % 5 === 0 ? [201, 228, 222] : [230, 233, 235]);
-  for (let k = 0; k <= H0; k++) fillR(pad, pad + k * cellPx, W0 * cellPx, scale, k % 5 === 0 ? [201, 228, 222] : [230, 233, 235]);
-  for (let y = 0; y < H0; y++) for (let x = 0; x < W0; x++) {
-    const t = cells[y * W0 + x];
-    if (t >= 0) fillR(pad + x * cellPx, pad + y * cellPx, cellPx, cellPx, hex2rgb(palette[t]));
-  }
+  const { im } = makeAppExport(cells, W0, H0, palette, { seed: 51 });
   const out = analyzeChart(im.data, im.w, im.h);
   let ok = !!out.ok && out.w === W0 && out.h === H0;
   let colorMiss = 0, cellMiss = 0;
@@ -258,20 +250,14 @@ const rnd0 = mulberry32(42);
 }
 
 // N. 小作品往返：6×10 网格、图案净宽 5 格、单色（真机踩过：MIN_CELLS=6 时报「图案太小」）
+// —— 同样走新版式镜像（窄作品：卡片居中浮在米黄页上，白底区占比是这里的敏感点）
 {
+  const { makeAppExport } = require('./export-synth.js');
   const W0 = 6, H0 = 10;
   const art = ['..X...', '..X...', '.XX...', '.X....', '.X....', '.XXXX.', '.X..X.', 'XX.XX.', 'X..X..', '..X...'];
   const cells = new Int16Array(W0 * H0).fill(-1);
   for (let y = 0; y < H0; y++) for (let x = 0; x < W0; x++) if (art[y][x] === 'X') cells[y * W0 + x] = 0;
-  const scale = 2, cellPx = 24 * scale, pad = Math.round(24 * 1.2) * scale;
-  const IW = W0 * cellPx + pad * 2, IH = H0 * cellPx + pad * 2;
-  const im = img(IW, IH, [255, 255, 255]);
-  const fillR = (x, y, w2, h2, rgb) => { for (let yy = y; yy < y + h2; yy++) for (let xx = x; xx < x + w2; xx++) { const o = (yy * IW + xx) * 4; im.data[o] = rgb[0]; im.data[o + 1] = rgb[1]; im.data[o + 2] = rgb[2]; } };
-  for (let k = 0; k <= W0; k++) fillR(pad + k * cellPx, pad, scale, H0 * cellPx, k % 5 === 0 ? [201, 228, 222] : [230, 233, 235]);
-  for (let k = 0; k <= H0; k++) fillR(pad, pad + k * cellPx, W0 * cellPx, scale, k % 5 === 0 ? [201, 228, 222] : [230, 233, 235]);
-  for (let y = 0; y < H0; y++) for (let x = 0; x < W0; x++) {
-    if (cells[y * W0 + x] === 0) fillR(pad + x * cellPx, pad + y * cellPx, cellPx, cellPx, [255, 77, 69]);
-  }
+  const { im } = makeAppExport(cells, W0, H0, ['#FF4D45'], { seed: 52 });
   const out = analyzeChart(im.data, im.w, im.h);
   // 图案净范围 5×10（第 6 列全空被裁掉），19 颗
   const ok = !!out.ok && out.w === 5 && out.h === 10 && out.total === 19 && out.colorN === 1;

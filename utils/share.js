@@ -1,7 +1,7 @@
 // 分享卡片 / 导出图片：直接绘制到传入的 canvas 上
 const { drawPatternInto, patternSize, workFinish } = require('./board');
 const { colorStats } = require('./convert');
-const { PALETTE } = require('./palette');
+const { PALETTE, textColorFor } = require('./palette');
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
@@ -207,44 +207,192 @@ function buildShareCardTo(canvas, work, scale) {
   return { width: W, height: H };
 }
 
-// 图纸样式导出（分享弹窗「保存图纸」）：纯白底 + 细格线（每格淡灰、5 格淡青参考线）+ 平色格。
-// 没有豆孔/高光/蒙孔点 —— 保存的图片可以再从「导入拼豆图纸」识别回来（往返闭环），
-// 颜色用色板原值（PNG 无损），识别后逐格逐色还原
+// 圆角矩形路径
+function rr(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// 文本截到给定宽度（超出加 …）
+function fitText(ctx, s, maxW) {
+  if (ctx.measureText(s).width <= maxW) return s;
+  while (s.length > 1 && ctx.measureText(s + '…').width > maxW) s = s.slice(0, -1);
+  return s + '…';
+}
+
+// 图纸样式导出（分享弹窗「保存图纸」）：仿实体拼豆图纸版式（参照 RED 图纸工坊）——
+// 米黄页面底 + 白底网格卡片；格内直接印 MARD 色号（对着图纸抓豆；自带色板作品没有
+// 实体色号，退回 1..N 编号）、四边坐标数字、每格淡灰线 + 5 格淡青参考线；
+// 底部「名称 · 尺寸 · 色数/总颗数」说明行 + 色号图例（编号 色号 ×数量 ——
+// 编号是 app 拼豆页色卡的编号，图例即两套标识的对照桥）。
+// 网格区仍是平色格（无豆孔/高光），保存的图可再从「导入拼豆图纸」识别回来（往返闭环）；
+// 标题/坐标/图例都画在米黄底上，导入时白底区定位天然把它们排除。
+// ⚠ 版式与 tests/export-synth.js 逐项镜像：改这里必须同步改镜像并跑 node tests/chart.test.js
 function buildChartExportTo(canvas, work, opts) {
   opts = opts || {};
-  const scale = opts.scale || 2;
-  const maxSide = opts.maxSide || 1600;
   const w = work.w, h = work.h, cells = work.cells;
-  const cellPx = clamp(Math.floor(maxSide / Math.max(w, h)), opts.minCell || 8, opts.maxCell || 24);
-  const pad = Math.round(cellPx * 1.2);
-  const W = w * cellPx + pad * 2, H = h * cellPx + pad * 2;
+  const maxSide = opts.maxSide || 1600;
+  const cellPx = clamp(Math.floor(maxSide / Math.max(w, h)), opts.minCell || 8, opts.maxCell || 32);
+  const hexOf = t => (work.palette ? work.palette[t] : PALETTE[t].hex);
+
+  const stats = colorStats(cells);
+  const numOf = new Map(stats.map((s, i) => [s.pal, i + 1]));
+  const total = stats.reduce((a, s) => a + s.count, 0);
+  // 格内标签：全局色板印 MARD 色号（对着图纸直接抓豆），自带色板作品退回编号
+  const labelOf = t => (work.palette ? String(numOf.get(t)) : PALETTE[t].code);
+
+  // 版式（逻辑像素）—— 常量改动要同步 tests/export-synth.js
+  const P = 30, HEADER = 56, COORD = 30, CARD_PAD = 14;
+  const INFO_H = 46, PILL_H = 42, PILL_GAP = 12, FOOT = 54;
+  const gridW = w * cellPx, gridH = h * cellPx;
+  const cardW = gridW + CARD_PAD * 2, cardH = gridH + CARD_PAD * 2;
+  const lgCols = Math.min(5, stats.length);
+  const lgMinW = lgCols ? lgCols * 110 + (lgCols - 1) * PILL_GAP : 0;
+  const W = Math.max(COORD * 2 + cardW, lgMinW, 430) + P * 2;
+  const CW = W - P * 2;
+  const cardX = (W - cardW) / 2;
+  const cardY = P + HEADER + COORD;
+  const gridX = cardX + CARD_PAD, gridY = cardY + CARD_PAD;
+  const infoY = cardY + cardH + COORD + 8;
+  const lgY = infoY + INFO_H;
+  const lgRows = lgCols ? Math.ceil(stats.length / lgCols) : 0;
+  const lgH = lgRows ? lgRows * PILL_H + (lgRows - 1) * PILL_GAP : 0;
+  const H = lgY + lgH + FOOT;
+
+  // 分辨率目标 2x；超出 canvas 安全边（~4096）整体降清晰度而不是砍版式
+  const scale = Math.max(1, Math.min(opts.scale || 2, 4050 / Math.max(W, H)));
   canvas.width = Math.round(W * scale);
   canvas.height = Math.round(H * scale);
   const ctx = canvas.getContext('2d');
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
-  ctx.fillStyle = '#FFFFFF';
+
+  // 页面底 + 头部（品牌三连豆 + 标题 + 日期）
+  ctx.fillStyle = '#FBF5EC';
   ctx.fillRect(0, 0, W, H);
-  // 格线铺满网格区（色格随后覆盖，空格处露出格线 —— 和真图纸一致）；格子太小就不画线
-  if (cellPx >= 5) {
-    for (let k = 0; k <= w; k++) {
-      ctx.fillStyle = k % 5 === 0 ? '#C9E4DE' : '#E6E9EB';
-      ctx.fillRect(pad + k * cellPx, pad, 1, h * cellPx);
-    }
-    for (let k = 0; k <= h; k++) {
-      ctx.fillStyle = k % 5 === 0 ? '#C9E4DE' : '#E6E9EB';
-      ctx.fillRect(pad, pad + k * cellPx, w * cellPx, 1);
-    }
-  }
+  drawBrandBeads(ctx, P + 34, P + 26, 9, 8);
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#5F4A4E';
+  ctx.font = 'bold 24px sans-serif';
+  ctx.fillText('拼豆便利店', P + 78, P + 27);
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#A59795';
+  ctx.font = '17px sans-serif';
+  ctx.fillText(fmtDate(work.completedAt || work.updatedAt), W - P, P + 28);
+
+  // 白底网格卡片
+  ctx.fillStyle = '#FFFFFF';
+  rr(ctx, cardX, cardY, cardW, cardH, 14);
+  ctx.fill();
+
   // 平色格（无孔无高光）
-  const hexOf = t => (work.palette ? work.palette[t] : PALETTE[t].hex);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const t = cells[y * w + x];
       if (t < 0) continue;
       ctx.fillStyle = hexOf(t);
-      ctx.fillRect(pad + x * cellPx, pad + y * cellPx, cellPx, cellPx);
+      ctx.fillRect(gridX + x * cellPx, gridY + y * cellPx, cellPx, cellPx);
     }
   }
+  // 格线画在豆色上层（真图纸同款，同色区域靠它分格）：每格淡灰、5 格淡青参考线
+  for (let k = 0; k <= w; k++) {
+    ctx.fillStyle = k % 5 === 0 ? '#C9E4DE' : '#E6E9EB';
+    ctx.fillRect(gridX + k * cellPx, gridY, 1, gridH);
+  }
+  for (let k = 0; k <= h; k++) {
+    ctx.fillStyle = k % 5 === 0 ? '#C9E4DE' : '#E6E9EB';
+    ctx.fillRect(gridX, gridY + k * cellPx, gridW, 1);
+  }
+  // 逐格标签（深浅字按格色亮度选）。色号 2-3 字符比编号宽：从理想字号起，
+  // 按本作品最宽的标签实测收缩到能塞进格子；缩到 6px 还不行（大板小格）就不印
+  ctx.textAlign = 'center';
+  const labelTexts = stats.map(s => labelOf(s.pal));
+  let lf = Math.min(12, Math.max(6, Math.round(cellPx * 0.5)));
+  const widest = () => {
+    ctx.font = lf + 'px sans-serif';
+    let m = 0;
+    for (const t of labelTexts) m = Math.max(m, ctx.measureText(t).width);
+    return m;
+  };
+  while (lf > 6 && widest() > cellPx - 2) lf--;
+  if (widest() <= cellPx - 1) {
+    ctx.font = lf + 'px sans-serif';
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const t = cells[y * w + x];
+        if (t < 0) continue;
+        ctx.fillStyle = textColorFor(hexOf(t));
+        ctx.fillText(labelOf(t), gridX + (x + 0.5) * cellPx, gridY + (y + 0.5) * cellPx + 0.5);
+      }
+    }
+  }
+
+  // 四边坐标数字（1, 6, 11, …, 尾数；在米黄底上）
+  ctx.fillStyle = '#A59795';
+  ctx.font = '13px sans-serif';
+  ctx.textAlign = 'center';
+  const marks = n => {
+    const a = [];
+    for (let k = 1; k <= n; k += 5) a.push(k);
+    if (a[a.length - 1] !== n) a.push(n);
+    return a;
+  };
+  for (const k of marks(w)) {
+    const x = gridX + (k - 0.5) * cellPx;
+    ctx.fillText(String(k), x, cardY - COORD / 2);
+    ctx.fillText(String(k), x, cardY + cardH + COORD / 2);
+  }
+  for (const k of marks(h)) {
+    const y = gridY + (k - 0.5) * cellPx;
+    ctx.fillText(String(k), cardX - COORD / 2, y);
+    ctx.fillText(String(k), cardX + cardW + COORD / 2, y);
+  }
+
+  // 说明行：「名字」 MARD · w×h · N 色 / 共 total 颗（与 RED 图纸工坊同位置的品牌标识；
+  // 文字属色号体系的描述性标注。自带色板作品不是 MARD 豆色，不标）
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#5F4A4E';
+  ctx.font = 'bold 23px sans-serif';
+  const dims = ' ' + (work.palette ? '' : 'MARD · ') + w + '×' + h + ' · ' + stats.length + ' 色 / 共 ' + total + ' 颗';
+  const nm = fitText(ctx, '「' + (work.name || '拼豆作品') + '」', CW - ctx.measureText(dims).width);
+  ctx.fillText(nm + dims, P, infoY + INFO_H / 2);
+
+  // 图例：色块药丸（编号 MARD色号 ×数量），5 列。
+  // 编号与格内/拼豆页色卡一致；MARD 色号只对全局色板作品展示（自带色板不是实体豆色，
+  // 标了会误导按码买豆）
+  if (lgCols) {
+    const pillW = (CW - (lgCols - 1) * PILL_GAP) / lgCols;
+    ctx.textAlign = 'center';
+    stats.forEach((s, i) => {
+      const hex = hexOf(s.pal);
+      const code = work.palette ? '' : PALETTE[s.pal].code + ' ';
+      const px = P + (i % lgCols) * (pillW + PILL_GAP);
+      const py = lgY + Math.floor(i / lgCols) * (PILL_H + PILL_GAP);
+      ctx.fillStyle = hex;
+      rr(ctx, px, py, pillW, PILL_H, 10);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(95,74,78,.22)';
+      ctx.lineWidth = 1.5;
+      rr(ctx, px + 0.75, py + 0.75, pillW - 1.5, PILL_H - 1.5, 10);
+      ctx.stroke();
+      ctx.fillStyle = textColorFor(hex);
+      ctx.font = 'bold 17px sans-serif';
+      ctx.fillText((i + 1) + ' ' + code + '×' + s.count, px + pillW / 2, py + PILL_H / 2 + 1);
+    });
+  }
+
+  // 页脚
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#B7A8A4';
+  ctx.font = '15px sans-serif';
+  ctx.fillText('图纸截图可在「新作品 → 导入拼豆图纸」里再拼同款', W / 2, H - FOOT / 2 + 4);
+
+  ctx.textBaseline = 'alphabetic'; // 复位，避免影响共用 canvas 的后续绘制
   return { width: W, height: H };
 }
 

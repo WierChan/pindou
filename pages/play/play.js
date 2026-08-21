@@ -9,7 +9,7 @@ const ui = require('../../utils/ui');
 const { cfg } = require('../../utils/config');
 const { buildGuide } = require('../../utils/guidance');
 
-const SWIPE_KEY = 'pindou.swipeUntil'; // 滑动拼豆到期时间戳（跨作品/跨会话有效）
+const PAINT_KEY = 'pindou.paintMode.v1'; // 划动模式:1 = 连续上豆 / 其余 = 拖动平移（跨作品记忆）
 
 Page({
   data: {
@@ -19,10 +19,8 @@ Page({
     title: '',
     pct: 0,
     chips: [],
-    rowCount: 0,
     rowActive: false,
-    swipeActive: false,
-    swipeLeft: 0,
+    paintOn: false,
     beadShape: 'square',
     muted: false,
     debug: cfg.DEBUG,
@@ -46,7 +44,6 @@ Page({
       wx.redirectTo({ url: '/pages/free/free?id=' + work.id });
       return;
     }
-    if (work.boostRow == null) work.boostRow = cfg.FREE_ROW_USES;
     this.work = work;
     this.uq = ui.serialQueue();
     // 作品自带色板（图纸导入）：渲染与 UI 用图纸真实颜色，色名借最近的全局色名
@@ -56,6 +53,8 @@ Page({
       const c = hexToRgb(work.palette[pal]);
       return PALETTE[nearestPalette(c[0], c[1], c[2])].name;
     };
+    // MARD 色号只对全局色板作品展示（自带色板的颜色不是实体豆色，标了会误导买豆）
+    this.palCode = pal => (work.palette ? '' : PALETTE[pal].code + ' ');
 
     const stats = colorStats(work.cells);
     this.colorsUsed = stats.map(s => s.pal);
@@ -76,10 +75,9 @@ Page({
     this.pending = [];
     this.flushTimer = 0;
     this.saveTimer = 0;
-    // 滑动拼豆权限：平时只能点按上豆，看广告解锁限时滑动
-    this.swipeUntil = 0;
-    try { this.swipeUntil = +wx.getStorageSync(SWIPE_KEY) || 0; } catch (e) { /* 忽略 */ }
-    this.swipeTimer = 0;
+    // 划动模式：关 = 单指拖动平移画布（默认，方便看图找色），开 = 划过格子连续上豆
+    this.paintOn = false;
+    try { this.paintOn = wx.getStorageSync(PAINT_KEY) === 1; } catch (e) { /* 忽略 */ }
 
     const chips = this.colorsUsed.map((pal, i) => {
       const n = this.remaining.get(pal);
@@ -96,14 +94,13 @@ Page({
       insets: ui.navInsets(),
       title: work.name,
       chips,
-      rowCount: work.boostRow,
+      paintOn: this.paintOn,
       beadShape: getBeadShape(),
       muted: audio.muted,
       total: this.total,
       colorN: this.colorsUsed.length,
       pct: this._pct(),
     });
-    if (Date.now() < this.swipeUntil) this._startSwipeTicker();
   },
 
   onReady() {
@@ -114,7 +111,7 @@ Page({
     buildGuide(this, 'play', [
       { sel: '.palette-bar', text: '先在这里选颜色！每种颜色有编号，下面的数字是还差几颗' },
       { text: '板上淡淡的格子就是图纸。点亮所有跟选中颜色一样的格子吧！点错了我会晃一晃提醒你。双指可以缩放看细节～' },
-      { sel: '.tools-row', text: '「整排拼豆」咔哒一下上一整排；「滑动拼豆」解锁后手指划过就能连续上豆，超解压！' },
+      { sel: '.tools-row', text: '「整排拼豆」咔哒一下上一整排；打开「连续上豆」，手指划过格子就能连着拼，超解压！' },
     ]);
   },
 
@@ -130,7 +127,6 @@ Page({
   onUnload() {
     this._gone = true;
     clearTimeout(this.flushTimer);
-    clearInterval(this.swipeTimer);
     this._flushSave();
     if (this.bv) this.bv.destroy();
   },
@@ -151,7 +147,7 @@ Page({
         numbers: this.numbers,
         getSelected: () => this.sel,
         getTool: () => this.tool,
-        canSwipe: () => Date.now() < this.swipeUntil,
+        canSwipe: () => this.paintOn,
         onPlace: i => this._onPlace(i),
         onWrong: () => {
           audio.wrong();
@@ -225,73 +221,23 @@ Page({
 
   tapRowTool() {
     if (this.finished) return;
-    if (!this.work.boostRow) {
-      ui.toast('免费次数用完啦，正式版可解锁更多道具 ✨');
-      return;
-    }
     this.tool = this.tool === 'row' ? null : 'row';
     if (this.tool) ui.toast('点任意一行，整排自动拼好');
     this.setData({ rowActive: !!this.tool });
     if (this.bv) this.bv.requestRender();
   },
 
-  /* ---------- 滑动拼豆（看广告限时解锁） ---------- */
-  tapSwipe() {
+  /* ---------- 划动模式：拖动平移 ↔ 连续上豆 ---------- */
+  // 单指划动二选一（常驻开关，跨作品记忆）：关 = 平移画布，开 = 划过格子连续上豆
+  togglePaint() {
     if (this.finished) return;
-    if (Date.now() < this.swipeUntil) {
-      ui.toast('滑动拼豆还剩 ' + Math.ceil((this.swipeUntil - Date.now()) / 1000) + ' 秒');
-      return;
-    }
-    this._unlockSwipe();
-  },
-
-  // 广告位预留：后台配置 SWIPE_AD_UNIT_ID 后改用激励视频，看完发放时长——
-  //   this._swipeAd = this._swipeAd || wx.createRewardedVideoAd({ adUnitId: cfg.SWIPE_AD_UNIT_ID });
-  //   this._swipeAd.onClose(res => { if (res && res.isEnded) this._grantSwipe(); });
-  //   this._swipeAd.show().catch(() => this._swipeAd.load().then(() => this._swipeAd.show()));
-  // 接入前：弹窗说明后直接发放体验时长
-  _unlockSwipe() {
-    if (cfg.SWIPE_AD_UNIT_ID) {
-      ui.toast('广告加载失败，稍后再试');
-      return;
-    }
-    wx.showModal({
-      title: '解锁滑动拼豆',
-      content: '看一段广告，即可获得 ' + cfg.SWIPE_AD_SECONDS + ' 秒「划过格子连续上豆」\n（广告位接入前先免费体验）',
-      confirmText: '立即解锁',
-      confirmColor: '#C9838F',
-      success: r => { if (r.confirm) this._grantSwipe(); },
-    });
-  },
-
-  _grantSwipe() {
-    if (this._gone) return;
-    this.swipeUntil = Date.now() + cfg.SWIPE_AD_SECONDS * 1000;
-    try { wx.setStorageSync(SWIPE_KEY, this.swipeUntil); } catch (e) { /* 忽略 */ }
-    ui.toast('滑动拼豆已开启，' + cfg.SWIPE_AD_SECONDS + ' 秒内随便划 ✨');
-    this._startSwipeTicker();
-  },
-
-  _startSwipeTicker() {
-    clearInterval(this.swipeTimer);
-    const tick = () => {
-      const left = Math.max(0, Math.ceil((this.swipeUntil - Date.now()) / 1000));
-      const active = left > 0;
-      if (left !== this.data.swipeLeft || active !== this.data.swipeActive) {
-        this.setData({ swipeActive: active, swipeLeft: left });
-      }
-      if (!active) {
-        clearInterval(this.swipeTimer);
-        this.swipeTimer = 0;
-        ui.toast('滑动时间用完啦，点按继续拼～');
-      }
-    };
-    tick();
-    this.swipeTimer = setInterval(tick, 500);
+    this.paintOn = !this.paintOn;
+    try { wx.setStorageSync(PAINT_KEY, this.paintOn ? 1 : 0); } catch (e) { /* 忽略 */ }
+    this.setData({ paintOn: this.paintOn });
+    ui.toast(this.paintOn ? '连续上豆：手指划过格子连着拼 ✨' : '已切回拖动画布');
   },
 
   _onToolTap(i) {
-    if (!this.work.boostRow) return;
     const row = Math.floor(i / this.work.w);
     const idx = [];
     for (let x = 0; x < this.work.w; x++) {
@@ -299,7 +245,6 @@ Page({
       if (this.work.cells[j] >= 0 && !this.work.placed[j]) idx.push(j);
     }
     if (!idx.length) { ui.toast('这一排已经拼好啦'); return; }
-    this.work.boostRow--;
     this.tool = null;
     this.bv.placeMany(idx);
     this._applyPlacement(idx, 'row');
@@ -334,10 +279,7 @@ Page({
       patch['chips[' + ci + '].left'] = n > 0 ? n : '✓';
       patch['chips[' + ci + '].done'] = n === 0;
     }
-    if (sound === 'row') {
-      patch.rowCount = this.work.boostRow;
-      patch.rowActive = false;
-    }
+    if (sound === 'row') patch.rowActive = false;
     this.setData(patch);
     this._scheduleSave();
     if (sound === 'tap') audio.tap();
@@ -348,7 +290,7 @@ Page({
       audio.colorDone();
       // 里程碑轻震：拼完一种颜色（普通上豆不震，震动语义留给错误与里程碑）
       try { wx.vibrateShort({ type: 'light' }); } catch (e) { /* 忽略 */ }
-      ui.toast('「' + this.palName(doneNow[0]) + '」拼完啦 ✓');
+      ui.toast('「' + this.palCode(doneNow[0]) + this.palName(doneNow[0]) + '」拼完啦 ✓');
       if (doneNow.indexOf(this.sel) >= 0) {
         const start = this.colorsUsed.indexOf(this.sel);
         for (let k = 1; k <= this.colorsUsed.length; k++) {
@@ -369,7 +311,6 @@ Page({
     if (!this.work) return;
     store.update(this.work.id, {
       placed: this.work.placed,
-      boostRow: this.work.boostRow,
       completed: this.work.completed || false,
     });
   },
@@ -386,7 +327,7 @@ Page({
     }
     store.update(work.id, {
       placed: work.placed, completed: true, ironDone: false,
-      ironed: work.ironed, boostRow: work.boostRow,
+      ironed: work.ironed,
     });
     if (this.utilCanvas) {
       this.uq(() => ui.makeThumb(this, this.utilCanvas, work, false))

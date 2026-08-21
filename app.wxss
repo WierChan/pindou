@@ -300,7 +300,6 @@ button.btn-reset::after { border: none; }
   background: var(--coin);
   box-shadow: 3px 3px 0 var(--coin-dark);
 }
-.tool-chip.locked { opacity: .6; }
 .tools-hint {
   font-size: 12px;
   color: var(--ink2);
@@ -407,3 +406,14 @@ button.btn-reset::after { border: none; }
 .modal-sub { color: var(--ink2); font-size: 14px; line-height: 1.7; }
 .modal-btns { display: flex; gap: 10px; }
 .modal-btns > view, .modal-btns > button { flex: 1; }
+
+/* 流量主 banner 容器：只留外边距定位，不改广告本体样式（遮挡/裁剪广告违反流量主规范） */
+.ad-slot { margin: 16px 0 4px; }
+
+/* 自绘像素图标（assets/icons/，tools/gen-icons.js 生成）：
+   替代 UI 里的系统 emoji —— iOS/安卓渲染一致，且与全站像素风统一 */
+.pxi { width: 16px; height: 16px; vertical-align: -3px; margin-right: 4px; }
+.pxi-s { width: 13px; height: 13px; vertical-align: -2px; margin-right: 3px; }
+.pxi-l { width: 20px; height: 20px; vertical-align: -4px; }
+.pxi-xl { width: 40px; height: 40px; }
+.icon-btn .pxi-l, .tb-actions .pxi-l { vertical-align: 0; margin: 0; }

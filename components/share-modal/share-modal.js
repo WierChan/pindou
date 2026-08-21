@@ -3,6 +3,7 @@
 const { store } = require('../../utils/store');
 const { buildShareCardTo, buildChartExportTo, loadShareAssets } = require('../../utils/share');
 const ui = require('../../utils/ui');
+const ads = require('../../utils/ads');
 
 Component({
   options: { styleIsolation: 'apply-shared' },
@@ -52,9 +53,18 @@ Component({
         },
       });
     },
-    // 保存纯网格图纸到相册（无品牌装饰、平色格 —— 往返闭环的载体）
+    // 保存纯网格图纸到相册（无品牌装饰、平色格 —— 往返闭环的载体）。
+    // 流量主接入后（rvChart 位下发）先看一段激励视频；未接入/失败直接放行，
+    // 同一作品当天只看一次（记账在 ads.js）
     saveChart() {
       const id = this.properties.workId;
+      ads.rewarded('rvChart', {
+        workId: id,
+        title: '保存高清图纸',
+        desc: '看一段短广告，即可把这幅作品的高清图纸保存到相册',
+      }).then(ok => { if (ok) this._doSaveChart(id); });
+    },
+    _doSaveChart(id) {
       if (this._chartFor === id && this._chartPath) { ui.saveToAlbum(this._chartPath); return; }
       const work = store.get(id);
       if (!work) return;

@@ -4,8 +4,8 @@
     <view class="tb-title">{{title}}</view>
     <view class="tb-actions">
       <view class="icon-btn" hover-class="pressed" bindtap="toggleShape">{{beadShape === 'round' ? '●' : '■'}}</view>
-      <view class="icon-btn" hover-class="pressed" bindtap="toggleMute">{{muted ? '🔇' : '🔊'}}</view>
-      <view wx:if="{{debug}}" class="icon-btn" bindtap="debugFill">⚡</view>
+      <view class="icon-btn" hover-class="pressed" bindtap="toggleMute"><image class="pxi-l" src="{{muted ? '/assets/icons/sndoff.png' : '/assets/icons/sndon.png'}}" /></view>
+      <view wx:if="{{debug}}" class="icon-btn" bindtap="debugFill"><image class="pxi-l" src="/assets/icons/bolt.png" /></view>
     </view>
   </view>
 
@@ -26,14 +26,9 @@
   <view class="bottom-bar">
     <view class="bb-inner">
       <view class="tools-row">
-        <view class="tool-chip {{rowActive ? 'active' : ''}} {{rowCount ? '' : 'locked'}}" bindtap="tapRowTool">
-          {{rowCount ? '⚡ 整排拼豆 ' : '🔒 整排拼豆 '}}<text class="b">×{{rowCount}}</text>
-        </view>
-        <view class="tool-chip {{swipeActive ? 'active' : ''}}" bindtap="tapSwipe">
-          <block wx:if="{{swipeActive}}">🖐️ 滑动中 <text class="b">{{swipeLeft}}s</text></block>
-          <block wx:else>📺 滑动拼豆</block>
-        </view>
-        <view class="tools-hint">{{swipeActive ? '划过格子连续上豆！' : '选颜色，点格子上豆'}}</view>
+        <view class="tool-chip {{rowActive ? 'active' : ''}}" bindtap="tapRowTool"><image class="pxi-s" src="/assets/icons/bolt.png" />整排拼豆</view>
+        <view class="tool-chip {{paintOn ? 'active' : ''}}" bindtap="togglePaint"><image class="pxi-s" src="/assets/icons/hand.png" />连续上豆</view>
+        <view class="tools-hint">{{paintOn ? '划过格子连续上豆！' : '选颜色，点格子上豆'}}</view>
       </view>
       <scroll-view class="palette-bar" scroll-x scroll-into-view="{{scrollInto}}"
                    scroll-with-animation enhanced show-scrollbar="{{false}}">
@@ -55,7 +50,7 @@
 <!-- 完成弹窗：页面顶层 + 提升层级，确保盖住画板 canvas -->
 <view wx:if="{{modal.show}}" class="overlay hi">
   <view class="modal">
-    <view class="modal-title">🎉 豆子拼齐啦！</view>
+    <view class="modal-title"><image class="pxi-l" src="/assets/icons/sparkle.png" />豆子拼齐啦！</view>
     <view class="modal-art" wx:if="{{modal.img}}">
       <image src="{{modal.img}}" style="width:{{modal.imgW}}px;height:{{modal.imgH}}px" />
     </view>
@@ -64,7 +59,7 @@
       <view>最后一步：亲手把它熨烫定型！</view>
     </view>
     <view class="modal-btns">
-      <view class="btn-primary" hover-class="pressed" bindtap="goIron">🔥 去熨烫</view>
+      <view class="btn-primary" hover-class="pressed" bindtap="goIron"><image class="pxi" src="/assets/icons/flame.png" />去熨烫</view>
     </view>
     <view class="btn-link" hover-class="pressed" bindtap="goHomeLater">稍后再烫，先回首页</view>
   </view>

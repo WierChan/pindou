@@ -29,14 +29,30 @@ function rgb2oklab(r, g, b) {
 
 const PAL_LAB = PALETTE_RGB.map(rgb => rgb2oklab(rgb[0], rgb[1], rgb[2]));
 
+// L 升序索引：最近色搜索从 L 最接近处向两侧展开，某侧 |ΔL|² 已 ≥ 当前最优就整侧剪掉
+// （L 差只增不减，剪枝精确无损）。色板扩到 221 色后 256 大板逐格全扫在真机（无 JIT）
+// 要多花约 1s，剪枝后平均只访问 ~20 个候选
+const PAL_ORDER = PAL_LAB.map((p, i) => i).sort((a, b) => PAL_LAB[a][0] - PAL_LAB[b][0]);
+const PAL_L = PAL_ORDER.map(i => PAL_LAB[i][0]);
+
 function nearestPalette(r, g, b) {
   const lab = rgb2oklab(r, g, b);
+  const L = lab[0], A = lab[1], B = lab[2];
+  let lo = 0, hi = PAL_L.length - 1;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (PAL_L[mid] < L) lo = mid + 1; else hi = mid; }
   let bi = 0, bd = Infinity;
-  for (let i = 0; i < PAL_LAB.length; i++) {
-    const p = PAL_LAB[i];
-    const dl = lab[0] - p[0], da = lab[1] - p[1], db = lab[2] - p[2];
-    const d = dl * dl + da * da + db * db; // OKLab 本身已是感知均匀，直接欧氏距离
-    if (d < bd) { bd = d; bi = i; }
+  let up = lo, down = lo - 1;
+  while (up < PAL_L.length || down >= 0) {
+    const du = up < PAL_L.length ? PAL_L[up] - L : Infinity;
+    const dd = down >= 0 ? L - PAL_L[down] : Infinity;
+    const useUp = du <= dd;
+    const dl = useUp ? du : dd;
+    if (dl * dl >= bd) break; // 两侧 L 差都不会再变小，剩余候选必然更远
+    const idx = PAL_ORDER[useUp ? up++ : down--];
+    const p = PAL_LAB[idx];
+    const dL = L - p[0], da = A - p[1], db = B - p[2];
+    const d = dL * dL + da * da + db * db; // OKLab 本身已是感知均匀，直接欧氏距离
+    if (d < bd) { bd = d; bi = idx; }
   }
   return bi;
 }

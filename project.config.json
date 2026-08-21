@@ -46,6 +46,10 @@
       {
         "type": "folder",
         "value": "docs"
+      },
+      {
+        "type": "folder",
+        "value": "tools"
       }
     ],
     "include": []

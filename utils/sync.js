@@ -6,7 +6,14 @@ const api = require('./api');
 
 const PENDING_KEY = 'pindou.sync.pending.v1'; // { push: {id:1}, del: {id:1} }
 const LOCAL_FIELDS = ['thumb', 'thumbV', 'thumbShape', 'thumbBeads'];
-const PUSH_DEBOUNCE = 1500;
+// 推送防抖（尾沿触发：每次写入重置计时，停手 20s 后才推）。
+// 拼豆中每 ~600ms 存一次档，原 1.5s 防抖等于边拼边整包上传（大作品一次几百 KB，
+// 一个活跃用户就是持续几十 KB/s 上行）——进度同步不需要实时，20s 把服务器写入量砍掉一个量级。
+// 可靠性不受影响：queuePush 先落挂起队列再计时，中途杀 App 下次启动 syncAll 会补推
+const PUSH_DEBOUNCE = 20000;
+// syncAll 冷却：首页每次 onShow 都会调（前后台切换很频繁），无挂起操作时 60s 内不重复全量同步
+const SYNC_COOLDOWN = 60000;
+let lastSyncAt = 0;
 
 const timers = {};
 let failToastShown = false; // 每次会话只提示一次,避免刷屏
@@ -130,6 +137,12 @@ function syncAll() {
   const { store } = require('./store');
   let changed = false;
 
+  // 冷却期内且没有挂起操作:跳过(失败不记冷却,下次 onShow 照常重试)
+  if (Date.now() - lastSyncAt < SYNC_COOLDOWN) {
+    const p = readPending();
+    if (!Object.keys(p.push).length && !Object.keys(p.del).length) return Promise.resolve(false);
+  }
+
   return api.ensureLogin()
     .then(() => {
       // 先补发上次失败的挂起操作
@@ -189,7 +202,10 @@ function syncAll() {
           return chain;
         });
     })
-    .then(() => changed);
+    .then(() => {
+      lastSyncAt = Date.now(); // 只有成功走完才记冷却
+      return changed;
+    });
 }
 
 module.exports = { queuePush, queueDelete, syncAll };

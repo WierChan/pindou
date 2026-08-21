@@ -4,12 +4,25 @@ const api = require('./api');
 
 const KEY = 'pindou.config.v1';
 
+// 流量主广告位表:值为后台的 adunit-xxxxxxxx,空串 = 该位关闭。
+// 全部由后端下发,不发版即可逐位开关(接口契约见 docs/ad-config-api.md)
+//   bannerHome       banner   首页作品列表底部
+//   bannerTpl        banner   创建页「图案库」tab 底部
+//   rvChart          激励视频  分享弹窗「保存图纸」前置
+//   rvExport         激励视频  自由画布「导出」前置
+//   interstitialDone 插屏     熨烫完成「回到首页」时机
+const AD_SLOTS = ['bannerHome', 'bannerTpl', 'rvChart', 'rvExport', 'interstitialDone'];
+
+function pickAd(src) {
+  const out = {};
+  for (const k of AD_SLOTS) out[k] = (src && typeof src[k] === 'string') ? src[k] : '';
+  return out;
+}
+
 const cfg = {
-  DEBUG: false,          // 调试开关:拼豆/熨烫页出现 ⚡ 一键完成按钮
-  FREE_ROW_USES: 0,      // 整排工具每幅作品免费次数
-  SWIPE_AD_SECONDS: 0,   // 看广告解锁的「滑动拼豆」时长(秒)
-  SWIPE_AD_UNIT_ID: '',  // 激励视频广告位 ID;空 = 广告未接入
-  loaded: false,         // 本次会话是否已从后端拉到
+  DEBUG: false,           // 调试开关:拼豆/熨烫页出现 ⚡ 一键完成按钮
+  AD_UNITS: pickAd(null), // 广告位 ID 表 {slot: adUnitId}
+  loaded: false,          // 本次会话是否已从后端拉到
 };
 
 // 上一次服务端下发的缓存(不是内置默认值,来源仍是后端)
@@ -17,26 +30,17 @@ try {
   const cached = wx.getStorageSync(KEY);
   if (cached && typeof cached === 'object') {
     cfg.DEBUG = !!cached.DEBUG;
-    cfg.FREE_ROW_USES = cached.FREE_ROW_USES || 0;
-    cfg.SWIPE_AD_SECONDS = cached.SWIPE_AD_SECONDS || 0;
-    cfg.SWIPE_AD_UNIT_ID = cached.SWIPE_AD_UNIT_ID || '';
+    cfg.AD_UNITS = pickAd(cached.AD_UNITS);
   }
 } catch (e) { /* 忽略 */ }
 
 function loadConfig() {
   return api.get('/api/config').then(d => {
     cfg.DEBUG = !!d.debug;
-    cfg.FREE_ROW_USES = d.freeRowUses || 0;
-    cfg.SWIPE_AD_SECONDS = d.swipeAdSeconds || 0;
-    cfg.SWIPE_AD_UNIT_ID = d.swipeAdUnitId || '';
+    cfg.AD_UNITS = pickAd(d.adUnits);
     cfg.loaded = true;
     try {
-      wx.setStorageSync(KEY, {
-        DEBUG: cfg.DEBUG,
-        FREE_ROW_USES: cfg.FREE_ROW_USES,
-        SWIPE_AD_SECONDS: cfg.SWIPE_AD_SECONDS,
-        SWIPE_AD_UNIT_ID: cfg.SWIPE_AD_UNIT_ID,
-      });
+      wx.setStorageSync(KEY, { DEBUG: cfg.DEBUG, AD_UNITS: cfg.AD_UNITS });
     } catch (e) { /* 忽略 */ }
     return cfg;
   });

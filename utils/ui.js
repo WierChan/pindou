@@ -121,7 +121,8 @@ function persistFile(tempPath, name, oldPath) {
 
 // 缩略图样式版本：画法变了就 +1，首页 _healThumbs 会为旧版本号的缩略图重新生成
 // v12：熨烫作品按质感选择铺颗粒纹理
-const THUMB_V = 12;
+// v13：色板对齐 MARD 实体色卡（色值整体更换，全部缩略图重新生成）
+const THUMB_V = 13;
 
 // 生成作品缩略图（持久化文件），并清掉旧图。
 // 与详情画板「拼好的样子」同款布局：白底板 + 蒙孔 + 颗颗豆，熨烫过的作品用熔合质感（fused）；

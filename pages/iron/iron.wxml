@@ -3,8 +3,8 @@
     <view class="tb-back" hover-class="pressed" bindtap="goBack">‹</view>
     <view class="tb-title">{{title}}</view>
     <view class="tb-actions">
-      <view class="icon-btn" hover-class="pressed" bindtap="toggleMute">{{muted ? '🔇' : '🔊'}}</view>
-      <view wx:if="{{debug}}" class="icon-btn" bindtap="debugFill">⚡</view>
+      <view class="icon-btn" hover-class="pressed" bindtap="toggleMute"><image class="pxi-l" src="{{muted ? '/assets/icons/sndoff.png' : '/assets/icons/sndon.png'}}" /></view>
+      <view wx:if="{{debug}}" class="icon-btn" bindtap="debugFill"><image class="pxi-l" src="/assets/icons/bolt.png" /></view>
     </view>
   </view>
 
@@ -27,11 +27,11 @@
     <view class="tex-row">
       <view class="tex-label">质感</view>
       <view class="tool-chip {{finish === 'grain' ? 'active' : ''}}" hover-class="pressed"
-            data-f="grain" bindtap="pickFinish">✨ 细腻纹理</view>
+            data-f="grain" bindtap="pickFinish"><image class="pxi-s" src="/assets/icons/sparkle.png" />细腻纹理</view>
       <view class="tool-chip {{finish === 'smooth' ? 'active' : ''}}" hover-class="pressed"
-            data-f="smooth" bindtap="pickFinish">◻️ 光滑平面</view>
+            data-f="smooth" bindtap="pickFinish"><image class="pxi-s" src="/assets/icons/smooth.png" />光滑平面</view>
     </view>
-    <view class="tools-hint iron-hint">🔥 按住熨斗，慢慢划过每一颗豆子，把它们烫平定型</view>
+    <view class="tools-hint iron-hint"><image class="pxi-s" src="/assets/icons/flame.png" />按住熨斗，慢慢划过每一颗豆子，把它们烫平定型</view>
   </view>
 
   <canvas wx:if="{{celebrating}}" type="2d" id="confetti" class="confetti"></canvas>
@@ -44,7 +44,7 @@
 <!-- 完成弹窗：页面顶层 + 提升层级，确保盖住画板 canvas -->
 <view wx:if="{{modal.show}}" class="overlay hi">
   <view class="modal">
-    <view class="modal-title">✨ 大功告成！</view>
+    <view class="modal-title"><image class="pxi-l" src="/assets/icons/sparkle.png" />大功告成！</view>
     <view class="modal-art" wx:if="{{modal.img}}">
       <image src="{{modal.img}}" style="width:{{modal.imgW}}px;height:{{modal.imgH}}px" />
     </view>

@@ -30,19 +30,19 @@
   <view class="cta-new {{ctaAnim}}" hover-class="pressed" bindtap="goCreate">＋ 开始新作品</view>
 
   <view class="tabs home-tabs">
-    <view class="tab {{tab === 'doing' ? 'active' : ''}}" bindtap="switchTab" data-tab="doing">🧺 进行中{{doing.length ? ' · ' + doing.length : ''}}</view>
-    <view class="tab {{tab === 'done' ? 'active' : ''}}" bindtap="switchTab" data-tab="done">🏆 已完成{{done.length ? ' · ' + done.length : ''}}</view>
+    <view class="tab {{tab === 'doing' ? 'active' : ''}}" bindtap="switchTab" data-tab="doing"><image class="pxi" src="/assets/icons/basket.png" />进行中{{doing.length ? ' · ' + doing.length : ''}}</view>
+    <view class="tab {{tab === 'done' ? 'active' : ''}}" bindtap="switchTab" data-tab="done"><image class="pxi" src="/assets/icons/trophy.png" />已完成{{done.length ? ' · ' + done.length : ''}}</view>
   </view>
 
   <view class="home-list">
     <view wx:if="{{!shown.length}}" class="empty-tip">
       <block wx:if="{{tab === 'done'}}">
         <view>还没有完成的作品～</view>
-        <view>拼完并熨烫定型后，就会收藏在这里 🏆</view>
+        <view>拼完并熨烫定型后，就会收藏在这里 <image class="pxi-s" src="/assets/icons/trophy.png" /></view>
       </block>
       <block wx:else>
         <view>没有进行中的作品～</view>
-        <view>上传一张图片，或者从图案库挑一个开始吧 🎨</view>
+        <view>上传一张图片，或者从图案库挑一个开始吧 <image class="pxi-s" src="/assets/icons/star.png" /></view>
       </block>
     </view>
     <view wx:else class="works-grid">
@@ -50,7 +50,7 @@
             bindtap="openWork" data-id="{{item.id}}" data-st="{{item.st}}">
         <view class="wc-thumb">
           <image wx:if="{{item.thumb}}" src="{{item.thumb}}" mode="aspectFit" />
-          <view wx:if="{{item.badgeText}}" class="wc-badge {{item.badgeClass}}">{{item.badgeText}}</view>
+          <view wx:if="{{item.badgeText}}" class="wc-badge {{item.badgeClass}}"><image wx:if="{{item.badgeIcon}}" class="pxi-s" src="{{item.badgeIcon}}" />{{item.badgeText}}</view>
         </view>
         <view class="wc-body">
           <view class="wc-name">{{item.name}}</view>
@@ -63,6 +63,11 @@
         <view class="wc-del" catchtap="delWork" data-id="{{item.id}}" data-name="{{item.name}}">✕</view>
       </view>
     </view>
+  </view>
+
+  <!-- 流量主 banner（bannerHome）：位 ID 未下发或列表为空不渲染；加载失败整体隐藏不留坑 -->
+  <view wx:if="{{adHome && shown.length}}" class="ad-slot">
+    <ad unit-id="{{adHome}}" binderror="onAdError"></ad>
   </view>
 </view>
 

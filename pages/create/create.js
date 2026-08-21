@@ -6,7 +6,7 @@ const { analyzeChart } = require('../../utils/chart');
 const { fetchTemplates, templatePattern } = require('../../utils/templates');
 const { renderPatternTo, patternSize, getBeadShape } = require('../../utils/board');
 const ui = require('../../utils/ui');
-const { cfg } = require('../../utils/config');
+const ads = require('../../utils/ads');
 const { buildGuide, guideSeen, markGuideSeen } = require('../../utils/guidance');
 const { normalize, format, fetchByCode, markCodePrompted, reportCode: reportImportCode } = require('../../utils/importcode');
 
@@ -43,8 +43,8 @@ Page({
     sizeHint: '',
     sizesShown: [16, 24, 32, 48],
     showColor: false,
-    colorMax: 45,
-    colorVal: 45,
+    colorMax: 48,
+    colorVal: 48,
     whiteEmpty: false,
     fixed: false,
     fromChart: false,
@@ -57,6 +57,7 @@ Page({
     codeShow: false,
     codeInput: '',
     importedCode: '',
+    adTpl: '', // 流量主 banner 位 ID（图案库 tab 底部；空 = 不渲染）
     guideSteps: [],
     name: '',
     dimText: '',
@@ -109,6 +110,16 @@ Page({
 
   retryTemplates() {
     this._loadTemplates();
+  },
+
+  // banner 位 ID 可能在启动配置拉到后才有值（口令直达冷启动时尤其），回到页面补一次
+  onShow() {
+    const id = ads.unit('bannerTpl');
+    if (id !== this.data.adTpl) this.setData({ adTpl: id });
+  },
+  onAdTplError(e) {
+    console.warn('图案库 banner 加载失败', e && e.detail);
+    this.setData({ adTpl: '' });
   },
 
   onReady() {
@@ -482,10 +493,11 @@ Page({
         this._baseKey = key;
       }
       const base = this._base;
-      // 颜色数量：2 ~ 自然色数
+      // 颜色数量：2 ~ 自然色数。默认封在 48（与图纸导入的聚色上限一致）——
+      // 全色板 221 色后照片自然色轻松上百，默认全开会把人吓退；滑杆上限仍到自然色数
       const natural = colorStats(base.cells).length;
       const colorMax = Math.max(2, natural);
-      const colorVal = this.colorLimit == null ? colorMax : ui.clamp(this.colorLimit, 2, colorMax);
+      const colorVal = this.colorLimit == null ? Math.min(colorMax, 48) : ui.clamp(this.colorLimit, 2, colorMax);
       let cells = base.cells;
       if (colorVal < natural) cells = reduceColors(base.cells, colorVal);
       p = this.pattern = { w: base.w, h: base.h, cells };
@@ -552,12 +564,11 @@ Page({
     const p = this.pattern;
     if (!p) return;
     const name = (this.name || '').trim() || '我的拼豆';
-    // 两支合并：作品自带色板（图纸导入）+ 配置改走 cfg；口令导入的记来源
+    // 作品自带色板（图纸导入）随建档持久化；口令导入的记来源
     const work = store.create({
       name, w: p.w, h: p.h, cells: p.cells, palette: p.palette,
       fromCode: this._importedCode || undefined,
     });
-    store.update(work.id, { boostRow: cfg.FREE_ROW_USES });
     const go = () => wx.redirectTo({ url: '/pages/play/play?id=' + work.id });
     this.uq(() => ui.makeThumb(this, this.utilCanvas, work, false))
       .then(path => { store.update(work.id, { thumb: path, thumbV: ui.THUMB_V, thumbShape: getBeadShape() }, true); go(); })

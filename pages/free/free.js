@@ -6,6 +6,7 @@ const { PALETTE, textColorFor } = require('../../utils/palette');
 const { BoardView, renderPatternTo, getBeadShape, setBeadShape } = require('../../utils/board');
 const { audio } = require('../../utils/audio');
 const ui = require('../../utils/ui');
+const ads = require('../../utils/ads');
 const { buildGuide } = require('../../utils/guidance');
 
 const WIN = 240;      // 渲染窗口边长（格）
@@ -71,12 +72,9 @@ Page({
       beadShape: getBeadShape(),
       muted: audio.muted,
       scrollInto: 'c' + this.sel,
-      chips: PALETTE.map((c, i) => ({
-        pal: i,
-        hex: c.hex,
-        tcol: textColorFor(c.hex),
-        active: i === this.sel,
-      })),
+      // 全色板选色条按 MARD 色系排（白灰黑→红→粉→橙棕→黄→绿→蓝青→紫→莫兰迪），
+      // 同系按系内序号 —— 存储顺序是「45 老色 + 176 追加」，直接摆会东一块西一块
+      chips: this._buildChips(),
     });
   },
 
@@ -113,11 +111,26 @@ Page({
     buildGuide(this, 'free', [
       { sel: '.palette-bar', text: '先挑个颜色，然后点板子上豆；按住划过去能连着画一串～' },
       { text: '这是块无边的板子：画到边上它会自己跟着延展，想画多大画多大。双指缩放看细节，点右下角 ⛶ 一键回到作品范围。' },
-      { sel: '.tools-row', text: '画错了用「🧽 橡皮」擦掉；「📤 导出」可以框一块存成图片；画完点「✅ 完成创作」，会自动裁掉多余空白去熨烫定型。' },
+      { sel: '.tools-row', text: '画错了用「橡皮」擦掉；「导出」可以框一块存成图片；画完点「完成创作」，会自动裁掉多余空白去熨烫定型。' },
     ]);
   },
 
   onGuideDone() { this.setData({ guideSteps: [] }); },
+
+  // 全色板选色条：按 MARD 色系排（白灰黑→红→粉→橙棕→黄→绿→蓝青→紫→莫兰迪），
+  // 同系按系内序号 —— 存储顺序是「45 老色 + 176 追加」，直接摆会东一块西一块。
+  // 排序后数组下标 ≠ 色板下标，tapChip 改 active 要走 chipIdx 映射
+  _buildChips() {
+    const chips = PALETTE.map((c, i) => ({
+      pal: i,
+      hex: c.hex,
+      tcol: textColorFor(c.hex),
+      active: i === this.sel,
+      k: 'HFEGABCDM'.indexOf(c.code[0]) * 1000 + parseInt(c.code.slice(1), 10),
+    })).sort((a, b) => a.k - b.k);
+    this.chipIdx = new Map(chips.map((c, i) => [c.pal, i]));
+    return chips;
+  },
 
   /* ---------- 渲染窗口管理 ---------- */
 
@@ -315,8 +328,8 @@ Page({
     this.sel = pal;
     this.tool = null;
     const patch = { eraser: false, scrollInto: 'c' + pal };
-    if (old != null) patch['chips[' + old + '].active'] = false;
-    patch['chips[' + pal + '].active'] = true;
+    if (old != null && this.chipIdx.has(old)) patch['chips[' + this.chipIdx.get(old) + '].active'] = false;
+    if (this.chipIdx.has(pal)) patch['chips[' + this.chipIdx.get(pal) + '].active'] = true;
     this.setData(patch);
     if (this.bv) this.bv.requestRender();
   },
@@ -328,11 +341,20 @@ Page({
   },
 
   /* ---------- 区域导出 ---------- */
-  // 📤：整幅渲染成预览图 → 裁剪弹窗框选区域 → 框到的格子高清重渲 → 存相册。
+  // 「导出」：整幅渲染成预览图 → 裁剪弹窗框选区域 → 框到的格子高清重渲 → 存相册。
   // 预览 pad=0：图片边缘与格子矩阵严格对齐，框选矩形可直接按比例换算成格子范围
   exportRegion() {
     if (!this.count) { ui.toast('先拼几颗豆子呀 ✨'); return; }
     if (!this.utilCanvas) { ui.toast('画布还没就绪，再试一次'); return; }
+    // 流量主接入后（rvExport 位下发）先看激励视频；未接入/失败直接放行，
+    // 同一作品当天只看一次
+    ads.rewarded('rvExport', {
+      workId: this.work.id,
+      title: '导出为图片',
+      desc: '看一段短广告，即可框选区域导出高清图片到相册',
+    }).then(ok => { if (ok && !this._gone) this._doExportRegion(); });
+  },
+  _doExportRegion() {
     const cp = this._croppedPattern();
     if (!cp) return;
     this._exportCp = cp;

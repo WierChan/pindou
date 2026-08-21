@@ -8,7 +8,7 @@
       <button class="btn-ghost slim2 slim3" hover-class="pressed" open-type="share">分享小程序</button>
     </view>
     <view class="share-links">
-      <!-- <view class="btn-link" hover-class="pressed" bindtap="saveChart">保存图纸</view> -->
+      <view class="btn-link" hover-class="pressed" bindtap="saveChart">保存图纸</view>
       <view class="btn-link" hover-class="pressed" bindtap="close">关闭</view>
     </view>
   </view>

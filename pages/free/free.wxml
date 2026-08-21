@@ -4,7 +4,7 @@
     <view class="tb-title">{{title}}</view>
     <view class="tb-actions">
       <view class="icon-btn" hover-class="pressed" bindtap="toggleShape">{{beadShape === 'round' ? '●' : '■'}}</view>
-      <view class="icon-btn" hover-class="pressed" bindtap="toggleMute">{{muted ? '🔇' : '🔊'}}</view>
+      <view class="icon-btn" hover-class="pressed" bindtap="toggleMute"><image class="pxi-l" src="{{muted ? '/assets/icons/sndoff.png' : '/assets/icons/sndon.png'}}" /></view>
     </view>
   </view>
 
@@ -25,9 +25,9 @@
   <view class="bottom-bar">
     <view class="bb-inner">
       <view class="tools-row">
-        <view class="tool-chip {{eraser ? 'active' : ''}}" bindtap="tapEraser">🧽 橡皮</view>
-        <view class="tool-chip" bindtap="exportRegion">📤 导出</view>
-        <view class="tool-chip done-chip" bindtap="finishWork">✅ 完成创作</view>
+        <view class="tool-chip {{eraser ? 'active' : ''}}" bindtap="tapEraser"><image class="pxi-s" src="/assets/icons/eraser.png" />橡皮</view>
+        <view class="tool-chip" bindtap="exportRegion"><image class="pxi-s" src="/assets/icons/export.png" />导出</view>
+        <view class="tool-chip done-chip" bindtap="finishWork"><image class="pxi-s" src="/assets/icons/check.png" />完成创作</view>
         <view class="tools-hint">{{eraser ? '点或划格子擦掉豆子' : '选颜色，点或划格子上豆'}}</view>
       </view>
       <scroll-view class="palette-bar" scroll-x scroll-into-view="{{scrollInto}}"

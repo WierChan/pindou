@@ -7,32 +7,32 @@
   <!-- 选择阶段 -->
   <view wx:if="{{mode === 'pick'}}" class="create-body">
     <view class="tabs">
-      <view class="tab {{tab === 'image' ? 'active' : ''}}" bindtap="switchTab" data-tab="image">📷 图片</view>
-      <view class="tab {{tab === 'tpl' ? 'active' : ''}}" bindtap="switchTab" data-tab="tpl">🧸 图案库</view>
-      <view class="tab {{tab === 'free' ? 'active' : ''}}" bindtap="switchTab" data-tab="free">✏️ 自由画布</view>
+      <view class="tab {{tab === 'image' ? 'active' : ''}}" bindtap="switchTab" data-tab="image"><image class="pxi" src="/assets/icons/camera.png" />图片</view>
+      <view class="tab {{tab === 'tpl' ? 'active' : ''}}" bindtap="switchTab" data-tab="tpl"><image class="pxi" src="/assets/icons/bear.png" />图案库</view>
+      <view class="tab {{tab === 'free' ? 'active' : ''}}" bindtap="switchTab" data-tab="free"><image class="pxi" src="/assets/icons/pencil.png" />自由画布</view>
     </view>
 
     <block wx:if="{{tab === 'image'}}">
       <view class="upload-zone" hover-class="uz-hover" bindtap="chooseImage">
-        <view class="uz-icon">🖼️</view>
+        <view class="uz-icon"><image class="pxi-xl" src="/assets/icons/picture.png" /></view>
         <view class="uz-title">选择一张图片</view>
         <view class="uz-sub">照片、表情包、logo 都可以</view>
         <view class="uz-sub">转成拼豆图纸后开拼</view>
       </view>
       <view class="upload-zone uz-chart" hover-class="uz-hover" bindtap="chooseChart">
-        <view class="uz-icon">📐</view>
+        <view class="uz-icon"><image class="pxi-xl" src="/assets/icons/chart.png" /></view>
         <view class="uz-title">导入拼豆图纸</view>
         <view class="uz-sub">小红书图纸工坊等生成的图纸截图</view>
         <view class="uz-sub">框出网格 → 自动识别 → 按图纸 1:1 开拼</view>
       </view>
       <view class="code-entry" hover-class="pressed" bindtap="openCodeInput">
-        🔑 有导入码？<text class="ce-b">输入口令拼同款</text>
+        <image class="pxi" src="/assets/icons/key.png" />有导入码？<text class="ce-b">输入口令拼同款</text>
       </view>
     </block>
 
     <block wx:elif="{{tab === 'free'}}">
       <view class="upload-zone" hover-class="uz-hover" bindtap="startFree">
-        <view class="uz-icon">✏️</view>
+        <view class="uz-icon"><image class="pxi-xl" src="/assets/icons/pencil.png" /></view>
         <view class="uz-title">开始自由创作</view>
         <view class="uz-sub">无边拼豆板 · 全色板不限量，画到哪算哪</view>
         <view class="uz-sub">完成时自动裁剪成作品，可熨烫、分享、导出</view>
@@ -40,7 +40,7 @@
     </block>
 
     <block wx:else>
-      <view class="pick-label">⭐ 新手友好 · 几分钟拼完一幅</view>
+      <view class="pick-label"><image class="pxi-s" src="/assets/icons/star.png" />新手友好 · 几分钟拼完一幅</view>
       <view wx:if="{{tplError}}" class="pick-label" bindtap="retryTemplates">⚠️ {{tplError}} · 点这里重试</view>
       <view class="tpl-grid">
         <view class="tpl-card" wx:for="{{templates}}" wx:key="name" hover-class="pressed"
@@ -56,6 +56,11 @@
         <view class="emoji-btn" wx:for="{{emojis}}" wx:key="*this" hover-class="pressed"
               bindtap="pickEmoji" data-ch="{{item}}">{{item}}</view>
       </view>
+
+      <!-- 流量主 banner（bannerTpl）：只在图案库浏览 tab 底部；位 ID 未下发不渲染，报错即隐藏 -->
+      <view wx:if="{{adTpl}}" class="ad-slot">
+        <ad unit-id="{{adTpl}}" binderror="onAdTplError"></ad>
+      </view>
     </block>
   </view>
 
@@ -68,7 +73,7 @@
         <canvas type="2d" id="preview" style="width:{{pvW}}px;height:{{pvH}}px"></canvas>
       </view>
       <view class="stats-line">{{dimText}} · <text class="b">{{total}}</text> 颗豆子 · <text class="b">{{colorN}}</text> 种颜色</view>
-      <view wx:if="{{fromChart}}" class="chart-hint">📐 图纸 1:1 还原，颜色与原图纸一致</view>
+      <view wx:if="{{fromChart}}" class="chart-hint"><image class="pxi-s" src="/assets/icons/chart.png" />图纸 1:1 还原，颜色与原图纸一致</view>
       <view wx:if="{{importedCode}}" class="code-report" bindtap="reportCode">对这幅图纸有疑问？举报</view>
       <view class="color-chips">
         <view class="cchip" wx:for="{{chips}}" wx:key="index">
@@ -130,7 +135,7 @@
 <view wx:if="{{codeShow}}" class="overlay hi" bindtap="closeCodeInput">
   <!-- no-anim：原生 input 在带 transform 动画的容器里真机会焦点错位 -->
   <view class="modal no-anim" catchtap="noop">
-    <view class="modal-title">🔑 输入导入码</view>
+    <view class="modal-title"><image class="pxi-l" src="/assets/icons/key.png" />输入导入码</view>
     <view class="modal-sub">
       <view>粘贴好友分享的口令（形如 PD-3K7F-9QWW）</view>
     </view>

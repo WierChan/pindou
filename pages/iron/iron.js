@@ -7,6 +7,7 @@ const { audio } = require('../../utils/audio');
 const { celebrate } = require('../../utils/confetti');
 const ui = require('../../utils/ui');
 const { cfg } = require('../../utils/config');
+const ads = require('../../utils/ads');
 const { buildGuide, guideSeen, markGuideSeen } = require('../../utils/guidance');
 
 Page({
@@ -37,6 +38,9 @@ Page({
     }
     this.work = work;
     this.uq = ui.serialQueue();
+    // 插屏（interstitialDone，二期后端配了才生效）：进页面就预建，给广告预载留时间；
+    // 弹出时机在完成弹窗「回到首页」——整条制作链路的终点，唯一的自然停顿点
+    this._itAd = ads.prepareInterstitial('interstitialDone');
     this.totalPlaced = work.cells.filter(t => t >= 0).length;
     this.ironedCount = work.ironed.reduce((a, b) => a + b, 0);
     this.finished = false;
@@ -104,6 +108,7 @@ Page({
     clearTimeout(this.pctTimer);
     this._flushSave();
     if (this.bv) this.bv.destroy();
+    if (this._itAd) this._itAd.destroy();
   },
 
   _pct() {
@@ -231,7 +236,11 @@ Page({
   closeShare() { this.setData({ shareShow: false }); },
   onCardBuilt(e) { this.shareImg = e.detail.path; },
 
-  goHome() { ui.backHome(); },
+  // 关掉插屏（或没广告可弹）才导航，回家永远不被广告卡住
+  goHome() {
+    if (this._itAd) this._itAd.showThen(() => ui.backHome());
+    else ui.backHome();
+  },
 
   onShareAppMessage() {
     const msg = {
