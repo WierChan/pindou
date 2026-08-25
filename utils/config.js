@@ -7,7 +7,8 @@ const KEY = 'pindou.config.v1';
 // 流量主广告位表:值为后台的 adunit-xxxxxxxx,空串 = 该位关闭。
 // 全部由后端下发,不发版即可逐位开关(接口契约见 docs/ad-config-api.md)
 //   bannerHome       banner   首页作品列表底部
-//   bannerTpl        banner   创建页「图案库」tab 底部
+//   bannerTpl        banner   创建页选择阶段底部(三个 tab 通吃;配置阶段与零作品新用户不出现。
+//                             key 名沿用最初挂在图案库 tab 时的叫法,接口字段不改)
 //   rvChart          激励视频  分享弹窗「保存图纸」前置
 //   rvExport         激励视频  自由画布「导出」前置
 //   interstitialDone 插屏     熨烫完成「回到首页」时机

@@ -57,7 +57,7 @@ Page({
     codeShow: false,
     codeInput: '',
     importedCode: '',
-    adTpl: '', // 流量主 banner 位 ID（图案库 tab 底部；空 = 不渲染）
+    adCreate: '', // 流量主 banner 位 ID（选择阶段底部；空 = 不渲染）
     guideSteps: [],
     name: '',
     dimText: '',
@@ -112,14 +112,16 @@ Page({
     this._loadTemplates();
   },
 
-  // banner 位 ID 可能在启动配置拉到后才有值（口令直达冷启动时尤其），回到页面补一次
+  // banner 位 ID 可能在启动配置拉到后才有值（口令直达冷启动时尤其），回到页面补一次。
+  // 零作品的新用户不展示：第一次「开始新作品」不该见到广告（与首页空状态同一原则）
   onShow() {
-    const id = ads.unit('bannerTpl');
-    if (id !== this.data.adTpl) this.setData({ adTpl: id });
+    // 位 key 仍叫 bannerTpl（沿用最初挂图案库 tab 时的接口字段名，不动后端契约）
+    const id = store.list().length ? ads.unit('bannerTpl') : '';
+    if (id !== this.data.adCreate) this.setData({ adCreate: id });
   },
-  onAdTplError(e) {
-    console.warn('图案库 banner 加载失败', e && e.detail);
-    this.setData({ adTpl: '' });
+  onAdCreateError(e) {
+    console.warn('创建页 banner 加载失败', e && e.detail);
+    this.setData({ adCreate: '' });
   },
 
   onReady() {

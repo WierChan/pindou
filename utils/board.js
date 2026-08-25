@@ -615,7 +615,7 @@ class BoardView {
     if (this.o.onPlace) this.o.onPlace(i, isNew);
   }
 
-  // 外部批量上豆（整排工具），带级联动画；豆子多时压缩总时长
+  // 外部批量上豆（现仅调试一键完成在用），带级联动画；豆子多时压缩总时长
   placeMany(indices) {
     const t0 = now();
     const step = Math.min(26, 900 / indices.length);

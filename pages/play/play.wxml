@@ -26,7 +26,6 @@
   <view class="bottom-bar">
     <view class="bb-inner">
       <view class="tools-row">
-        <view class="tool-chip {{rowActive ? 'active' : ''}}" bindtap="tapRowTool"><image class="pxi-s" src="/assets/icons/bolt.png" />整排拼豆</view>
         <view class="tool-chip {{paintOn ? 'active' : ''}}" bindtap="togglePaint"><image class="pxi-s" src="/assets/icons/hand.png" />连续上豆</view>
         <view class="tools-hint">{{paintOn ? '划过格子连续上豆！' : '选颜色，点格子上豆'}}</view>
       </view>

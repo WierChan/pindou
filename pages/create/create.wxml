@@ -41,7 +41,7 @@
 
     <block wx:else>
       <view class="pick-label"><image class="pxi-s" src="/assets/icons/star.png" />新手友好 · 几分钟拼完一幅</view>
-      <view wx:if="{{tplError}}" class="pick-label" bindtap="retryTemplates">⚠️ {{tplError}} · 点这里重试</view>
+      <view wx:if="{{tplError}}" class="pick-label" bindtap="retryTemplates">⚠ {{tplError}} · 点这里重试</view>
       <view class="tpl-grid">
         <view class="tpl-card" wx:for="{{templates}}" wx:key="name" hover-class="pressed"
               bindtap="pickTpl" data-i="{{index}}">
@@ -56,12 +56,14 @@
         <view class="emoji-btn" wx:for="{{emojis}}" wx:key="*this" hover-class="pressed"
               bindtap="pickEmoji" data-ch="{{item}}">{{item}}</view>
       </view>
-
-      <!-- 流量主 banner（bannerTpl）：只在图案库浏览 tab 底部；位 ID 未下发不渲染，报错即隐藏 -->
-      <view wx:if="{{adTpl}}" class="ad-slot">
-        <ad unit-id="{{adTpl}}" binderror="onAdTplError"></ad>
-      </view>
     </block>
+
+    <!-- 流量主 banner（位 key: bannerTpl，沿用旧名）：选择阶段整体底部，三个 tab 通吃
+         （配置阶段不出现）。位 ID 未下发或用户还没有任何作品（首次创建的第一印象）
+         不渲染；报错即隐藏 -->
+    <view wx:if="{{adCreate}}" class="ad-slot">
+      <ad unit-id="{{adCreate}}" binderror="onAdCreateError"></ad>
+    </view>
   </view>
 
   <!-- 配置阶段 -->

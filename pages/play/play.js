@@ -19,7 +19,6 @@ Page({
     title: '',
     pct: 0,
     chips: [],
-    rowActive: false,
     paintOn: false,
     beadShape: 'square',
     muted: false,
@@ -70,7 +69,6 @@ Page({
     this.placedCount = this.total - left;
     this.sel = this.colorsUsed.find(p => this.remaining.get(p) > 0);
     if (this.sel == null) this.sel = this.colorsUsed[0];
-    this.tool = null;
     this.finished = false;
     this.pending = [];
     this.flushTimer = 0;
@@ -111,7 +109,7 @@ Page({
     buildGuide(this, 'play', [
       { sel: '.palette-bar', text: '先在这里选颜色！每种颜色有编号，下面的数字是还差几颗' },
       { text: '板上淡淡的格子就是图纸。点亮所有跟选中颜色一样的格子吧！点错了我会晃一晃提醒你。双指可以缩放看细节～' },
-      { sel: '.tools-row', text: '「整排拼豆」咔哒一下上一整排；打开「连续上豆」，手指划过格子就能连着拼，超解压！' },
+      { sel: '.tools-row', text: '打开「连续上豆」，手指划过格子就能连着拼，超解压！关掉就是单指拖动画布～' },
     ]);
   },
 
@@ -146,14 +144,12 @@ Page({
         mode: 'play',
         numbers: this.numbers,
         getSelected: () => this.sel,
-        getTool: () => this.tool,
         canSwipe: () => this.paintOn,
         onPlace: i => this._onPlace(i),
         onWrong: () => {
           audio.wrong();
           try { wx.vibrateShort({ type: 'medium' }); } catch (e) { /* 忽略 */ }
         },
-        onToolTap: i => this._onToolTap(i),
       });
       this.bv.setViewport(r.width, r.height, dpr, r.left, r.top);
       // 布局稳定后复测画布位置，防止部分机型触点参照系偏移
@@ -211,19 +207,10 @@ Page({
   _setSel(pal) {
     const old = this.sel;
     this.sel = pal;
-    this.tool = null;
-    const patch = { rowActive: false, scrollInto: 'c' + pal };
+    const patch = { scrollInto: 'c' + pal };
     if (old != null && this.chipIdx.has(old)) patch['chips[' + this.chipIdx.get(old) + '].active'] = false;
     if (this.chipIdx.has(pal)) patch['chips[' + this.chipIdx.get(pal) + '].active'] = true;
     this.setData(patch);
-    if (this.bv) this.bv.requestRender();
-  },
-
-  tapRowTool() {
-    if (this.finished) return;
-    this.tool = this.tool === 'row' ? null : 'row';
-    if (this.tool) ui.toast('点任意一行，整排自动拼好');
-    this.setData({ rowActive: !!this.tool });
     if (this.bv) this.bv.requestRender();
   },
 
@@ -235,19 +222,6 @@ Page({
     try { wx.setStorageSync(PAINT_KEY, this.paintOn ? 1 : 0); } catch (e) { /* 忽略 */ }
     this.setData({ paintOn: this.paintOn });
     ui.toast(this.paintOn ? '连续上豆：手指划过格子连着拼 ✨' : '已切回拖动画布');
-  },
-
-  _onToolTap(i) {
-    const row = Math.floor(i / this.work.w);
-    const idx = [];
-    for (let x = 0; x < this.work.w; x++) {
-      const j = row * this.work.w + x;
-      if (this.work.cells[j] >= 0 && !this.work.placed[j]) idx.push(j);
-    }
-    if (!idx.length) { ui.toast('这一排已经拼好啦'); return; }
-    this.tool = null;
-    this.bv.placeMany(idx);
-    this._applyPlacement(idx, 'row');
   },
 
   /* ---------- 上豆结算 ---------- */
@@ -279,11 +253,10 @@ Page({
       patch['chips[' + ci + '].left'] = n > 0 ? n : '✓';
       patch['chips[' + ci + '].done'] = n === 0;
     }
-    if (sound === 'row') patch.rowActive = false;
     this.setData(patch);
     this._scheduleSave();
     if (sound === 'tap') audio.tap();
-    if (sound === 'row') audio.rowFill();
+    if (sound === 'row') audio.rowFill(); // 'row' 音效仅剩调试一键完成（debugFill）在用
     if (this.placedCount >= this.total) { this._finish(); return; }
     const doneNow = [...affected].filter(t => this.remaining.get(t) === 0);
     if (doneNow.length) {
@@ -319,7 +292,6 @@ Page({
   _finish() {
     if (this.finished) return;
     this.finished = true;
-    this.tool = null;
     const work = this.work;
     work.completed = true;
     if (!work.ironed || work.ironed.length !== work.cells.length) {
