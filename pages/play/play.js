@@ -3,13 +3,17 @@ const { store } = require('../../utils/store');
 const { PALETTE, textColorFor, hexToRgb } = require('../../utils/palette');
 const { colorStats, nearestPalette } = require('../../utils/convert');
 const { BoardView, renderPatternTo, getBeadShape, setBeadShape } = require('../../utils/board');
-const { audio } = require('../../utils/audio');
+const { audio, bgm } = require('../../utils/audio');
 const { celebrate } = require('../../utils/confetti');
 const ui = require('../../utils/ui');
 const { cfg } = require('../../utils/config');
-const { buildGuide } = require('../../utils/guidance');
+const { buildGuide, guideSeen, markGuideSeen } = require('../../utils/guidance');
+const ads = require('../../utils/ads');
+const { buildChartExportTo } = require('../../utils/share');
+const { createCode, format, markCodePrompted } = require('../../utils/importcode');
 
 const PAINT_KEY = 'pindou.paintMode.v1'; // 划动模式:1 = 连续上豆 / 其余 = 拖动平移（跨作品记忆）
+const LOCATE_KEY = 'pindou.locate.v1';   // 定位高亮:1 = 开（当前色未拼格标红、其余变淡，跨作品记忆）
 
 Page({
   data: {
@@ -20,10 +24,13 @@ Page({
     pct: 0,
     chips: [],
     paintOn: false,
+    locateOn: false,
     beadShape: 'square',
     muted: false,
+    bgmOn: false,
     debug: cfg.DEBUG,
     total: 0,
+    left: 0,
     colorN: 0,
     scrollInto: '',
     celebrating: false,
@@ -76,6 +83,9 @@ Page({
     // 划动模式：关 = 单指拖动平移画布（默认，方便看图找色），开 = 划过格子连续上豆
     this.paintOn = false;
     try { this.paintOn = wx.getStorageSync(PAINT_KEY) === 1; } catch (e) { /* 忽略 */ }
+    // 定位高亮：关 = 普通淡图纸，开 = 当前色未拼格标红、其余变淡（跨作品记忆）
+    this.locateOn = false;
+    try { this.locateOn = wx.getStorageSync(LOCATE_KEY) === 1; } catch (e) { /* 忽略 */ }
 
     const chips = this.colorsUsed.map((pal, i) => {
       const n = this.remaining.get(pal);
@@ -93,9 +103,12 @@ Page({
       title: work.name,
       chips,
       paintOn: this.paintOn,
+      locateOn: this.locateOn,
       beadShape: getBeadShape(),
       muted: audio.muted,
+      bgmOn: bgm.enabled,
       total: this.total,
+      left: this.total - this.placedCount,
       colorN: this.colorsUsed.length,
       pct: this._pct(),
     });
@@ -105,28 +118,44 @@ Page({
     if (!this.work) return;
     this._initBoard();
     ui.queryNode(this, '#util').then(r => { if (r) this.utilCanvas = r.node; });
-    // 首次拼豆：讲核心三件事（选色 → 点格子 → 工具）
-    buildGuide(this, 'play', [
-      { sel: '.palette-bar', text: '先在这里选颜色！每种颜色有编号，下面的数字是还差几颗' },
-      { text: '板上淡淡的格子就是图纸。点亮所有跟选中颜色一样的格子吧！点错了我会晃一晃提醒你。双指可以缩放看细节～' },
-      { sel: '.tools-row', text: '打开「连续上豆」，手指划过格子就能连着拼，超解压！关掉就是单指拖动画布～' },
-    ]);
+    // 首次拼豆：讲核心几件事（选色 → 点格子 → 工具 → 右下按钮）。
+    // 右下这排按钮是后加的：看过老版 play 引导的用户单步补看（play-tools）
+    const toolsStep = { sel: '.tr-btns', text: '右下角这排：红色🔴是「定位」——把当前颜色还没拼的格子标红，一眼找到该拼哪；中间是「分享」——导出图纸、或邀请好友接着拼；最后一个是复位视角/大小。' };
+    if (guideSeen('play')) {
+      buildGuide(this, 'play-tools', [toolsStep]);
+    } else {
+      buildGuide(this, 'play', [
+        { sel: '.palette-bar', text: '先在这里选颜色！每种颜色有编号，下面的数字是还差几颗' },
+        { text: '板上淡淡的格子就是图纸。点亮所有跟选中颜色一样的格子吧！点错了我会晃一晃提醒你。双指可以缩放看细节～' },
+        { sel: '.tools-row', text: '打开「连续上豆」，手指划过格子就能连着拼，超解压！关掉就是单指拖动画布～' },
+        toolsStep,
+      ]);
+    }
   },
 
-  onGuideDone() { this.setData({ guideSteps: [] }); },
+  onGuideDone() {
+    if (this.data.guideId === 'play') markGuideSeen('play-tools');
+    this.setData({ guideSteps: [] });
+  },
 
   onResize() {
     this.setData({ insets: ui.navInsets() });
     this._refitBoard();
   },
 
-  onHide() { this._flushSave(); },
+  onShow() {
+    // 回到拼豆页就续上背景音乐（首次进入 / 切后台再回来 / 从熨烫返回都靠它）
+    if (this.work && bgm.enabled) bgm.start();
+  },
+
+  onHide() { this._flushSave(); bgm.stop(); },
 
   onUnload() {
     this._gone = true;
     clearTimeout(this.flushTimer);
     this._flushSave();
     if (this.bv) this.bv.destroy();
+    bgm.stop();
   },
 
   _pct() {
@@ -142,6 +171,7 @@ Page({
         cells: this.work.cells, placed: this.work.placed,
         palette: this.work.palette || null,
         mode: 'play',
+        locate: this.locateOn,
         numbers: this.numbers,
         getSelected: () => this.sel,
         canSwipe: () => this.paintOn,
@@ -169,6 +199,67 @@ Page({
   onTE(e) { if (this.bv) this.bv.touchEnd(e); },
   zoomFit() { if (this.bv) this.bv.fit(); },
 
+  // 导出图纸：把这幅图纸（网格 + 色号）保存/分享，拼到一半也能导——对着拼、打印，
+  // 或发给好友「导入拼豆图纸」拼同款。跟分享弹窗「保存图纸」同款，走同一激励视频位
+  exportChart() {
+    const work = this.work;
+    if (!work || !this.utilCanvas) return;
+    ads.rewarded('rvChart', {
+      workId: work.id,
+      title: '导出高清图纸',
+      desc: '看一段短广告，即可把这幅图纸保存或分享',
+    }).then(ok => {
+      if (!ok) return;
+      wx.showLoading({ title: '生成中', mask: true });
+      this.uq(() => ui.captureCanvas(this, this.utilCanvas, () => buildChartExportTo(this.utilCanvas, work)))
+        .then(path => { wx.hideLoading(); ui.shareImage(path); })
+        .catch(() => { wx.hideLoading(); ui.toast('导出失败，再试一次'); });
+    });
+  },
+
+  // 右下「分享」：导出图纸让好友拼同款，或邀请好友从当前进度接着拼
+  shareMenu() {
+    wx.showActionSheet({
+      itemList: ['导出图纸 · 好友拼同款', '邀请好友接着拼 · 带进度'],
+      success: r => {
+        if (r.tapIndex === 0) this.exportChart();
+        else if (r.tapIndex === 1) this.relayShare();
+      },
+      fail: () => { /* 取消 */ },
+    });
+  },
+
+  // 接力分享：把当前图纸 + 进度上传成口令，好友复制口令打开小程序就能从这个进度接着拼
+  relayShare() {
+    const work = this.work;
+    if (!work) return;
+    const pct = this._pct();
+    wx.showModal({
+      title: '邀请好友接力',
+      content: '会把这幅图纸和你「拼到 ' + pct + '%」的进度上传，好友凭口令就能接着拼。请确认这是你原创或已获授权分享的图纸。',
+      confirmText: '生成口令',
+      cancelText: '先不了',
+      confirmColor: '#C9838F',
+      success: r => {
+        if (!r.confirm) return;
+        wx.showLoading({ title: '生成中', mask: true });
+        createCode(work, { placed: work.placed }).then(code => {
+          wx.hideLoading();
+          if (!code) { ui.toast('生成失败，稍后再试'); return; }
+          markCodePrompted(code); // 自家口令：复制后回前台不被剪贴板识别弹窗打扰
+          wx.setClipboardData({
+            data: '我在拼豆便利店拼「' + work.name + '」拼到 ' + pct + '% 啦！复制这段话打开「拼豆便利店」小程序，' +
+              '凭口令 ' + format(code) + ' 接着帮我拼～也可以在 新作品 → 输入导入码 里粘贴。',
+            success: () => ui.toast('接力口令已复制，发给好友吧 ✨'),
+          });
+        }).catch(err => {
+          wx.hideLoading();
+          ui.toast((err && err.message) || '生成失败，稍后再试');
+        });
+      },
+    });
+  },
+
   /* ---------- 顶栏 ---------- */
   goBack() {
     this._flushSave();
@@ -177,6 +268,10 @@ Page({
   toggleMute() {
     audio.setMuted(!audio.muted);
     this.setData({ muted: audio.muted });
+  },
+  // 🎵 背景音乐开关：与音效静音各自独立，只管拼豆页的循环 BGM
+  toggleBgm() {
+    this.setData({ bgmOn: bgm.toggle() });
   },
   // 豆子形状切换：全局生效（画板/预览/缩略图/分享图同一套绘制）
   toggleShape() {
@@ -224,6 +319,16 @@ Page({
     ui.toast(this.paintOn ? '连续上豆：手指划过格子连着拼 ✨' : '已切回拖动画布');
   },
 
+  // 定位高亮：把当前色还没拼的格子标红、其余变淡，一眼看清现在要拼哪（跨作品记忆）
+  toggleLocate() {
+    if (this.finished) return;
+    this.locateOn = !this.locateOn;
+    try { wx.setStorageSync(LOCATE_KEY, this.locateOn ? 1 : 0); } catch (e) { /* 忽略 */ }
+    this.setData({ locateOn: this.locateOn });
+    if (this.bv) this.bv.setLocate(this.locateOn);
+    ui.toast(this.locateOn ? '定位开：红色就是现在要拼的地方' : '定位已关');
+  },
+
   /* ---------- 上豆结算 ---------- */
   _onPlace(i) {
     this.pending.push(i);
@@ -246,7 +351,7 @@ Page({
       this.remaining.set(t, this.remaining.get(t) - 1);
       affected.add(t);
     }
-    const patch = { pct: this._pct() };
+    const patch = { pct: this._pct(), left: this.total - this.placedCount };
     for (const t of affected) {
       const ci = this.chipIdx.get(t);
       const n = this.remaining.get(t);

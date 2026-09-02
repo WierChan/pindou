@@ -11,6 +11,8 @@ const css = (rgb, a) => a == null || a >= 1
   : 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',' + a + ')';
 const mix = (c1, c2, t) => [0, 1, 2].map(i => Math.round(c1[i] + (c2[i] - c1[i]) * t));
 const BLACK = [35, 33, 58]; // 豆孔/选中框的加深混色基准（豆子本体质感，不随 UI 配色变）
+const LOCATE_RED = 'rgb(233,71,55)';       // 定位模式：当前色需拼格高亮红
+const LOCATE_EDGE = 'rgba(150,28,20,.9)';  // 高亮红格描边（相邻红格也分得清一颗颗）
 
 /* ---- 豆子形状：'square' 方形像素豆 / 'round' 圆形经典豆（全局设置，持久化） ---- */
 let BEAD_SHAPE = 'square';
@@ -81,16 +83,27 @@ function drawBead(ctx, cx, cy, r, rgb, alpha, matte) {
   if (alpha < 1) ctx.globalAlpha = 1;
 }
 
-// 熨烫后的融合豆：方形 = 方块搭接；圆形 = 圆角方块搭接
-function drawFused(ctx, x, y, s, rgb) {
+// 熨烫后的融合豆：方形 = 方块搭接；圆形 = 圆角方块搭接。
+// holeR 为豆孔半径比例（0/undefined = 无孔）：成品中心留一个略深的孔，大小用户熨烫前可选。
+function drawFused(ctx, x, y, s, rgb, holeR) {
   const e = s * 0.06; // 外扩使相邻豆融合
   if (BEAD_SHAPE === 'round' && s >= 3.5) {
     roundRect(ctx, x - e, y - e, s + e * 2, s + e * 2, s * 0.3);
     ctx.fillStyle = css(rgb); ctx.fill();
-    return;
+  } else {
+    ctx.fillStyle = css(rgb);
+    ctx.fillRect(x - e, y - e, s + e * 2, s + e * 2);
   }
-  ctx.fillStyle = css(rgb);
-  ctx.fillRect(x - e, y - e, s + e * 2, s + e * 2);
+  if (holeR > 0 && s >= 4) {
+    const cx = x + s / 2, cy = y + s / 2;
+    ctx.fillStyle = css(mix(rgb, BLACK, 0.42)); // 比豆面深一档，像凹下去的孔
+    if (BEAD_SHAPE === 'round') {
+      ctx.beginPath(); ctx.arc(cx, cy, s * holeR, 0, 7); ctx.fill();
+    } else {
+      const hs = s * holeR * 2;
+      ctx.fillRect(cx - hs / 2, cy - hs / 2, hs, hs);
+    }
+  }
 }
 
 /* ---------- 熨烫质感 ----------
@@ -105,11 +118,37 @@ const GRAIN_BEADS = 8;    // 贴片边长（豆数）
 // 两档质感。存档里可能出现三种历史值，都在 workFinish 里归一：
 // 首版是布尔 texture；中途试过 'bling' 闪粉烫（效果不好已撤），按细腻纹理渲染
 const SMOOTH = 'smooth', GRAIN = 'grain';
+// 全局默认熨烫质感（设置页可改）：只影响没选过的新作品；读不到回退细腻纹理
+function defaultFinish() {
+  try { const v = wx.getStorageSync('pindou.defaultFinish'); if (v === SMOOTH || v === GRAIN) return v; } catch (e) { /* 忽略 */ }
+  return GRAIN;
+}
 function workFinish(work) {
-  if (!work) return GRAIN;
-  if (work.finish === SMOOTH) return SMOOTH;
-  if (work.finish) return GRAIN;                 // grain / 已撤的 bling 都按 grain
-  return work.texture === false ? SMOOTH : GRAIN; // 兼容：老作品无字段 = 细腻纹理
+  if (work) {
+    if (work.finish === SMOOTH) return SMOOTH;
+    if (work.finish) return GRAIN;               // grain / 已撤的 bling 都按 grain
+    if (work.texture === false) return SMOOTH;   // 兼容老布尔字段
+    if (work.texture === true) return GRAIN;
+  }
+  return defaultFinish();                          // 无任何字段（新作品）→ 全局默认
+}
+
+/* ---- 豆孔：成品（融合豆）中心残留的孔，熨烫前可选大小 ----
+   none 无孔 / small 小孔（默认，贴近真实拼豆熨烫后的样子）/ large 大孔。
+   作品级字段 work.hole，渲染链跟 finish 一起走（缩略图/分享/导出/查看都认） */
+const HOLE_NONE = 'none', HOLE_SMALL = 'small', HOLE_LARGE = 'large';
+// 全局默认豆孔（设置页可改）：没选过的新作品跟它走；读不到回退小孔
+function defaultHole() {
+  try { const v = wx.getStorageSync('pindou.defaultHole'); if (v === HOLE_NONE || v === HOLE_SMALL || v === HOLE_LARGE) return v; } catch (e) { /* 忽略 */ }
+  return HOLE_SMALL;
+}
+function workHole(work) {
+  const h = work && work.hole;
+  if (h === HOLE_NONE || h === HOLE_SMALL || h === HOLE_LARGE) return h;
+  return defaultHole(); // 无字段（新作品）→ 全局默认
+}
+function holeRatio(hole) { // 孔半径占格宽的比例（0 = 无孔）
+  return hole === HOLE_NONE ? 0 : hole === HOLE_LARGE ? 0.26 : 0.15;
 }
 
 function makeOffscreen(w, h) {
@@ -234,6 +273,7 @@ function patternSize(p, opts) {
 function drawPatternInto(ctx, p, opts) {
   opts = opts || {};
   const fused = !!opts.fused;
+  const holeR = holeRatio(opts.hole); // 成品豆孔大小（跟着作品的 hole 字段）
   const placed = opts.placed || null;
   const PAL = palRGB(opts.palette || p.palette);
   const size = patternSize(p, opts);
@@ -265,7 +305,7 @@ function drawPatternInto(ctx, p, opts) {
       if (t < 0) continue;
       if (placed && !placed[i]) continue;
       const x = pad + cx * cellPx, y = pad + cy * cellPx;
-      if (fused) drawFused(ctx, x, y, cellPx, PAL[t]);
+      if (fused) drawFused(ctx, x, y, cellPx, PAL[t], holeR);
       else drawBead(ctx, x + cellPx / 2, y + cellPx / 2, cellPx * 0.46, PAL[t], 1, !!opts.matte);
     }
   }
@@ -338,7 +378,10 @@ class BoardView {
     this.pal = palRGB(opts.palette); // 作品自定义色板（hex 数组）或全局色板
     this.fused = !!opts.fused;
     this.finish = opts.finish || SMOOTH; // 熨烫质感：grain 细腻纹理 / smooth 光滑平面
+    this.hole = opts.hole; // 成品豆孔档位：none / small / large
+    this.holeR = holeRatio(opts.hole);
     this.chart = !!opts.chart; // 图纸显示模式（view）
+    this.locate = !!opts.locate; // 定位模式（play）：高亮当前色未拼格、其余变淡
     this.scale = 20; this.ox = 0; this.oy = 0;
     this.vw = 0; this.vh = 0; this.dpr = 1;
     this.rl = 0; this.rt = 0; // canvas 在视口中的位置（把 clientX/Y 换算成画布坐标）
@@ -368,8 +411,12 @@ class BoardView {
   setFused(v) { this.fused = v; this.dirty = true; }
   // 熨烫质感切换（熨烫页可在开烫前后随时换，画面即时反映）
   setFinish(v) { this.finish = v || SMOOTH; this.dirty = true; }
+  // 成品豆孔大小切换（熨烫页选，已烫的融合豆即时反映）
+  setHole(v) { this.hole = v; this.holeR = holeRatio(v); this.dirty = true; }
   // 图纸显示模式（view 模式用）：平色格 + 网格线，与分享/导出图纸同款观感
   setChart(v) { this.chart = !!v; this.dirty = true; }
+  // 定位模式（play 模式用）：当前选中色的未拼格高亮红、其余变淡，方便找位置
+  setLocate(v) { this.locate = !!v; this.dirty = true; }
 
   // 页面布局完成 / 窗口尺寸变化（iPad 分屏、转屏）时调用
   setViewport(w, h, dpr, left, top) {
@@ -768,7 +815,8 @@ class BoardView {
     const chartView = this.chart && !isPlay && !isIron && !isFree; // 图纸显示（view 模式）
     const ironed = this.o.ironed;
     const sel = isPlay ? this.o.getSelected() : -2;
-    const showNum = isPlay && s >= 15 && this.o.numbers;
+    const locate = isPlay && this.locate; // 定位：高亮当前色未拼格、其余变淡
+    const showNum = isPlay && !locate && s >= 15 && this.o.numbers;
     const showPeg = s >= 9;
     const tiny = s < 3.5; // 大画布缩到很小时改用方块填充，绕开圆弧/渐变的开销
     const fused = this.fused && !isPlay && !isIron && !chartView;
@@ -830,60 +878,92 @@ class BoardView {
           else if (isIron) {
             if (ironed[i]) {
               const m0 = this.ironAnims.get(i);
-              if (m0 == null) { drawFused(ctx, px, py, s, rgbT); if (grainOn) { gxs[gn++] = px; gxs[gn++] = py; } }
+              if (m0 == null) { drawFused(ctx, px, py, s, rgbT, this.holeR); if (grainOn) { gxs[gn++] = px; gxs[gn++] = py; } }
               else {
                 const k = (t - m0) / 260;
                 if (k < 0) drawBead(ctx, mx, my, r, rgbT); // 级联还没轮到
                 else if (k >= 1) {
                   this.ironAnims.delete(i);
-                  drawFused(ctx, px, py, s, rgbT);
+                  drawFused(ctx, px, py, s, rgbT, this.holeR);
                   if (grainOn) { gxs[gn++] = px; gxs[gn++] = py; }
                 } else {
                   // 熔化：豆子摊开淡出，熔块淡入（纹理随熔块一起淡入）
                   drawBead(ctx, mx, my, r * (1 + 0.12 * k), rgbT, 1 - k);
                   ctx.globalAlpha = k;
-                  drawFused(ctx, px, py, s, rgbT);
+                  drawFused(ctx, px, py, s, rgbT, this.holeR);
                   ctx.globalAlpha = 1;
                 }
               }
             } else drawBead(ctx, mx, my, r, rgbT);
           }
-          else if (fused) { drawFused(ctx, px, py, s, rgbT); if (grainOn) { gxs[gn++] = px; gxs[gn++] = py; } }
-          else if (tiny) { ctx.fillStyle = css(rgbT); ctx.fillRect(px, py, s, s); }
-          else drawBead(ctx, mx, my, r, rgbT);
+          else if (fused) { drawFused(ctx, px, py, s, rgbT, this.holeR); if (grainOn) { gxs[gn++] = px; gxs[gn++] = py; } }
+          else if (tiny) { ctx.fillStyle = css(rgbT); ctx.globalAlpha = locate ? 0.4 : 1; ctx.fillRect(px, py, s, s); ctx.globalAlpha = 1; }
+          else drawBead(ctx, mx, my, r, rgbT, locate ? 0.4 : 1); // 定位模式：已拼豆淡下去，让红色目标更跳
         } else if (isPlay) {
           const isSel = tc === sel;
           const rgb = this.pal[tc];
-          ctx.globalAlpha = isSel ? 0.5 : 0.2;
-          if (tiny) {
-            ctx.fillStyle = css(rgb); ctx.fillRect(px, py, s, s);
-          } else if (BEAD_SHAPE === 'round') {
-            ctx.beginPath(); ctx.arc(mx, my, s * 0.38, 0, 7);
-            ctx.fillStyle = css(rgb); ctx.fill();
-          } else {
-            const gs = s * 0.76;
-            ctx.fillStyle = css(rgb);
-            ctx.fillRect(mx - gs / 2, my - gs / 2, gs, gs);
-          }
-          ctx.globalAlpha = 1;
-          if (isSel && s >= 8) {
-            ctx.setLineDash([s * 0.16, s * 0.13]);
-            ctx.strokeStyle = css(mix(rgb, BLACK, 0.3), 0.75);
-            ctx.lineWidth = Math.max(1, s * 0.06);
-            if (BEAD_SHAPE === 'round') {
-              ctx.beginPath(); ctx.arc(mx, my, s * 0.42, 0, 7); ctx.stroke();
+          if (locate) {
+            // 定位模式：当前色未拼格 = "现在要拼的地方" → 高亮红；其余未拼格淡成影子
+            if (isSel) {
+              if (tiny) {
+                ctx.fillStyle = LOCATE_RED; ctx.fillRect(px, py, s, s);
+              } else if (BEAD_SHAPE === 'round') {
+                ctx.beginPath(); ctx.arc(mx, my, s * 0.42, 0, 7);
+                ctx.fillStyle = LOCATE_RED; ctx.fill();
+              } else {
+                const gs = s * 0.82;
+                ctx.fillStyle = LOCATE_RED;
+                ctx.fillRect(mx - gs / 2, my - gs / 2, gs, gs);
+              }
+              if (s >= 8) {
+                ctx.strokeStyle = LOCATE_EDGE;
+                ctx.lineWidth = Math.max(1, s * 0.07);
+                if (BEAD_SHAPE === 'round') {
+                  ctx.beginPath(); ctx.arc(mx, my, s * 0.42, 0, 7); ctx.stroke();
+                } else {
+                  const ds = s * 0.82;
+                  ctx.strokeRect(mx - ds / 2, my - ds / 2, ds, ds);
+                }
+              }
             } else {
-              const ds = s * 0.84;
-              ctx.strokeRect(mx - ds / 2, my - ds / 2, ds, ds);
+              ctx.globalAlpha = 0.1;
+              const gs = s * 0.7;
+              ctx.fillStyle = css(rgb);
+              ctx.fillRect(mx - gs / 2, my - gs / 2, gs, gs);
+              ctx.globalAlpha = 1;
             }
-            ctx.setLineDash([]);
-          }
-          if (showNum) {
-            const n = this.o.numbers.get(tc);
-            if (n != null) {
-              ctx.fillStyle = 'rgba(95,74,78,.8)';
-              ctx.fillText(String(n), mx, my + s * 0.02);
-              ctx.font = numFont;
+          } else {
+            ctx.globalAlpha = isSel ? 0.5 : 0.2;
+            if (tiny) {
+              ctx.fillStyle = css(rgb); ctx.fillRect(px, py, s, s);
+            } else if (BEAD_SHAPE === 'round') {
+              ctx.beginPath(); ctx.arc(mx, my, s * 0.38, 0, 7);
+              ctx.fillStyle = css(rgb); ctx.fill();
+            } else {
+              const gs = s * 0.76;
+              ctx.fillStyle = css(rgb);
+              ctx.fillRect(mx - gs / 2, my - gs / 2, gs, gs);
+            }
+            ctx.globalAlpha = 1;
+            if (isSel && s >= 8) {
+              ctx.setLineDash([s * 0.16, s * 0.13]);
+              ctx.strokeStyle = css(mix(rgb, BLACK, 0.3), 0.75);
+              ctx.lineWidth = Math.max(1, s * 0.06);
+              if (BEAD_SHAPE === 'round') {
+                ctx.beginPath(); ctx.arc(mx, my, s * 0.42, 0, 7); ctx.stroke();
+              } else {
+                const ds = s * 0.84;
+                ctx.strokeRect(mx - ds / 2, my - ds / 2, ds, ds);
+              }
+              ctx.setLineDash([]);
+            }
+            if (showNum) {
+              const n = this.o.numbers.get(tc);
+              if (n != null) {
+                ctx.fillStyle = 'rgba(95,74,78,.8)';
+                ctx.fillText(String(n), mx, my + s * 0.02);
+                ctx.font = numFont;
+              }
             }
           }
         }
@@ -1009,5 +1089,5 @@ function drawIron(ctx, x, y, s) {
 
 module.exports = {
   drawBead, patternSize, drawPatternInto, renderPatternTo, BoardView,
-  getBeadShape, setBeadShape, workFinish,
+  getBeadShape, setBeadShape, workFinish, workHole,
 };

@@ -4,6 +4,7 @@
     <view class="tb-title">{{title}}</view>
     <view class="tb-actions">
       <view class="icon-btn" hover-class="pressed" bindtap="toggleShape">{{beadShape === 'round' ? '●' : '■'}}</view>
+      <view class="icon-btn" hover-class="pressed" bindtap="toggleBgm"><image class="pxi-l" src="{{bgmOn ? '/assets/icons/musicon.png' : '/assets/icons/musicoff.png'}}" /></view>
       <view class="icon-btn" hover-class="pressed" bindtap="toggleMute"><image class="pxi-l" src="{{muted ? '/assets/icons/sndoff.png' : '/assets/icons/sndon.png'}}" /></view>
       <view wx:if="{{debug}}" class="icon-btn" bindtap="debugFill"><image class="pxi-l" src="/assets/icons/bolt.png" /></view>
     </view>
@@ -11,16 +12,16 @@
 
   <view class="prog-wrap">
     <view class="prog-bar"><view class="fill" style="width:{{pct}}%" /></view>
-    <view class="prog-txt">{{pct}}%</view>
+    <view class="prog-txt">
+      <text class="prog-pct">{{pct}}%</text>
+      <text class="prog-left">{{left > 0 ? '还差 ' + left + ' 颗' : '拼齐啦'}}</text>
+    </view>
   </view>
 
   <view class="board-area">
     <canvas type="2d" id="board" class="board"
             bindtouchstart="onTS" bindtouchmove="onTM"
             bindtouchend="onTE" bindtouchcancel="onTE"></canvas>
-    <view class="zoom-fabs">
-      <view hover-class="pressed" bindtap="zoomFit">⛶</view>
-    </view>
   </view>
 
   <view class="bottom-bar">
@@ -28,6 +29,11 @@
       <view class="tools-row">
         <view class="tool-chip {{paintOn ? 'active' : ''}}" bindtap="togglePaint"><image class="pxi-s" src="/assets/icons/hand.png" />连续上豆</view>
         <view class="tools-hint">{{paintOn ? '划过格子连续上豆！' : '选颜色，点格子上豆'}}</view>
+        <view class="tr-btns">
+          <view class="tr-btn loc {{locateOn ? 'active' : ''}}" hover-class="pressed" bindtap="toggleLocate">◎</view>
+          <view class="tr-btn" hover-class="pressed" bindtap="shareMenu"><image class="pxi-l" src="/assets/icons/export.png" /></view>
+          <view class="tr-btn" hover-class="pressed" bindtap="zoomFit">⛶</view>
+        </view>
       </view>
       <scroll-view class="palette-bar" scroll-x scroll-into-view="{{scrollInto}}"
                    scroll-with-animation enhanced show-scrollbar="{{false}}">

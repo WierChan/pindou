@@ -152,6 +152,11 @@ view, text, image, canvas, input, scroll-view, button {
 }
 .btn-ghost.slim2 { padding: 10px 18px; align-self: auto; }
 .btn-ghost.slim3 { padding: 14px; font-size: 16px; box-shadow: 4px 4px 0 #E2DAD3;}
+/* 彩色副按钮（给白底 ghost 按钮上色，像素风=浅色底 + 同色深一档的硬投影）。
+   放在 slim3 之后：同为双类选择器，靠源码顺序压过 slim3 的白色投影 */
+.btn-ghost.c-green { background: #B7E6A6; box-shadow: 4px 4px 0 #5CC454; }
+.btn-ghost.c-gold { background: #FFE39A; box-shadow: 3px 3px 0 #D98F2B; }
+.btn-ghost.c-mute { background: #ECE4DC; box-shadow: 3px 3px 0 #C9BFB4; }
 .btn-link {
   color: var(--ink2);
   font-size: 13px;
@@ -215,11 +220,23 @@ button.btn-reset::after { border: none; }
   transition: width .25s;
 }
 .prog-txt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 34px;
+  line-height: 1.2;
   font-size: 12px;
   font-weight: 800;
   color: var(--accent-dark);
-  min-width: 34px;
   text-align: right;
+}
+/* 拼豆页进度：百分比下面再显示"还差 X 颗"（熨烫页只有一行百分比，样式沿用上面即可） */
+.prog-txt .prog-left {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ink2);
 }
 
 .board-area {
@@ -257,6 +274,31 @@ button.btn-reset::after { border: none; }
   align-items: center;
   justify-content: center;
   transition: transform .12s;
+}
+
+/* 底栏工具按钮组：原画板右下的悬浮键（定位/分享/还原）挪进底栏，不再挡住豆子 */
+.tr-btns { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.tools-row .tr-btns { margin-left: auto; } /* 拼豆页：顶到工具栏右端 */
+.iron-tr { display: flex; justify-content: flex-end; padding: 2px 16px 6px; } /* 熨烫页：底栏顶端右对齐一排 */
+.tr-btn {
+  width: 34px;
+  height: 34px;
+  border: 2px solid var(--ink);
+  background: var(--card);
+  box-shadow: 2px 2px 0 #E2DAD3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.tr-btn.loc { color: #E94737; } /* 定位：常态红字 */
+.tr-btn.loc.active {           /* 开启：整块变红 */
+  background: #E94737;
+  color: #FFFFFF;
+  border-color: #B41E14;
+  box-shadow: inset 2px 2px 0 rgba(0, 0, 0, .18);
 }
 
 .confetti {

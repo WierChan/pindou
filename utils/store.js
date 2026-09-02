@@ -73,7 +73,8 @@ const store = {
   create(o) {
     const work = {
       id: genId(), name: o.name, w: o.w, h: o.h, cells: o.cells,
-      placed: new Array(o.cells.length).fill(0),
+      // 一般新建从空开始；接力导入（o.placed）则带着好友的进度建档，直接接着拼
+      placed: (Array.isArray(o.placed) && o.placed.length === o.cells.length) ? o.placed.slice() : new Array(o.cells.length).fill(0),
       free: !!o.free, // 自由画布模式：cells 即用户作品本身，可随意增改
       completed: false, ironDone: false, thumb: '',
       createdAt: Date.now(), updatedAt: Date.now(),

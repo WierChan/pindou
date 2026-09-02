@@ -298,6 +298,20 @@ Page({
     fetchByCode(code).then(p => {
       wx.hideLoading();
       markCodePrompted(code); // 导入过的码不再被剪贴板识别弹窗打扰
+      // 接力口令（带进度）：直接建档、进拼豆页从好友的进度接着拼，跳过配置
+      if (p.placed) {
+        const work = store.create({
+          name: p.name, w: p.w, h: p.h, cells: p.cells,
+          palette: p.palette, placed: p.placed, fromCode: code,
+        });
+        const go = () => wx.redirectTo({ url: '/pages/play/play?id=' + work.id });
+        if (this.utilCanvas) {
+          this.uq(() => ui.makeThumb(this, this.utilCanvas, work, false))
+            .then(path => { store.update(work.id, { thumb: path, thumbV: ui.THUMB_V, thumbShape: getBeadShape() }, true); go(); })
+            .catch(go);
+        } else go();
+        return;
+      }
       // 复用「外来固定图纸」配置路径：1:1 还原、自带色板
       this.pattern = { w: p.w, h: p.h, cells: p.cells, palette: p.palette };
       this.fromChart = true;

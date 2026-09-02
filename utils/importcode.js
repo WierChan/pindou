@@ -38,6 +38,28 @@ function format(code) {
   return code ? 'PD-' + code.slice(0, 4) + '-' + code.slice(4, 8) : '';
 }
 
+// 进度位串：0/1 数组 ↔ 十六进制（每字符 4 格），接力口令带进度用，比原始数组省 8× 体积
+function packPlaced(placed, n) {
+  let s = '';
+  for (let i = 0; i < n; i += 4) {
+    let v = 0;
+    if (placed[i]) v |= 1;
+    if (placed[i + 1]) v |= 2;
+    if (placed[i + 2]) v |= 4;
+    if (placed[i + 3]) v |= 8;
+    s += v.toString(16);
+  }
+  return s;
+}
+function unpackPlaced(s, n) {
+  const out = new Array(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    const v = parseInt(s.charAt(i >> 2) || '0', 16); // 非法字符 → NaN，下面按位与得 0，安全
+    if (v & (1 << (i & 3))) out[i] = 1;
+  }
+  return out;
+}
+
 // 服务端数据不可信：导入前逐项校验，返回清洗后的图纸或 null
 function validatePattern(p) {
   if (!p || !Number.isInteger(p.w) || !Number.isInteger(p.h)) return null;
@@ -52,25 +74,43 @@ function validatePattern(p) {
     if (t >= 0) beads++;
   }
   if (!beads) return null;
+  // 进度（可选，只有接力口令才有）：十六进制位串还原成 0/1，且只认「该格有豆」的已拼
+  let placed;
+  if (typeof p.placed === 'string' && p.placed) {
+    const raw = unpackPlaced(p.placed, p.w * p.h);
+    placed = new Array(p.w * p.h);
+    for (let i = 0; i < placed.length; i++) placed[i] = (raw[i] && p.cells[i] >= 0) ? 1 : 0;
+  }
   return {
     w: p.w, h: p.h, cells: p.cells,
     palette: hasPal ? p.palette : undefined,
     name: String(p.name || '口令拼豆').slice(0, 20),
+    placed, // undefined（普通图纸口令）或 0/1 数组（接力口令）
   };
 }
 
-// 生成（或取回）作品的导入码；服务端按 (用户, clientWorkId) 去重，重复调用返回同一个码
-function createCode(work) {
+// 生成（或取回）作品的导入码；服务端按 (用户, clientWorkId) 去重，重复调用返回同一个码。
+// opts.placed（可选）：把当前进度一并带上（接力分享）——好友导入后从这个进度接着拼。
+function createCode(work, opts) {
+  opts = opts || {};
+  const payload = {
+    w: work.w, h: work.h, cells: work.cells,
+    palette: work.palette || undefined, name: work.name,
+  };
+  let clientWorkId = work.id;
+  if (opts.placed) {
+    // 进度变了要换码：否则服务端按 clientWorkId 幂等会返回旧进度。用已拼数区分快照
+    const done = opts.placed.reduce((a, v) => a + (v ? 1 : 0), 0);
+    payload.placed = packPlaced(opts.placed, work.cells.length);
+    clientWorkId = work.id + '@' + done;
+  }
   return api.post('/api/patterns', {
-    clientWorkId: work.id,
+    clientWorkId,
     name: work.name,
     w: work.w,
     h: work.h,
     total: work.cells.filter(t => t >= 0).length,
-    payload: JSON.stringify({
-      w: work.w, h: work.h, cells: work.cells,
-      palette: work.palette || undefined, name: work.name,
-    }),
+    payload: JSON.stringify(payload),
   }).then(d => normalize(d && d.code));
 }
 

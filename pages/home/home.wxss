@@ -1,5 +1,19 @@
 .home { padding-bottom: 40px; }
 
+/* 设置入口：放在「进行中 / 已完成」这一排右端（挪出热闹的门头场景，不跟装饰打架）。
+   深玫瑰底 + 白齿轮，和左边两个 tab 区分开；高度跟 tab 齐平 */
+.home-set {
+  flex-shrink: 0;
+  width: 46px;
+  align-self: stretch;
+  border: 3px solid var(--ink);
+  background: var(--accent-dark);
+  box-shadow: 3px 3px 0 rgba(95, 74, 78, .35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .home-header { text-align: center; padding: 0 0 20px; }
 
 /* 便利店遮阳棚：粉白条纹 + 方齿垂边（出血到屏幕两侧） */

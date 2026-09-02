@@ -1,6 +1,6 @@
 // 作品查看：完成后的展示与分享
 const { store } = require('../../utils/store');
-const { BoardView, workFinish } = require('../../utils/board');
+const { BoardView, workFinish, workHole } = require('../../utils/board');
 const { createCode, format, markCodePrompted } = require('../../utils/importcode');
 const ui = require('../../utils/ui');
 const { buildGuide } = require('../../utils/guidance');
@@ -45,6 +45,7 @@ Page({
         palette: this.work.palette || null,
         mode: 'view', fused: true,
         finish: workFinish(this.work), // 熨烫时选的质感档位
+        hole: workHole(this.work),     // 熨烫时选的豆孔大小
         chart: false, // 默认成品效果（与首页缩略图、分享卡一致）
       });
       this.bv.setViewport(r.width, r.height, dpr, r.left, r.top);

@@ -1,0 +1,82 @@
+<view class="setpage">
+  <view class="topbar" style="padding-top:{{insets.top}}px;padding-right:{{insets.right}}px">
+    <view class="tb-back" hover-class="pressed" bindtap="goBack">‹</view>
+    <view class="tb-title">设置</view>
+    <view class="tb-actions"></view>
+  </view>
+
+  <view class="set-scroll">
+    <!-- 声音 -->
+    <view class="set-sec">
+      <view class="set-sec-t">声音</view>
+      <view class="set-card">
+        <view class="set-row">
+          <view class="set-lb">音效</view>
+          <view class="seg">
+            <view class="seg-i {{sfxOn ? 'on' : ''}}" hover-class="pressed" data-v="1" bindtap="setSfx">开</view>
+            <view class="seg-i {{!sfxOn ? 'on' : ''}}" hover-class="pressed" data-v="0" bindtap="setSfx">关</view>
+          </view>
+        </view>
+        <view class="set-row">
+          <view class="set-lb">背景音乐<text class="set-sub">（拼豆页）</text></view>
+          <view class="seg">
+            <view class="seg-i {{bgmOn ? 'on' : ''}}" hover-class="pressed" data-v="1" bindtap="setBgm">开</view>
+            <view class="seg-i {{!bgmOn ? 'on' : ''}}" hover-class="pressed" data-v="0" bindtap="setBgm">关</view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 拼豆偏好 -->
+    <view class="set-sec">
+      <view class="set-sec-t">拼豆偏好</view>
+      <view class="set-card">
+        <view class="set-row">
+          <view class="set-lb">豆子形状</view>
+          <view class="seg">
+            <view class="seg-i {{beadShape === 'square' ? 'on' : ''}}" hover-class="pressed" data-v="square" bindtap="setShape">方形</view>
+            <view class="seg-i {{beadShape === 'round' ? 'on' : ''}}" hover-class="pressed" data-v="round" bindtap="setShape">圆形</view>
+          </view>
+        </view>
+        <view class="set-row">
+          <view class="set-lb">划动方式</view>
+          <view class="seg">
+            <view class="seg-i {{!paintOn ? 'on' : ''}}" hover-class="pressed" data-v="0" bindtap="setPaint">拖动画布</view>
+            <view class="seg-i {{paintOn ? 'on' : ''}}" hover-class="pressed" data-v="1" bindtap="setPaint">连续上豆</view>
+          </view>
+        </view>
+        <view class="set-row">
+          <view class="set-lb">定位高亮</view>
+          <view class="seg">
+            <view class="seg-i {{!locateOn ? 'on' : ''}}" hover-class="pressed" data-v="0" bindtap="setLocate">关</view>
+            <view class="seg-i {{locateOn ? 'on' : ''}}" hover-class="pressed" data-v="1" bindtap="setLocate">开</view>
+          </view>
+        </view>
+      </view>
+      <view class="set-hint">划动方式、定位高亮是拼豆页每次打开的默认值，拼的时候仍可随时切换。</view>
+    </view>
+
+    <!-- 熨烫成品默认 -->
+    <view class="set-sec">
+      <view class="set-sec-t">熨烫成品默认</view>
+      <view class="set-card">
+        <view class="set-row">
+          <view class="set-lb">质感</view>
+          <view class="seg">
+            <view class="seg-i {{finish === 'grain' ? 'on' : ''}}" hover-class="pressed" data-v="grain" bindtap="setFinish">细腻纹理</view>
+            <view class="seg-i {{finish === 'smooth' ? 'on' : ''}}" hover-class="pressed" data-v="smooth" bindtap="setFinish">光滑平面</view>
+          </view>
+        </view>
+        <view class="set-row">
+          <view class="set-lb">豆孔</view>
+          <view class="seg">
+            <view class="seg-i {{hole === 'none' ? 'on' : ''}}" hover-class="pressed" data-v="none" bindtap="setHole">无孔</view>
+            <view class="seg-i {{hole === 'small' ? 'on' : ''}}" hover-class="pressed" data-v="small" bindtap="setHole">小孔</view>
+            <view class="seg-i {{hole === 'large' ? 'on' : ''}}" hover-class="pressed" data-v="large" bindtap="setHole">大孔</view>
+          </view>
+        </view>
+      </view>
+      <view class="set-hint">新作品熨烫时的默认值；每幅作品在熨烫页仍可单独调整。</view>
+    </view>
+  </view>
+</view>

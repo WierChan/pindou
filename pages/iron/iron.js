@@ -2,12 +2,13 @@
 const { store } = require('../../utils/store');
 const { PALETTE } = require('../../utils/palette');
 const { colorStats } = require('../../utils/convert');
-const { BoardView, renderPatternTo, getBeadShape, workFinish } = require('../../utils/board');
+const { BoardView, renderPatternTo, getBeadShape, workFinish, workHole } = require('../../utils/board');
 const { audio } = require('../../utils/audio');
 const { celebrate } = require('../../utils/confetti');
 const ui = require('../../utils/ui');
 const { cfg } = require('../../utils/config');
 const ads = require('../../utils/ads');
+const { buildChartExportTo } = require('../../utils/share');
 const { buildGuide, guideSeen, markGuideSeen } = require('../../utils/guidance');
 
 Page({
@@ -26,6 +27,7 @@ Page({
     workId: '',
     guideSteps: [],
     finish: 'grain', // 熨烫质感：grain 细腻纹理 / smooth 光滑平面
+    hole: 'small',   // 成品豆孔：none 无孔 / small 小孔 / large 大孔
   },
 
   onLoad(q) {
@@ -54,6 +56,7 @@ Page({
       muted: audio.muted,
       pct: this._pct(),
       finish: workFinish(work), // 老作品没这个字段：默认细腻纹理
+      hole: workHole(work),     // 老作品没这个字段：默认小孔
     });
   },
 
@@ -68,31 +71,43 @@ Page({
         palette: this.work.palette || null,
         mode: 'iron', ironed: this.work.ironed,
         finish: this.data.finish,
+        hole: this.data.hole,
         onIron: n => this._applyIron(n),
       });
       this.bv.setViewport(r.width, r.height, dpr, r.left, r.top);
       setTimeout(() => ui.syncBoardRect(this, this.bv), 600);
     });
     ui.queryNode(this, '#util').then(r => { if (r) this.utilCanvas = r.node; });
-    // 首次熨烫：教操作
-    // 质感选择是后加的：看过老版 iron 引导的用户只补看这一步（记在 iron-texture 上）
+    // 首次熨烫：教操作。质感、豆孔都是后加的，按看过的程度分层补看：
+    //   没看过 iron → 完整版（操作 + 质感 + 豆孔）
+    //   看过 iron 没看过质感 → iron-texture（质感 + 豆孔）
+    //   质感也看过、只差豆孔 → iron-hole（豆孔）
     const texStep = {
       sel: '.tex-row',
       text: '烫之前先挑个质感：「细腻纹理」有真实拼豆的手作颗粒感，「光滑平面」干净利落。烫的过程中也能随时换～',
     };
-    if (guideSeen('iron')) {
-      buildGuide(this, 'iron-texture', [texStep]);
-    } else {
+    const holeStep = {
+      sel: '.tex-hole',
+      text: '再选成品的豆孔大小：无孔更整洁，小孔 / 大孔更像真实拼豆——熨烫定型后就是这个样子。（默认值可在设置里改）',
+    };
+    if (!guideSeen('iron')) {
       buildGuide(this, 'iron', [
         { text: '豆子拼齐啦，最后一步：按住屏幕不放，熨斗就会出现，划过豆子把它们烫平定型！全部烫完就大功告成～' },
         texStep,
+        holeStep,
       ]);
+    } else if (!guideSeen('iron-texture')) {
+      buildGuide(this, 'iron-texture', [texStep, holeStep]);
+    } else {
+      buildGuide(this, 'iron-hole', [holeStep]);
     }
   },
 
   onGuideDone() {
-    // 完整版 iron 引导已包含质感这一步，不用再补看单步版
-    if (this.data.guideId === 'iron') markGuideSeen('iron-texture');
+    // 完整/上层引导已含下层步骤，别再让这些用户重复补看
+    const id = this.data.guideId;
+    if (id === 'iron') { markGuideSeen('iron-texture'); markGuideSeen('iron-hole'); }
+    else if (id === 'iron-texture') { markGuideSeen('iron-hole'); }
     this.setData({ guideSteps: [] });
   },
 
@@ -121,6 +136,23 @@ Page({
   onTE(e) { if (this.bv) this.bv.touchEnd(e); },
   zoomFit() { if (this.bv) this.bv.fit(); },
 
+  // 导出图纸：把这幅图纸（网格 + 色号）保存/分享，熨烫阶段也能导（同分享弹窗「保存图纸」）
+  exportChart() {
+    const work = this.work;
+    if (!work || !this.utilCanvas) return;
+    ads.rewarded('rvChart', {
+      workId: work.id,
+      title: '导出高清图纸',
+      desc: '看一段短广告，即可把这幅图纸保存或分享',
+    }).then(ok => {
+      if (!ok) return;
+      wx.showLoading({ title: '生成中', mask: true });
+      this.uq(() => ui.captureCanvas(this, this.utilCanvas, () => buildChartExportTo(this.utilCanvas, work)))
+        .then(path => { wx.hideLoading(); ui.shareImage(path); })
+        .catch(() => { wx.hideLoading(); ui.toast('导出失败，再试一次'); });
+    });
+  },
+
   goBack() {
     this._flushSave();
     ui.backHome();
@@ -141,6 +173,19 @@ Page({
       store.update(this.work.id, { finish: f });
     }
     if (this.bv) this.bv.setFinish(f);
+  },
+
+  // 成品豆孔大小三选一（无孔 / 小孔 / 大孔）。同样随时可切、随作品持久化，
+  // 之后查看页 / 首页缩略图 / 分享卡 / 导出图都按它渲染成品
+  pickHole(e) {
+    const h = e.currentTarget.dataset.h;
+    if (!h || h === this.data.hole) return;
+    this.setData({ hole: h });
+    if (this.work) {
+      this.work.hole = h;
+      store.update(this.work.id, { hole: h });
+    }
+    if (this.bv) this.bv.setHole(h);
   },
   debugFill() {
     if (this.finished || !this.bv) return;
@@ -184,6 +229,7 @@ Page({
     store.update(work.id, {
       ironed: work.ironed, ironDone: true,
       finish: this.data.finish, // 定型时把质感选择一并落盘（缩略图/分享按它渲染）
+      hole: this.data.hole,     // 豆孔选择一并落盘
       completedAt: Date.now(),
     });
     if (this.utilCanvas) {
@@ -225,7 +271,7 @@ Page({
       const cellPx = ui.clamp(Math.floor(300 / Math.max(work.w, work.h)), 4, 20);
       let size = null; // captureCanvas 内部会先调 draw() 再导出
       const draw = () => (size = renderPatternTo(this.utilCanvas, work, {
-        cellPx, fused: true, finish: this.data.finish, scale: 2,
+        cellPx, fused: true, finish: this.data.finish, hole: this.data.hole, scale: 2,
       }));
       return ui.captureCanvas(this, this.utilCanvas, draw).then(path => show(path, size.width, size.height));
     }).catch(() => show('', 0, 0));

@@ -6,7 +6,7 @@ const { getBeadShape } = require('../../utils/board');
 const ui = require('../../utils/ui');
 const sync = require('../../utils/sync');
 const ads = require('../../utils/ads');
-const { buildGuide } = require('../../utils/guidance');
+const { buildGuide, guideSeen, markGuideSeen } = require('../../utils/guidance');
 
 // 从自由画布的稀疏豆表裁出密集图纸（heal 重建缩略图用）
 function freePattern(work) {
@@ -71,15 +71,25 @@ Page({
   },
 
   onReady() {
-    // 首次进入：豆豆开场引导
-    buildGuide(this, 'home', [
-      { text: '欢迎光临拼豆便利店！我是豆豆～这里可以把喜欢的图片一颗一颗拼出来，跟你转一圈！' },
-      { sel: '.cta-new', text: '一切从这里开始：选一张图片、导入拼豆图纸，或者开一块自由画布随便画！' },
-      { sel: '.home-tabs', text: '拼到一半的作品放在「进行中」，拼完熨烫定型的收藏在「已完成」。去开你的第一个作品吧！' },
-    ]);
+    // 首次进入：豆豆开场引导。设置入口是后加的：看过老版 home 引导的用户单步补看（home-set）
+    const setStep = { sel: '.home-set', text: '右上角这个齿轮是「设置」：音效、背景音乐、豆子形状，还有默认的熨烫质感和豆孔，都能在这儿调～' };
+    if (guideSeen('home')) {
+      buildGuide(this, 'home-set', [setStep]);
+    } else {
+      buildGuide(this, 'home', [
+        { text: '欢迎光临拼豆便利店！我是豆豆～这里可以把喜欢的图片一颗一颗拼出来，跟你转一圈！' },
+        { sel: '.cta-new', text: '一切从这里开始：选一张图片、导入拼豆图纸，或者开一块自由画布随便画！' },
+        { sel: '.home-tabs', text: '拼到一半的作品放在「进行中」，拼完熨烫定型的收藏在「已完成」。去开你的第一个作品吧！' },
+        setStep,
+      ]);
+    }
   },
 
-  onGuideDone() { this.setData({ guideSteps: [] }); },
+  onGuideDone() {
+    // 完整版 home 引导已含设置一步，别再让这些用户单独补看
+    if (this.data.guideId === 'home') markGuideSeen('home-set');
+    this.setData({ guideSteps: [] });
+  },
 
   onHide() { this._stopFx(); },
   onUnload() { this._stopFx(); },
@@ -301,6 +311,8 @@ Page({
       });
     });
   },
+
+  goSettings() { wx.navigateTo({ url: '/pages/settings/settings' }); },
 
   goCreate() {
     if (this._navT) return;

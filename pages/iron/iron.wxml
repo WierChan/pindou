@@ -17,12 +17,15 @@
     <canvas type="2d" id="board" class="board"
             bindtouchstart="onTS" bindtouchmove="onTM"
             bindtouchend="onTE" bindtouchcancel="onTE"></canvas>
-    <view class="zoom-fabs">
-      <view hover-class="pressed" bindtap="zoomFit">⛶</view>
-    </view>
   </view>
 
   <view class="bottom-bar">
+    <view class="iron-tr">
+      <view class="tr-btns">
+        <view class="tr-btn" hover-class="pressed" bindtap="exportChart"><image class="pxi-l" src="/assets/icons/export.png" /></view>
+        <view class="tr-btn" hover-class="pressed" bindtap="zoomFit">⛶</view>
+      </view>
+    </view>
     <!-- 熨烫质感：开烫前先选，烫的过程中也能随时换（已烫的格子即时变） -->
     <view class="tex-row">
       <view class="tex-label">质感</view>
@@ -30,6 +33,13 @@
             data-f="grain" bindtap="pickFinish"><image class="pxi-s" src="/assets/icons/sparkle.png" />细腻纹理</view>
       <view class="tool-chip {{finish === 'smooth' ? 'active' : ''}}" hover-class="pressed"
             data-f="smooth" bindtap="pickFinish"><image class="pxi-s" src="/assets/icons/smooth.png" />光滑平面</view>
+    </view>
+    <!-- 成品豆孔：熨烫前选大小、甚至无孔（已烫的融合豆即时反映） -->
+    <view class="tex-row tex-hole">
+      <view class="tex-label">豆孔</view>
+      <view class="tool-chip {{hole === 'none' ? 'active' : ''}}" hover-class="pressed" data-h="none" bindtap="pickHole">无孔</view>
+      <view class="tool-chip {{hole === 'small' ? 'active' : ''}}" hover-class="pressed" data-h="small" bindtap="pickHole">小孔</view>
+      <view class="tool-chip {{hole === 'large' ? 'active' : ''}}" hover-class="pressed" data-h="large" bindtap="pickHole">大孔</view>
     </view>
     <view class="tools-hint iron-hint"><image class="pxi-s" src="/assets/icons/flame.png" />按住熨斗，慢慢划过每一颗豆子，把它们烫平定型</view>
   </view>

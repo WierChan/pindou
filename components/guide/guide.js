@@ -26,7 +26,7 @@ Component({
     txt: '',
     hole: null,        // 聚光灯洞（视口坐标）
     mascotRight: false, // 洞在左半屏时豆豆站右边，不挡目标
-    bubbleTop: false,   // 洞在下半屏时气泡挪到上方
+    stageStyle: '',     // 气泡+豆豆的定位：贴着聚光灯（洞在下半屏→放洞上方，反之放下方）
     blink: false,
     talk: false,
     last: false,
@@ -55,7 +55,8 @@ Component({
       const s = this.properties.steps[i];
       if (!s) { this.finish(); return; }
       const win = ui.winInfo();
-      let hole = null, mascotRight = false, bubbleTop = false;
+      const H = win.windowHeight, W = win.windowWidth;
+      let hole = null, mascotRight = false, stageStyle = '';
       if (s.rect) {
         hole = {
           x: Math.max(2, s.rect.left - 6),
@@ -63,11 +64,17 @@ Component({
           w: s.rect.width + 12,
           h: s.rect.height + 12,
         };
-        mascotRight = hole.x + hole.w / 2 < win.windowWidth / 2;
-        bubbleTop = hole.y + hole.h / 2 > win.windowHeight * 0.55;
+        mascotRight = hole.x + hole.w / 2 < W / 2;
+        // 气泡贴着聚光灯：洞在下半屏→底边压在洞顶上方（向上生长）；上半屏→放到洞下方
+        const gap = 14;
+        if (hole.y + hole.h / 2 > H * 0.5) {
+          stageStyle = 'top:auto;bottom:' + Math.round(H - hole.y + gap) + 'px';
+        } else {
+          stageStyle = 'bottom:auto;top:' + Math.round(hole.y + hole.h + gap) + 'px';
+        }
       }
       this.setData({
-        idx: i, hole, mascotRight, bubbleTop,
+        idx: i, hole, mascotRight, stageStyle,
         last: i === this.properties.steps.length - 1,
         txt: '',
       });

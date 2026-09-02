@@ -14,7 +14,9 @@
   font-size: 14px;
 }
 .share-tip { font-size: 12px; color: var(--ink2); }
-.share-links { display: flex; justify-content: center; gap: 32px; }
+/* 保存图纸 / 关闭：从文字链接改成按钮（次级，比上排分享按钮小一号） */
+.share-links { display: flex; gap: 10px; }
+.share-links > view { flex: 1; }
 button.share-fwd {
   align-self: auto;
   padding: 9px 16px;

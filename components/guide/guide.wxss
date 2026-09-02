@@ -37,7 +37,6 @@
   animation: gpop .35s cubic-bezier(.2, 1.4, .4, 1);
 }
 .g-stage.right { align-items: flex-end; }
-.g-stage.top { bottom: auto; top: 18vh; }
 @keyframes gpop { from { transform: translateY(24px); opacity: 0; } }
 
 .g-bubble {

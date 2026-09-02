@@ -32,6 +32,7 @@
   <view class="tabs home-tabs">
     <view class="tab {{tab === 'doing' ? 'active' : ''}}" bindtap="switchTab" data-tab="doing"><image class="pxi" src="/assets/icons/basket.png" />进行中{{doing.length ? ' · ' + doing.length : ''}}</view>
     <view class="tab {{tab === 'done' ? 'active' : ''}}" bindtap="switchTab" data-tab="done"><image class="pxi" src="/assets/icons/trophy.png" />已完成{{done.length ? ' · ' + done.length : ''}}</view>
+    <view class="home-set" hover-class="pressed" bindtap="goSettings"><image class="pxi-l" src="/assets/icons/gear.png" /></view>
   </view>
 
   <view class="home-list">

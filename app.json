@@ -6,7 +6,8 @@
     "pages/play/play",
     "pages/free/free",
     "pages/iron/iron",
-    "pages/view/view"
+    "pages/view/view",
+    "pages/settings/settings"
   ],
   "window": {
     "navigationStyle": "custom",

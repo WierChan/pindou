@@ -1,5 +1,5 @@
 // 页面通用工具：导航安全区、canvas 出图、相册保存、串行队列
-const { renderPatternTo, patternSize, workFinish } = require('./board');
+const { renderPatternTo, patternSize, workFinish, workHole } = require('./board');
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
@@ -122,7 +122,7 @@ function persistFile(tempPath, name, oldPath) {
 // 缩略图样式版本：画法变了就 +1，首页 _healThumbs 会为旧版本号的缩略图重新生成
 // v12：熨烫作品按质感选择铺颗粒纹理
 // v13：色板对齐 MARD 实体色卡（色值整体更换，全部缩略图重新生成）
-const THUMB_V = 13;
+const THUMB_V = 14; // 14：成品融合豆加了可选豆孔（默认小孔），全量重刷
 
 // 生成作品缩略图（持久化文件），并清掉旧图。
 // 与详情画板「拼好的样子」同款布局：白底板 + 蒙孔 + 颗颗豆，熨烫过的作品用熔合质感（fused）；
@@ -135,12 +135,28 @@ function makeThumb(host, canvas, work, fused) {
   const size = patternSize(work, { cellPx });
   const scale = Math.max(size.width, size.height) > 900 ? 1 : 2;
   const finish = fused ? workFinish(work) : 'smooth';
-  const draw = () => renderPatternTo(canvas, work, { cellPx, fused: !!fused, matte: true, finish, scale });
+  const hole = fused ? workHole(work) : 'none';
+  const draw = () => renderPatternTo(canvas, work, { cellPx, fused: !!fused, matte: true, finish, hole, scale });
   return captureCanvas(host, canvas, draw).then(tmp =>
     persistFile(tmp, 'thumb-' + work.id + '-' + Date.now() + '.png', work.thumb));
 }
 
 // 保存图片到相册，处理授权被拒的情况
+// 调起系统图片分享菜单（发好友 / 朋友圈 / 保存到相册都在里面）；
+// 老基础库不支持 showShareImageMenu 就退回直接保存到相册
+function shareImage(path) {
+  if (!path) return;
+  if (!wx.showShareImageMenu) { saveToAlbum(path); return; }
+  wx.showShareImageMenu({
+    path,
+    fail: err => {
+      const msg = (err && err.errMsg) || '';
+      if (msg.indexOf('cancel') >= 0) return; // 用户取消不提示
+      saveToAlbum(path);                       // 调起失败就直接存相册
+    },
+  });
+}
+
 function saveToAlbum(path) {
   return new Promise(resolve => {
     wx.saveImageToPhotosAlbum({
@@ -191,6 +207,6 @@ function serialQueue() {
 
 module.exports = {
   clamp, winInfo, navInsets, toast, backHome,
-  queryNode, canvasToTemp, captureCanvas, persistFile, makeThumb, THUMB_V, saveToAlbum,
+  queryNode, canvasToTemp, captureCanvas, persistFile, makeThumb, THUMB_V, saveToAlbum, shareImage,
   serialQueue, syncBoardRect,
 };

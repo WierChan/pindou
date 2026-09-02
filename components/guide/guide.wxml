@@ -4,7 +4,7 @@
         style="left:{{hole.x}}px;top:{{hole.y}}px;width:{{hole.w}}px;height:{{hole.h}}px"></view>
   <view wx:else class="g-dim"></view>
 
-  <view class="g-stage {{mascotRight ? 'right' : ''}} {{bubbleTop ? 'top' : ''}}">
+  <view class="g-stage {{mascotRight ? 'right' : ''}}" style="{{stageStyle}}">
     <view class="g-bubble">
       <view class="g-count" wx:if="{{total > 1}}">{{idx + 1}} / {{total}}</view>
       <text class="g-txt">{{txt}}</text>

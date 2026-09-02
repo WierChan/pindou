@@ -1,5 +1,5 @@
 // 分享卡片 / 导出图片：直接绘制到传入的 canvas 上
-const { drawPatternInto, patternSize, workFinish } = require('./board');
+const { drawPatternInto, patternSize, workFinish, workHole } = require('./board');
 const { colorStats } = require('./convert');
 const { PALETTE, textColorFor } = require('./palette');
 
@@ -157,9 +157,9 @@ function buildShareCardTo(canvas, work, scale) {
   pixelPanel(ctx, M, py, W - M * 2, panelH);
   ctx.save();
   ctx.translate(W / 2 - artW / 2, py + 32);
-  // finish：作品在熨烫前选的质感（withMargin 产出的是展示用副本，显式传进去）
+  // finish / hole：作品在熨烫前选的质感与豆孔（withMargin 产出的是展示用副本，显式传进去）
   drawPatternInto(ctx, view, {
-    cellPx: artCell, pad: artPad, fused: true, finish: workFinish(work),
+    cellPx: artCell, pad: artPad, fused: true, finish: workFinish(work), hole: workHole(work),
   });
   ctx.restore();
 
@@ -408,7 +408,7 @@ function buildExportTo(canvas, work, fused, scale) {
   const ctx = canvas.getContext('2d');
   ctx.setTransform(scale, 0, 0, scale, 0, 0);
   ctx.clearRect(0, 0, size.width, size.height);
-  drawPatternInto(ctx, work, { cellPx, fused, finish: fused ? workFinish(work) : 'smooth' });
+  drawPatternInto(ctx, work, { cellPx, fused, finish: fused ? workFinish(work) : 'smooth', hole: fused ? workHole(work) : 'none' });
   return { width: size.width, height: size.height };
 }
 
