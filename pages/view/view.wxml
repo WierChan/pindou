@@ -13,15 +13,42 @@
             bindtouchend="onTE" bindtouchcancel="onTE"></canvas>
   </view>
 
-  <view class="bottom-bar view-bottom">
-    <view class="tool-chip vt-effect {{fusedOn ? 'active' : ''}}" bindtap="toggleFused"><image class="pxi-s" src="/assets/icons/flame.png" />熨烫效果</view>
-    <view class="btn-primary slim vt-share" hover-class="pressed" bindtap="openShare">分享</view>
-    <view class="tool-chip vt-code" bindtap="shareCode"><image class="pxi-s" src="/assets/icons/key.png" />导入码</view>
+  <view class="bottom-bar vt-sheet">
+    <!-- 未烫成品 / 烫后效果 -->
+    <view class="seg vt-toggle">
+      <view class="seg-i {{fusedOn ? '' : 'on'}}" hover-class="pressed" data-v="0" bindtap="toggleFused">未烫成品</view>
+      <view class="seg-i {{fusedOn ? 'on' : ''}}" hover-class="pressed" data-v="1" bindtap="toggleFused">✦ 烫后效果</view>
+    </view>
+    <!-- 选烫法：三类 Tab 切换 + 该类卡片（即时预览） -->
+    <view class="fp-label">选择烫法</view>
+    <view class="fp-tabs">
+      <view wx:for="{{cats}}" wx:key="cat" class="fp-tab {{finishTab === item.cat ? 'on' : ''}}"
+            data-cat="{{item.cat}}" bindtap="switchFinishTab">{{item.label}}</view>
+    </view>
+    <scroll-view scroll-x class="fp-scroll" enhanced show-scrollbar="{{false}}">
+      <view class="fp-row">
+        <view wx:for="{{cards}}" wx:key="key" class="fp-card {{item.active ? 'on' : ''}}"
+              data-f="{{item.key}}" bindtap="pickFinish" hover-class="pressed">
+          <image wx:if="{{item.img}}" class="fp-pv" src="{{item.img}}" mode="aspectFit" />
+          <view wx:else class="fp-pv ph"></view>
+          <view class="fp-nm">{{item.name}}</view>
+          <view class="fp-sub">{{item.sub}}</view>
+        </view>
+      </view>
+    </scroll-view>
+    <!-- 操作：分享 / 导入码 / 保存这个效果 -->
+    <view class="vt-mini-row">
+      <view class="btn-ghost vt-mini" hover-class="pressed" bindtap="openShare"><image class="pxi-s" src="/assets/icons/export.png" />分享</view>
+      <view class="btn-ghost vt-mini" hover-class="pressed" bindtap="shareCode"><image class="pxi-s" src="/assets/icons/key.png" />导入码</view>
+    </view>
+    <view class="btn-primary vt-save" hover-class="pressed" bindtap="saveFinish">保存这个效果 →</view>
   </view>
 
   <share-modal workId="{{workId}}" show="{{shareShow}}" bind:close="closeShare" bind:built="onCardBuilt" />
   <guide gid="{{guideId}}" steps="{{guideSteps}}" bind:done="onGuideDone" />
 </view>
+
+<canvas type="2d" id="util" class="util-canvas" style="width:{{capW}}px;height:{{capH}}px"></canvas>
 
 <!-- 导入码弹窗：放页面顶层 + 提升层级，确保盖住画板 canvas -->
 <view wx:if="{{codeShow}}" class="overlay hi" bindtap="closeCode">

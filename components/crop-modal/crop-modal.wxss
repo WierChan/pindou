@@ -83,7 +83,10 @@
 .hd-bl { left: -20px; bottom: -20px; }
 .hd-br { right: -20px; bottom: -20px; }
 
-/* 裁剪比例 */
+/* 裁剪比例（= 拼豆画布比例） */
+.cm-ratio-grp { display: flex; flex-direction: column; gap: 6px; }
+.cm-ratio-lb { font-size: 13px; font-weight: 700; color: var(--ink); }
+.cm-ratio-sub { font-size: 11px; font-weight: 400; color: var(--ink2); margin-left: 6px; }
 .cm-ratios {
   display: flex;
   gap: 8px;

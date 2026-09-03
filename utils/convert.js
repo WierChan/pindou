@@ -35,9 +35,8 @@ const PAL_LAB = PALETTE_RGB.map(rgb => rgb2oklab(rgb[0], rgb[1], rgb[2]));
 const PAL_ORDER = PAL_LAB.map((p, i) => i).sort((a, b) => PAL_LAB[a][0] - PAL_LAB[b][0]);
 const PAL_L = PAL_ORDER.map(i => PAL_LAB[i][0]);
 
-function nearestPalette(r, g, b) {
-  const lab = rgb2oklab(r, g, b);
-  const L = lab[0], A = lab[1], B = lab[2];
+// OKLab 三元组 → 最近的色板下标（L 排序 + 亚像素剪枝）
+function nearestLab(L, A, B) {
   let lo = 0, hi = PAL_L.length - 1;
   while (lo < hi) { const mid = (lo + hi) >> 1; if (PAL_L[mid] < L) lo = mid + 1; else hi = mid; }
   let bi = 0, bd = Infinity;
@@ -55,6 +54,30 @@ function nearestPalette(r, g, b) {
     if (d < bd) { bd = d; bi = idx; }
   }
   return bi;
+}
+function nearestPalette(r, g, b) {
+  const lab = rgb2oklab(r, g, b);
+  return nearestLab(lab[0], lab[1], lab[2]);
+}
+
+/* ---------- 一键换色：整套「不一样但近似」的配色变体 ----------
+   在 OKLab 上对每个色做同一种变换（移相 / 增艳 / 变柔…），再各自映射回最近的实体豆色。
+   整体一致地平移，成品仍认得出原图，只是换了一套色。vi=0 原样，1..N 各套变体，循环。*/
+function _rotHue(lab, deg) {
+  const t = deg * Math.PI / 180, c = Math.cos(t), s = Math.sin(t);
+  return [lab[0], lab[1] * c - lab[2] * s, lab[1] * s + lab[2] * c];
+}
+// 只保留一套「不一样但近似」的配色：整体略偏暖移相 + 微增艳，成品明显换色又不违和
+const COLOR_VARIANTS = [
+  lab => _rotHue([lab[0], lab[1] * 1.12, lab[2] * 1.12], -24),
+];
+function variantCount() { return COLOR_VARIANTS.length; }
+function variantPal(pal, vi) {
+  const n = COLOR_VARIANTS.length;
+  const k = ((vi % (n + 1)) + (n + 1)) % (n + 1); // 0..n
+  if (k === 0) return pal;
+  const nl = COLOR_VARIANTS[k - 1](PAL_LAB[pal]);
+  return nearestLab(nl[0], nl[1], nl[2]);
 }
 
 // 轻微对比 + 饱和度提升：弥补降采样平均造成的发灰，让拼豆成品更接近原图观感
@@ -199,4 +222,4 @@ function reduceColors(cells, n) {
   return cells.map(t => (t >= 0 ? resolve(t) : -1));
 }
 
-module.exports = { rgb2oklab, nearestPalette, loadImageToData, emojiToData, imageToPattern, colorStats, reduceColors };
+module.exports = { rgb2oklab, nearestPalette, loadImageToData, emojiToData, imageToPattern, colorStats, reduceColors, variantPal, variantCount };

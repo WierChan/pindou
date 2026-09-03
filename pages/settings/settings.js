@@ -1,12 +1,12 @@
 // 设置：集中项目里的各项偏好——音效 / 背景音乐 / 豆子形状 / 划动方式 / 定位高亮，
 // 以及新作品熨烫时的默认质感、默认豆孔。都各自持久化，页面/组件读同样的 storage key。
 const { audio, bgm } = require('../../utils/audio');
-const { getBeadShape, setBeadShape } = require('../../utils/board');
+const { getBeadShape, setBeadShape, finishList, normFinish } = require('../../utils/board');
 const ui = require('../../utils/ui');
 
 const K_PAINT = 'pindou.paintMode.v1';   // 划动默认：1 连续上豆 / 其余 拖动画布
 const K_LOCATE = 'pindou.locate.v1';     // 定位高亮默认：1 开
-const K_FINISH = 'pindou.defaultFinish'; // 默认质感：grain / smooth
+const K_FINISH = 'pindou.defaultFinish'; // 默认烫法：10 选 1（见 board.FINISHES）
 const K_HOLE = 'pindou.defaultHole';     // 默认豆孔：none / small / large
 
 function rd(k, def) {
@@ -22,8 +22,9 @@ Page({
     beadShape: 'square',
     paintOn: false,
     locateOn: false,
-    finish: 'grain',
-    hole: 'small',
+    finish: 'towel',
+    finishGroups: [],
+    hole: 'none',
   },
 
   onLoad() {
@@ -34,8 +35,9 @@ Page({
       beadShape: getBeadShape(),
       paintOn: rd(K_PAINT, 0) === 1,
       locateOn: rd(K_LOCATE, 0) === 1,
-      finish: rd(K_FINISH, 'grain'),
-      hole: rd(K_HOLE, 'small'),
+      finish: normFinish(rd(K_FINISH, 'towel')) || 'towel',
+      finishGroups: finishList(),
+      hole: rd(K_HOLE, 'none'),
     });
   },
 

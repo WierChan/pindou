@@ -77,8 +77,17 @@
       <view class="stats-line">{{dimText}} · <text class="b">{{total}}</text> 颗豆子 · <text class="b">{{colorN}}</text> 种颜色</view>
       <view wx:if="{{fromChart}}" class="chart-hint"><image class="pxi-s" src="/assets/icons/chart.png" />图纸 1:1 还原，颜色与原图纸一致</view>
       <view wx:if="{{importedCode}}" class="code-report" bindtap="reportCode">对这幅图纸有疑问？举报</view>
+      <!-- 照片图纸可改色：点色块换单色 / 一键换整套近似配色 -->
+      <view wx:if="{{canEdit}}" class="recolor-bar">
+        <view class="recolor-tip"><image class="pxi-s" src="/assets/icons/pencil.png" />点色块可换色</view>
+        <view class="recolor-btns">
+          <view class="recolor-btn" hover-class="pressed" bindtap="oneKeyRecolor"><image class="pxi-s" src="/assets/icons/sparkle.png" />一键换色</view>
+          <view class="recolor-btn ghost" hover-class="pressed" bindtap="restoreColor">还原配色</view>
+        </view>
+      </view>
       <view class="color-chips">
-        <view class="cchip" wx:for="{{chips}}" wx:key="index">
+        <view class="cchip {{canEdit ? 'edit' : ''}} {{item.swapped ? 'swapped' : ''}}" wx:for="{{chips}}" wx:key="index"
+              bindtap="tapEditColor" data-pal="{{item.pal}}">
           <view class="dot" style="background:{{item.hex}}" />{{item.count}}
         </view>
       </view>
@@ -87,7 +96,7 @@
         <view class="opt-col sz-opt">
           <view class="opt-row">
             <view class="opt-label">画布大小</view>
-            <view class="opt-val">{{size}} 豆</view>
+            <view class="opt-val"><image class="opt-edit" src="/assets/icons/pencil.png" /><input class="opt-input" type="number" value="{{size}}" bindblur="onSizeInput" bindconfirm="onSizeInput" />豆</view>
           </view>
           <view class="size-chips" wx:if="{{sizesShown.length}}">
             <view class="chip {{size === item ? 'active' : ''}}" wx:for="{{sizesShown}}" wx:key="*this"
@@ -101,7 +110,7 @@
         <view class="opt-col cl-opt" wx:if="{{showColor}}">
           <view class="opt-row">
             <view class="opt-label">颜色数量</view>
-            <view class="opt-val">{{colorVal}} 色</view>
+            <view class="opt-val"><image class="opt-edit" src="/assets/icons/pencil.png" /><input class="opt-input" type="number" value="{{colorVal}}" bindblur="onColorInput" bindconfirm="onColorInput" />色</view>
           </view>
           <slider class="opt-slider" min="2" max="{{colorMax}}" value="{{colorVal}}" step="1"
                   activeColor="#EABFC3" backgroundColor="#F0E4E0" block-size="20"
@@ -132,6 +141,26 @@
             bind:confirm="onCropConfirm" bind:cancel="onCropCancel" />
 
 <guide gid="{{guideId}}" steps="{{guideSteps}}" bind:done="onGuideDone" />
+
+<!-- 单个换色取色器：全色板按色系排列，点一个即换 -->
+<view wx:if="{{swapShow}}" class="overlay hi" bindtap="closeSwap">
+  <view class="modal swap-modal no-anim" catchtap="noop">
+    <view class="swap-head">
+      <view class="swap-cur"><view class="swap-cur-dot" style="background:{{swapHex}}" /><text>把「{{swapName}}」换成…</text></view>
+      <view class="swap-x" hover-class="pressed" catchtap="closeSwap">✕</view>
+    </view>
+    <scroll-view scroll-y class="swap-scroll">
+      <view class="swap-grid">
+        <view class="swap-sw" wx:for="{{swapChips}}" wx:key="pal" style="background:{{item.hex}}"
+              hover-class="pressed" data-pal="{{item.pal}}" catchtap="pickSwapColor" />
+      </view>
+    </scroll-view>
+    <view class="modal-btns">
+      <view class="btn-ghost slim2" hover-class="pressed" catchtap="resetSwapColor">还原此色</view>
+      <view class="btn-ghost slim2" hover-class="pressed" catchtap="closeSwap">取消</view>
+    </view>
+  </view>
+</view>
 
 <!-- 导入码输入弹窗 -->
 <view wx:if="{{codeShow}}" class="overlay hi" bindtap="closeCodeInput">

@@ -1,7 +1,7 @@
 // 创建作品：图片转图纸 / 图案库 / 表情图案
 const { store } = require('../../utils/store');
-const { PALETTE } = require('../../utils/palette');
-const { loadImageToData, emojiToData, imageToPattern, colorStats, reduceColors } = require('../../utils/convert');
+const { PALETTE, textColorFor } = require('../../utils/palette');
+const { loadImageToData, emojiToData, imageToPattern, colorStats, reduceColors, variantPal } = require('../../utils/convert');
 const { analyzeChart } = require('../../utils/chart');
 const { fetchTemplates, templatePattern } = require('../../utils/templates');
 const { renderPatternTo, patternSize, getBeadShape } = require('../../utils/board');
@@ -37,11 +37,11 @@ Page({
     templates: [],
     tplError: '',
     emojis: EMOJIS,
-    size: 32,
+    size: 52,
     sizeMin: 8,
-    sizeMax: 48,
+    sizeMax: 104,
     sizeHint: '',
-    sizesShown: [16, 24, 32, 48],
+    sizesShown: [52, 78, 104],
     showColor: false,
     colorMax: 48,
     colorVal: 48,
@@ -64,6 +64,12 @@ Page({
     total: 0,
     colorN: 0,
     chips: [],
+    canEdit: false,       // 照片转的图纸可改色（模板/图纸导入不可）
+    swapShow: false,      // 单个换色的取色器
+    swapPal: null,
+    swapName: '',
+    swapHex: '',
+    swapChips: [],        // 全色板（按色系排序），取色器用
     pvW: 0,
     pvH: 0,
   },
@@ -75,6 +81,8 @@ Page({
     this.pattern = null;    // {w, h, cells} 最终图纸
     this.fromChart = false; // 图纸导入模式：pattern 按图纸 1:1 还原，不可调大小/颜色
     this.colorLimit = null; // 用户设定的颜色数量（null = 不限制）
+    this.colorSwap = new Map(); // 手动单个换色：原色下标 → 换成的色下标
+    this.variantIdx = 0;    // 一键换色：0 原样，1..N 各套变体
     this._base = null;      // 未做颜色缩减的基础图纸缓存
     this._baseKey = '';
     this._pvNode = null;    // 预览 canvas 节点缓存（退出配置页时失效）
@@ -380,6 +388,7 @@ Page({
       this.name = '我的拼豆';
       this._base = null;
       this.colorLimit = null;
+      this._resetColorEdits();
       this._renderConfig();
       wx.hideLoading();
     }).catch(() => { wx.hideLoading(); ui.toast('图片打开失败，换一张试试'); });
@@ -448,6 +457,7 @@ Page({
       this.name = ch + ' 拼豆';
       this._base = null;
       this.colorLimit = null;
+      this._resetColorEdits();
       this._renderConfig();
     }).catch(() => ui.toast('生成失败，换一个试试'));
   },
@@ -462,6 +472,7 @@ Page({
   setSize(e) {
     const n = +e.currentTarget.dataset.n;
     if (n === this.data.size) return;
+    this._resetColorEdits(); // 换尺寸会重采样、原色全变，改色重置
     this.setData({ size: n });
     this._renderConfig();
   },
@@ -469,6 +480,7 @@ Page({
   onSizeSlider(e) {
     const v = +e.detail.value;
     if (v === this.data.size) return;
+    this._resetColorEdits();
     this.setData({ size: v });
     this._renderConfig();
   },
@@ -478,9 +490,73 @@ Page({
     this._renderConfig();
   },
 
+  // 手动输入画布大小：右侧数字可直接打字（超范围自动收进 sizeMin~sizeMax）
+  onSizeInput(e) {
+    let v = parseInt(e.detail.value, 10);
+    if (!(v > 0)) v = this.data.size;                       // 空/非法：保持原值
+    v = ui.clamp(v, this.data.sizeMin, this.data.sizeMax);
+    this._resetColorEdits();
+    this.setData({ size: v });                              // 回写（越界输入会被纠正显示）
+    this._renderConfig();
+  },
+  // 手动输入颜色数量（2 ~ 自然色数）
+  onColorInput(e) {
+    let v = parseInt(e.detail.value, 10);
+    if (!(v > 0)) v = this.data.colorVal;
+    v = ui.clamp(v, 2, this.data.colorMax);
+    this.colorLimit = v;
+    this._renderConfig();
+  },
+
   onWhiteChange(e) {
+    this._resetColorEdits();
     this.setData({ whiteEmpty: e.detail.value });
     this._renderConfig();
+  },
+
+  /* ---------- 改色（照片转的图纸）---------- */
+  _resetColorEdits() { this.colorSwap.clear(); this.variantIdx = 0; },
+
+  // 点色块 → 打开取色器，把这个颜色换成别的
+  tapEditColor(e) {
+    if (!this.data.canEdit) return;
+    const pal = +e.currentTarget.dataset.pal;
+    if (!this.data.swapChips.length) this._buildSwapChips();
+    const cur = this.colorSwap.has(pal) ? this.colorSwap.get(pal)
+      : (this.variantIdx ? variantPal(pal, this.variantIdx) : pal);
+    this.setData({ swapShow: true, swapPal: pal, swapName: PALETTE[cur].name, swapHex: PALETTE[cur].hex });
+  },
+  // 取色器：全色板按色系排序（白灰黑→红→粉→橙棕→黄→绿→蓝青→紫→莫兰迪）
+  _buildSwapChips() {
+    const chips = PALETTE.map((c, i) => ({
+      pal: i, hex: c.hex, tcol: textColorFor(c.hex),
+      k: 'HFEGABCDM'.indexOf(c.code[0]) * 1000 + parseInt(c.code.slice(1), 10),
+    })).sort((a, b) => a.k - b.k);
+    this.setData({ swapChips: chips });
+  },
+  pickSwapColor(e) {
+    this.colorSwap.set(this.data.swapPal, +e.currentTarget.dataset.pal);
+    this.setData({ swapShow: false });
+    this._renderConfig();
+  },
+  resetSwapColor() { // 取色器里「还原此色」
+    this.colorSwap.delete(this.data.swapPal);
+    this.setData({ swapShow: false });
+    this._renderConfig();
+  },
+  closeSwap() { this.setData({ swapShow: false }); },
+
+  // 一键换色：换成一套不一样但近似的配色（手动单换过的色块保持不变）
+  oneKeyRecolor() {
+    this.variantIdx = 1;
+    this._renderConfig();
+    ui.toast('已换成另一套配色');
+  },
+  // 还原配色：回到系统最初选的那套（连手动单换也一并还原）
+  restoreColor() {
+    this._resetColorEdits();
+    this._renderConfig();
+    ui.toast('已还原原来的配色');
   },
 
   onName(e) {
@@ -493,6 +569,7 @@ Page({
     let p;
     if (fixed) {
       p = this.pattern;
+      this._qcells = null; // 模板/图纸不改色
     } else {
       if (!this.srcData) return;
       // 画布大小：上限 = 图片像素长边（1:1 还原），再受 SIZE_CAP 保护
@@ -516,6 +593,11 @@ Page({
       const colorVal = this.colorLimit == null ? Math.min(colorMax, 48) : ui.clamp(this.colorLimit, 2, colorMax);
       let cells = base.cells;
       if (colorVal < natural) cells = reduceColors(base.cells, colorVal);
+      // 改色：单换（colorSwap）优先，否则一键换色变体（variantIdx）——都作用在缩减后的原色上
+      this._qcells = cells;
+      this._finalOf = op => (this.colorSwap.has(op) ? this.colorSwap.get(op)
+        : (this.variantIdx ? variantPal(op, this.variantIdx) : op));
+      if (this.colorSwap.size || this.variantIdx) cells = cells.map(c => (c >= 0 ? this._finalOf(c) : -1));
       p = this.pattern = { w: base.w, h: base.h, cells };
       extra.size = size;
       extra.sizeMin = sizeMin;
@@ -523,7 +605,7 @@ Page({
       extra.sizeHint = sizeMax < imgSide
         ? '最大 ' + sizeMax + ' 豆'
         : '最大 ' + sizeMax + ' 豆 · 1:1 还原图片像素';
-      extra.sizesShown = [16, 24, 32, 48].filter(n => n >= sizeMin && n <= sizeMax);
+      extra.sizesShown = [52, 78, 104].filter(n => n >= sizeMin && n <= sizeMax);
       extra.showColor = natural > 2;
       extra.colorMax = colorMax;
       extra.colorVal = colorVal;
@@ -533,8 +615,17 @@ Page({
     const firstConfig = this.data.mode !== 'config';
     const stats = colorStats(p.cells);
     const total = stats.reduce((a, s) => a + s.count, 0);
-    const chips = stats.slice().sort((a, b) => b.count - a.count).slice(0, 12)
-      .map(s => ({ hex: p.palette ? p.palette[s.pal] : PALETTE[s.pal].hex, count: s.count }));
+    // 照片可改色：色块按「改色前的原色」建（点它走 tapEditColor(原色下标)），显示的是改后颜色
+    let chips;
+    if (!fixed && this._qcells) {
+      chips = colorStats(this._qcells).slice().sort((a, b) => b.count - a.count).map(s => {
+        const hex = PALETTE[this._finalOf(s.pal)].hex;
+        return { pal: s.pal, hex, tcol: textColorFor(hex), count: s.count, swapped: this.colorSwap.has(s.pal) };
+      });
+    } else {
+      chips = stats.slice().sort((a, b) => b.count - a.count).slice(0, 12)
+        .map(s => ({ pal: s.pal, hex: p.palette ? p.palette[s.pal] : PALETTE[s.pal].hex, count: s.count }));
+    }
 
     const ins = ui.navInsets();
     const maxPx = Math.min(340, ins.winW - 72);
@@ -544,6 +635,7 @@ Page({
     this.setData(Object.assign(extra, {
       mode: 'config',
       fixed,
+      canEdit: !fixed,
       fromChart: !!this.fromChart,
       importedCode: this._importedCode || '',
       name: this.name,
@@ -570,7 +662,7 @@ Page({
     if (firstConfig && !fixed) {
       buildGuide(this, 'create-config', [
         { sel: '.preview-wrap', text: '图片变成拼豆图纸啦！上面是预览，下面标着一共要多少颗豆子、用几种颜色' },
-        { sel: '.sz-opt', text: '「画布大小」= 长边的豆子数：调大细节更多、拼得也更久。第一次拼建议 32 豆上下～' },
+        { sel: '.sz-opt', text: '「画布大小」= 长边的豆子数：常规板 52 / 78 / 104，点右边数字还能直接手动输入。越大细节越多、拼得越久，新手从 52 起步就好～' },
         { sel: '.cl-opt', text: '颜色太多拼起来累！往小调会自动合并相近色，更好拼也更耐看；白底图片记得开下面的「白色背景不拼豆」' },
       ], 600);
     }

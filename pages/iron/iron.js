@@ -1,15 +1,24 @@
-// 熨烫界面：按住熨斗划过豆子，烫平定型
+// 熨烫界面：自动熨烫机流程（选烫法 → 盖烘焙布 → 上滑推托盘进机器 → 自动压合 → 拖动掀布揭晓 → 完成进查看页）
 const { store } = require('../../utils/store');
 const { PALETTE } = require('../../utils/palette');
 const { colorStats } = require('../../utils/convert');
-const { BoardView, renderPatternTo, getBeadShape, workFinish, workHole } = require('../../utils/board');
+const { renderPatternTo, getBeadShape, workFinish, workHole, finishList, finishInfo } = require('../../utils/board');
+const { ensureFinishSwatches } = require('../../utils/finishswatch');
 const { audio } = require('../../utils/audio');
 const { celebrate } = require('../../utils/confetti');
 const ui = require('../../utils/ui');
 const { cfg } = require('../../utils/config');
 const ads = require('../../utils/ads');
-const { buildChartExportTo } = require('../../utils/share');
 const { buildGuide, guideSeen, markGuideSeen } = require('../../utils/guidance');
+
+const HOLE_LABEL = { none: '无孔', small: '小孔', large: '大孔' };
+// 每个流程步骤的标题/副标
+const STEP = {
+  cover: { t: '盖上烘焙布', s: '先给豆子盖一层烘焙布，保护表面、受热更均匀。' },
+  insert: { t: '把托盘推进去', s: '烘焙布已盖好，手指上滑，把托盘推进机器。' },
+  press: { t: '正在自动压合', s: '压板缓慢下降，把豆豆稳稳压住、均匀加热。' },
+  peel: { t: '从右下角轻轻掀开', s: '按住布角，向左上方拖，慢慢掀开烘焙布。' },
+};
 
 Page({
   data: {
@@ -18,16 +27,32 @@ Page({
     capH: 900,
     title: '',
     workName: '',
-    pct: 0,
+    workId: '',
     muted: false,
     debug: cfg.DEBUG,
+    // 选烫法
+    finish: 'smooth',
+    hole: 'none',
+    holeLabel: '无孔',
+    finishName: '',
+    cats: [],
+    finishTab: 'common',
+    cards: [],
+    // 机器流程
+    phase: 'pick', // pick / cover / insert / press / peel
+    stepT: '',
+    stepS: '',
+    ledText: 'READY',
+    pressPct: 0,
+    peelPct: 0,
+    trayLift: 0,    // 托盘上移像素（上滑推入）
+    trayDrag: false, // 拖动中：关掉过渡，让托盘跟手（松手/推入才用过渡）
+    trayOp: 1,      // 托盘透明度（推入机器时淡出=被吞进去）
+    trayScale: 1,   // 托盘缩放（推入时略缩，进机器口）
+    trayW: 200,
+    trayH: 200,
     celebrating: false,
-    modal: { show: false, img: '', imgW: 0, imgH: 0 },
-    shareShow: false,
-    workId: '',
     guideSteps: [],
-    finish: 'grain', // 熨烫质感：grain 细腻纹理 / smooth 光滑平面
-    hole: 'small',   // 成品豆孔：none 无孔 / small 小孔 / large 大孔
   },
 
   onLoad(q) {
@@ -40,260 +65,211 @@ Page({
     }
     this.work = work;
     this.uq = ui.serialQueue();
-    // 插屏（interstitialDone，二期后端配了才生效）：进页面就预建，给广告预载留时间；
-    // 弹出时机在完成弹窗「回到首页」——整条制作链路的终点，唯一的自然停顿点
+    // 插屏预建（完成后回首页时弹）
     this._itAd = ads.prepareInterstitial('interstitialDone');
-    this.totalPlaced = work.cells.filter(t => t >= 0).length;
-    this.ironedCount = work.ironed.reduce((a, b) => a + b, 0);
-    this.finished = false;
-    this.saveTimer = 0;
-    this.pctTimer = 0;
+    this.finishImg = {};
+    const finish = workFinish(work);
+    const hole = workHole(work);
     this.setData({
       insets: ui.navInsets(),
       title: '熨烫 · ' + work.name,
       workName: work.name,
       workId: work.id,
       muted: audio.muted,
-      pct: this._pct(),
-      finish: workFinish(work), // 老作品没这个字段：默认细腻纹理
-      hole: workHole(work),     // 老作品没这个字段：默认小孔
+      finish,
+      hole,
+      holeLabel: HOLE_LABEL[hole],
+      finishName: finishInfo(finish).name,
+      finishTab: finishInfo(finish).cat,
+      cats: finishList().map(g => ({ cat: g.cat, label: g.label })),
+      cards: this._cardsFor(finishInfo(finish).cat, finish),
     });
+  },
+
+  _cardsFor(cat, finish) {
+    const g = finishList().find(x => x.cat === cat) || { items: [] };
+    return g.items.map(it => ({ key: it.key, name: it.name, sub: it.sub, img: (this.finishImg && this.finishImg[it.key]) || '', active: it.key === finish }));
   },
 
   onReady() {
     if (!this.work) return;
-    ui.queryNode(this, '#board').then(r => {
-      if (!r || !r.node || !this.work) return;
-      const dpr = Math.min(3, ui.navInsets().dpr);
-      this.bv = new BoardView(r.node, {
-        w: this.work.w, h: this.work.h,
-        cells: this.work.cells, placed: this.work.placed,
-        palette: this.work.palette || null,
-        mode: 'iron', ironed: this.work.ironed,
-        finish: this.data.finish,
-        hole: this.data.hole,
-        onIron: n => this._applyIron(n),
-      });
-      this.bv.setViewport(r.width, r.height, dpr, r.left, r.top);
-      setTimeout(() => ui.syncBoardRect(this, this.bv), 600);
+    ui.queryNode(this, '#tray').then(r => { if (r && r.node) { this.trayCanvas = r.node; this.renderTray(false); } });
+    ui.queryNode(this, '#util').then(r => { if (r) { this.utilCanvas = r.node; this._loadSwatches(); } });
+    // 首次熨烫引导（选烫法 → 开始）
+    const pickStep = { sel: '.fp-tabs', text: '先挑烫法：常用 / 特殊工艺 / 闪粉三类，点上面切换、选卡片；下面再选豆孔。' };
+    const goStep = { sel: '.start-btn', text: '点「开始熨烫」进自动熨烫机——盖布、上滑推托盘、自动压合、掀布揭晓，跟着提示走就行～' };
+    if (!guideSeen('iron')) buildGuide(this, 'iron', [pickStep, goStep]);
+    else if (!guideSeen('iron-texture')) buildGuide(this, 'iron-texture', [pickStep]);
+  },
+
+  // 渲染托盘里的图：fused=false 原豆 / true 融合成品
+  renderTray(fused) {
+    if (!this.trayCanvas || !this.work) return;
+    const work = this.work;
+    const cellPx = ui.clamp(Math.floor(200 / Math.max(work.w, work.h)), 3, 12);
+    const size = renderPatternTo(this.trayCanvas, work, { cellPx, fused, finish: this.data.finish, hole: fused ? this.data.hole : 'none', scale: 2 });
+    const k = Math.min(1, 230 / size.width, 250 / size.height);
+    this.setData({ trayW: Math.round(size.width * k), trayH: Math.round(size.height * k) });
+  },
+
+  _loadSwatches() {
+    const keys = this.data.cards.filter(c => c.key).map(c => c.key);
+    ensureFinishSwatches(this, keys, (key, path) => {
+      this.finishImg[key] = path;
+      const i = this.data.cards.findIndex(c => c.key === key);
+      if (i >= 0) this.setData({ ['cards[' + i + '].img']: path });
     });
-    ui.queryNode(this, '#util').then(r => { if (r) this.utilCanvas = r.node; });
-    // 首次熨烫：教操作。质感、豆孔都是后加的，按看过的程度分层补看：
-    //   没看过 iron → 完整版（操作 + 质感 + 豆孔）
-    //   看过 iron 没看过质感 → iron-texture（质感 + 豆孔）
-    //   质感也看过、只差豆孔 → iron-hole（豆孔）
-    const texStep = {
-      sel: '.tex-row',
-      text: '烫之前先挑个质感：「细腻纹理」有真实拼豆的手作颗粒感，「光滑平面」干净利落。烫的过程中也能随时换～',
-    };
-    const holeStep = {
-      sel: '.tex-hole',
-      text: '再选成品的豆孔大小：无孔更整洁，小孔 / 大孔更像真实拼豆——熨烫定型后就是这个样子。（默认值可在设置里改）',
-    };
-    if (!guideSeen('iron')) {
-      buildGuide(this, 'iron', [
-        { text: '豆子拼齐啦，最后一步：按住屏幕不放，熨斗就会出现，划过豆子把它们烫平定型！全部烫完就大功告成～' },
-        texStep,
-        holeStep,
-      ]);
-    } else if (!guideSeen('iron-texture')) {
-      buildGuide(this, 'iron-texture', [texStep, holeStep]);
-    } else {
-      buildGuide(this, 'iron-hole', [holeStep]);
-    }
   },
 
   onGuideDone() {
-    // 完整/上层引导已含下层步骤，别再让这些用户重复补看
-    const id = this.data.guideId;
-    if (id === 'iron') { markGuideSeen('iron-texture'); markGuideSeen('iron-hole'); }
-    else if (id === 'iron-texture') { markGuideSeen('iron-hole'); }
+    if (this.data.guideId === 'iron') markGuideSeen('iron-texture');
     this.setData({ guideSteps: [] });
   },
 
-  onResize() {
-    this.setData({ insets: ui.navInsets() });
-    setTimeout(() => ui.syncBoardRect(this, this.bv), 120);
-  },
-
+  onResize() { this.setData({ insets: ui.navInsets() }); },
   onHide() { this._flushSave(); },
-
   onUnload() {
     this._gone = true;
-    clearTimeout(this.pctTimer);
     this._flushSave();
-    if (this.bv) this.bv.destroy();
     if (this._itAd) this._itAd.destroy();
   },
-
-  _pct() {
-    return this.totalPlaced ? Math.round(this.ironedCount / this.totalPlaced * 100) : 0;
+  _flushSave() {
+    if (!this.work) return;
+    store.update(this.work.id, { ironed: this.work.ironed, ironDone: this.work.ironDone || false });
   },
 
-  /* ---------- 画板事件 ---------- */
-  onTS(e) { if (this.bv && !this.finished) this.bv.touchStart(e); },
-  onTM(e) { if (this.bv && !this.finished) this.bv.touchMove(e); },
-  onTE(e) { if (this.bv) this.bv.touchEnd(e); },
-  zoomFit() { if (this.bv) this.bv.fit(); },
+  toggleMute() { audio.setMuted(!audio.muted); this.setData({ muted: audio.muted }); },
+  goBack() { ui.backHome(); },
 
-  // 导出图纸：把这幅图纸（网格 + 色号）保存/分享，熨烫阶段也能导（同分享弹窗「保存图纸」）
-  exportChart() {
-    const work = this.work;
-    if (!work || !this.utilCanvas) return;
-    ads.rewarded('rvChart', {
-      workId: work.id,
-      title: '导出高清图纸',
-      desc: '看一段短广告，即可把这幅图纸保存或分享',
-    }).then(ok => {
-      if (!ok) return;
-      wx.showLoading({ title: '生成中', mask: true });
-      this.uq(() => ui.captureCanvas(this, this.utilCanvas, () => buildChartExportTo(this.utilCanvas, work)))
-        .then(path => { wx.hideLoading(); ui.shareImage(path); })
-        .catch(() => { wx.hideLoading(); ui.toast('导出失败，再试一次'); });
-    });
+  /* ---------- 选烫法 / 豆孔 ---------- */
+  switchFinishTab(e) {
+    const cat = e.currentTarget.dataset.cat;
+    if (!cat || cat === this.data.finishTab) return;
+    this.setData({ finishTab: cat, cards: this._cardsFor(cat, this.data.finish) });
+    this._loadSwatches();
   },
-
-  goBack() {
-    this._flushSave();
-    ui.backHome();
-  },
-  toggleMute() {
-    audio.setMuted(!audio.muted);
-    this.setData({ muted: audio.muted });
-  },
-
-  // 熨烫质感三选一。随时可切（已烫的格子即时变），选择随作品持久化 ——
-  // 之后的查看页、首页缩略图、分享卡都按它渲染
   pickFinish(e) {
     const f = e.currentTarget.dataset.f;
     if (!f || f === this.data.finish) return;
-    this.setData({ finish: f });
-    if (this.work) {
-      this.work.finish = f;
-      store.update(this.work.id, { finish: f });
-    }
-    if (this.bv) this.bv.setFinish(f);
+    const patch = { finish: f, finishName: finishInfo(f).name };
+    this.data.cards.forEach((c, i) => { const on = c.key === f; if (c.active !== on) patch['cards[' + i + '].active'] = on; });
+    this.setData(patch);
+    if (this.work) { this.work.finish = f; store.update(this.work.id, { finish: f }); }
   },
-
-  // 成品豆孔大小三选一（无孔 / 小孔 / 大孔）。同样随时可切、随作品持久化，
-  // 之后查看页 / 首页缩略图 / 分享卡 / 导出图都按它渲染成品
   pickHole(e) {
     const h = e.currentTarget.dataset.h;
     if (!h || h === this.data.hole) return;
-    this.setData({ hole: h });
-    if (this.work) {
-      this.work.hole = h;
-      store.update(this.work.id, { hole: h });
-    }
-    if (this.bv) this.bv.setHole(h);
-  },
-  debugFill() {
-    if (this.finished || !this.bv) return;
-    const n = this.bv.ironAll();
-    if (n) this._applyIron(n);
+    this.setData({ hole: h, holeLabel: HOLE_LABEL[h] });
+    if (this.work) { this.work.hole = h; store.update(this.work.id, { hole: h }); }
   },
 
-  /* ---------- 熨烫结算 ---------- */
-  _applyIron(n) {
-    if (this.finished || this._gone) return;
-    this.ironedCount += n;
+  /* ---------- 机器流程 ---------- */
+  _step(p) { this.setData({ phase: p, stepT: STEP[p] ? STEP[p].t : '', stepS: STEP[p] ? STEP[p].s : '' }); },
+
+  // 开始熨烫：盖布 → 自动进入推入
+  startIron() {
+    this._step('cover');
+    setTimeout(() => { if (!this._gone && this.data.phase === 'cover') this._step('insert'); }, 1000);
+  },
+
+  // 推托盘：上滑手势（跟手，无过渡；也可点按钮）
+  onTrayTS(e) {
+    if (this.data.phase !== 'insert') return;
+    const t = e.touches && e.touches[0]; if (!t) return;
+    this._sy = t.clientY; this._sMoved = 0; this._lastLift = null;
+  },
+  onTrayTM(e) {
+    if (this.data.phase !== 'insert' || this._sy == null) return;
+    const t = e.touches && e.touches[0]; if (!t) return;
+    const dy = this._sy - t.clientY;
+    this._sMoved = dy;
+    const lift = Math.max(0, Math.min(140, dy));
+    if (this._lastLift != null && Math.abs(lift - this._lastLift) < 3) return; // 节流
+    this._lastLift = lift;
+    this.setData({ trayLift: lift, trayDrag: true });
+  },
+  onTrayTE() {
+    if (this.data.phase !== 'insert') return;
+    const moved = this._sMoved;
+    this._sy = null; this._lastLift = null;
+    if (moved > 28) this.doInsert();               // 上滑一点就推入，更灵敏
+    else this.setData({ trayLift: 0, trayDrag: false });
+  },
+  doInsert() {
+    if (this.data.phase !== 'insert') return;
+    // 上移进机器口 + 淡出 + 略缩 → 被机器"吞进去"，不飞到机器上方（机器 z-index 更高，会遮住托盘）
+    this.setData({ trayLift: 180, trayOp: 0, trayScale: 0.82, trayDrag: false });
+    try { wx.vibrateShort({ type: 'light' }); } catch (e) { /* 忽略 */ }
+    setTimeout(() => this.startPress(), 520);
+  },
+
+  // 自动压合
+  startPress() {
+    this._step('press');
+    this.setData({ ledText: 'PRESS', pressPct: 0 });
+    setTimeout(() => { if (!this._gone) this.setData({ pressPct: 100 }); }, 60);
     audio.sizzle();
-    if (!this.pctTimer) {
-      this.pctTimer = setTimeout(() => {
-        this.pctTimer = 0;
-        this.setData({ pct: this._pct() });
-      }, 100);
-    }
-    this._scheduleSave();
-    if (this.ironedCount >= this.totalPlaced) this._finishIron();
+    setTimeout(() => { if (!this._gone) { this.setData({ ledText: 'HEAT' }); audio.sizzle(); } }, 1300);
+    setTimeout(() => {
+      if (this._gone) return;
+      this.renderTray(true);                       // 融合成成品
+      this.setData({ peelPct: 0, trayLift: 0, trayOp: 1, trayScale: 1 }); // 托盘弹出，准备掀布
+      this._step('peel');
+    }, 2600);
   },
 
-  _scheduleSave() {
-    clearTimeout(this.saveTimer);
-    this.saveTimer = setTimeout(() => this._flushSave(), 600);
+  // 掀布：拖动手势（handler 挂在 .pan 上，点布角/布面都算——布角 grip 是 cloth 的兄弟，挂 cloth 上点不到）
+  onClothTS(e) {
+    if (this.data.phase !== 'peel') return;
+    const t = e.touches && e.touches[0]; if (!t) return;
+    this._px = t.clientX; this._py = t.clientY;
   },
-  _flushSave() {
-    clearTimeout(this.saveTimer);
-    if (!this.work) return;
-    store.update(this.work.id, {
-      ironed: this.work.ironed,
-      ironDone: this.work.ironDone || false,
-    });
+  onClothTM(e) {
+    if (this.data.phase !== 'peel' || this._px == null) return;
+    const t = e.touches && e.touches[0]; if (!t) return;
+    const dx = this._px - t.clientX, dy = this._py - t.clientY;
+    const p = Math.max(0, Math.min(100, (dx + dy) / 1.8)); // 往左上拖，更省力
+    this.setData({ peelPct: p });
+    if (p >= 100) { this._px = null; this._finishIron(); }
+  },
+  onClothTE() {
+    if (this.data.phase !== 'peel') return;
+    if (this.data.peelPct >= 45) { this.setData({ peelPct: 100 }); this._finishIron(); }
+    else this.setData({ peelPct: 0 });
+    this._px = null;
   },
 
+  /* ---------- 完成 → 查看页 ---------- */
   _finishIron() {
-    if (this.finished) return;
-    this.finished = true;
+    if (this._done) return;
+    this._done = true;
     const work = this.work;
+    for (let i = 0; i < work.ironed.length; i++) if (work.cells[i] >= 0 && work.placed[i]) work.ironed[i] = 1;
     work.ironDone = true;
     store.update(work.id, {
       ironed: work.ironed, ironDone: true,
-      finish: this.data.finish, // 定型时把质感选择一并落盘（缩略图/分享按它渲染）
-      hole: this.data.hole,     // 豆孔选择一并落盘
-      completedAt: Date.now(),
+      finish: this.data.finish, hole: this.data.hole, completedAt: Date.now(),
     });
     if (this.utilCanvas) {
       this.uq(() => ui.makeThumb(this, this.utilCanvas, work, true))
         .then(path => store.update(work.id, { thumb: path, thumbV: ui.THUMB_V, thumbShape: getBeadShape() }, true))
-        .catch(() => { /* 忽略 */ });
+        .catch(() => { /* 缩略图失败不影响 */ });
     }
-    setTimeout(() => {
-      this.setData({ pct: 100 });
-      audio.finish();
-      // 里程碑中震：熨烫定型完成
-      try { wx.vibrateShort({ type: 'medium' }); } catch (e) { /* 忽略 */ }
-      this._celebrate();
-    }, 300);
-    setTimeout(() => this._showDoneModal(), 1200);
+    audio.finish();
+    try { wx.vibrateShort({ type: 'medium' }); } catch (e) { /* 忽略 */ }
+    this._celebrate();
+    setTimeout(() => { if (!this._gone) wx.redirectTo({ url: '/pages/view/view?id=' + work.id }); }, 1500);
   },
 
   _celebrate() {
     this.setData({ celebrating: true }, () => {
       ui.queryNode(this, '#confetti').then(r => {
-        if (!r || !r.node) { this.setData({ celebrating: false }); return; }
+        if (!r || !r.node) return;
         const dpr = Math.min(2, ui.navInsets().dpr);
         const w = this.work;
         const hexes = colorStats(w.cells).map(s => (w.palette ? w.palette[s.pal] : PALETTE[s.pal].hex));
-        celebrate(r.node, r.width, r.height, dpr, hexes, () => this.setData({ celebrating: false }));
+        celebrate(r.node, r.width, r.height, dpr, hexes, () => { /* 完成即将跳转 */ });
       });
     });
-  },
-
-  _showDoneModal() {
-    const work = this.work;
-    // 预览尽量占满弹窗内宽（.modal max-width 340 - 边框内距 ≈ 285），高度限 300 防长图撑爆弹窗
-    const show = (img, w, h) => {
-      const k = Math.min(1, 300 / (h || 300), 285 / (w || 285));
-      this.setData({ modal: { show: true, img: img || '', imgW: Math.round((w || 0) * k), imgH: Math.round((h || 0) * k) } });
-    };
-    if (!this.utilCanvas) { show('', 0, 0); return; }
-    this.uq(() => {
-      const cellPx = ui.clamp(Math.floor(300 / Math.max(work.w, work.h)), 4, 20);
-      let size = null; // captureCanvas 内部会先调 draw() 再导出
-      const draw = () => (size = renderPatternTo(this.utilCanvas, work, {
-        cellPx, fused: true, finish: this.data.finish, hole: this.data.hole, scale: 2,
-      }));
-      return ui.captureCanvas(this, this.utilCanvas, draw).then(path => show(path, size.width, size.height));
-    }).catch(() => show('', 0, 0));
-  },
-
-  /* ---------- 完成后的分享 ---------- */
-  openShare() { this.setData({ shareShow: true }); },
-  closeShare() { this.setData({ shareShow: false }); },
-  onCardBuilt(e) { this.shareImg = e.detail.path; },
-
-  // 关掉插屏（或没广告可弹）才导航，回家永远不被广告卡住
-  goHome() {
-    if (this._itAd) this._itAd.showThen(() => ui.backHome());
-    else ui.backHome();
-  },
-
-  onShareAppMessage() {
-    const msg = {
-      title: '我拼好了「' + (this.work ? this.work.name : '拼豆作品') + '」，来拼豆便利店逛逛！',
-      path: '/pages/home/home',
-    };
-    if (this.shareImg) msg.imageUrl = this.shareImg;
-    return msg;
   },
 });

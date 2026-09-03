@@ -112,6 +112,34 @@
   border-radius: 0;
   border: 1.5px solid rgba(95, 74, 78, .35);
 }
+/* —— 改色 —— */
+.recolor-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.recolor-tip { font-size: 12px; color: var(--ink2); display: flex; align-items: center; }
+.recolor-btns { display: flex; gap: 8px; flex-shrink: 0; }
+.recolor-btn {
+  display: inline-flex; align-items: center;
+  padding: 6px 12px; font-size: 13px; font-weight: 700;
+  color: var(--ink); background: var(--coin);
+  border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--coin-dark);
+}
+.recolor-btn.ghost { background: var(--card); box-shadow: 2px 2px 0 #E2DAD3; }
+.cchip.edit { border-color: var(--accent-dark); }
+.cchip.swapped .dot { border: 2px solid var(--accent-dark); box-shadow: 0 0 0 1.5px #fff inset; }
+
+/* 换色取色器 */
+.swap-modal { max-width: 400px; text-align: left; }
+.swap-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.swap-cur { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; min-width: 0; }
+.swap-cur-dot { width: 22px; height: 22px; border: 2px solid var(--ink); flex-shrink: 0; }
+.swap-x {
+  width: 30px; height: 30px; flex-shrink: 0;
+  border: 2px solid var(--ink); box-shadow: 2px 2px 0 #E2DAD3;
+  display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700;
+}
+/* scroll-view 上直接 flex-wrap 真机不认（会竖排）→ 里面包一层普通 view 做换行 */
+.swap-scroll { max-height: 46vh; }
+.swap-grid { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px; }
+.swap-sw { width: 34px; height: 34px; flex-shrink: 0; border: 2px solid rgba(95, 74, 78, .28); }
 
 .opt-row {
   display: flex;
@@ -122,7 +150,21 @@
 }
 .opt-label { font-size: 14px; font-weight: 600; flex-shrink: 0; }
 .opt-col { display: flex; flex-direction: column; gap: 8px; }
-.opt-val { font-size: 13px; font-weight: 700; color: var(--accent-dark); }
+.opt-val { font-size: 13px; font-weight: 700; color: var(--accent-dark); display: flex; align-items: center; gap: 3px; }
+/* 可手动输入的数字框（画布大小 / 颜色数量）：浅底 + 樱粉描边，示意可点按输入 */
+.opt-edit { width: 14px; height: 14px; vertical-align: -2px; }
+.opt-input {
+  width: 52px;
+  min-height: 30px;
+  padding: 3px 6px;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--accent-dark);
+  background: #FBFAF3;
+  border: 2px solid var(--accent);
+  border-radius: 0;
+}
 .opt-hint { font-size: 11px; color: var(--ink2); }
 .opt-slider { margin: 2px 4px; }
 .size-chips { display: flex; gap: 7px; }

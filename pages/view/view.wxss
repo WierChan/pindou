@@ -1,4 +1,14 @@
-/* 作品查看：主体样式在 app.wxss 的 playpage 骨架里 */
+/* 作品查看：主体样式在 app.wxss 的 playpage 骨架里；选烫法横滑器 .fp-* 在 app.wxss 全局 */
+
+/* 底部：未烫/烫后切换 + 选烫法横滑 + 导出/保存（竖向堆叠） */
+.vt-sheet { display: block; }
+.vt-toggle { width: max-content; max-width: 100%; margin: 2px auto 12px; }
+.vt-toggle .seg-i { padding: 9px 22px; font-size: 14px; }
+/* 分享 / 导入码 一排，保存这个效果 单独一排（占满宽） */
+.vt-mini-row { display: flex; gap: 10px; max-width: 720px; margin: 12px auto 0; padding: 0 4px; }
+.vt-mini { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 11px 8px; }
+.vt-save { display: block; text-align: center; max-width: 720px; margin: 10px auto 2px; }
+
 
 /* 导入码弹窗 */
 .code-big {

@@ -15,6 +15,24 @@ const { createCode, format, markCodePrompted } = require('../../utils/importcode
 const PAINT_KEY = 'pindou.paintMode.v1'; // 划动模式:1 = 连续上豆 / 其余 = 拖动平移（跨作品记忆）
 const LOCATE_KEY = 'pindou.locate.v1';   // 定位高亮:1 = 开（当前色未拼格标红、其余变淡，跨作品记忆）
 
+// 一键拼豆：每天 3 次（全局，跨作品共享，隔天自动重置；不接激励视频补次数——避免被当小游戏审）
+const FILL_PER_DAY = 3;
+const FILL_DAY_KEY = 'pindou.fillDay';
+const FILL_N_KEY = 'pindou.fillLeft';
+function _fillToday() { const d = new Date(); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); }
+function readFillLeft() {
+  try {
+    if (wx.getStorageSync(FILL_DAY_KEY) !== _fillToday()) return FILL_PER_DAY; // 新的一天：满额
+    const n = wx.getStorageSync(FILL_N_KEY);
+    return (n === '' || n == null) ? FILL_PER_DAY : n;
+  } catch (e) { return FILL_PER_DAY; }
+}
+function useFill() {
+  const left = Math.max(0, readFillLeft() - 1);
+  try { wx.setStorageSync(FILL_DAY_KEY, _fillToday()); wx.setStorageSync(FILL_N_KEY, left); } catch (e) { /* 忽略 */ }
+  return left;
+}
+
 Page({
   data: {
     insets: { top: 24, h: 44, right: 8 },
@@ -25,6 +43,8 @@ Page({
     chips: [],
     paintOn: false,
     locateOn: false,
+    fillLeft: 3,        // 一键拼豆今日剩余次数
+    fillArmed: false,   // 一键拼豆武装中：等用户点画板选一整片同色
     beadShape: 'square',
     muted: false,
     bgmOn: false,
@@ -86,6 +106,7 @@ Page({
     // 定位高亮：关 = 普通淡图纸，开 = 当前色未拼格标红、其余变淡（跨作品记忆）
     this.locateOn = false;
     try { this.locateOn = wx.getStorageSync(LOCATE_KEY) === 1; } catch (e) { /* 忽略 */ }
+    this.fillArmed = false; // 一键拼豆武装态（不持久化：进页面永远是未武装）
 
     const chips = this.colorsUsed.map((pal, i) => {
       const n = this.remaining.get(pal);
@@ -104,6 +125,7 @@ Page({
       chips,
       paintOn: this.paintOn,
       locateOn: this.locateOn,
+      fillLeft: readFillLeft(),
       beadShape: getBeadShape(),
       muted: audio.muted,
       bgmOn: bgm.enabled,
@@ -127,7 +149,7 @@ Page({
       buildGuide(this, 'play', [
         { sel: '.palette-bar', text: '先在这里选颜色！每种颜色有编号，下面的数字是还差几颗' },
         { text: '板上淡淡的格子就是图纸。点亮所有跟选中颜色一样的格子吧！点错了我会晃一晃提醒你。双指可以缩放看细节～' },
-        { sel: '.tools-row', text: '打开「连续上豆」，手指划过格子就能连着拼，超解压！关掉就是单指拖动画布～' },
+        { sel: '.tools-row', text: '开「连续上豆」手指划过就能连着拼；旁边「一键拼豆」每天 3 次——点一下它，再点画板上想铺满的一整片同色，就会从那里扩散着铺满～' },
         toolsStep,
       ]);
     }
@@ -144,11 +166,13 @@ Page({
   },
 
   onShow() {
-    // 回到拼豆页就续上背景音乐（首次进入 / 切后台再回来 / 从熨烫返回都靠它）
-    if (this.work && bgm.enabled) bgm.start();
+    if (!this.work) return;
+    if (bgm.enabled) bgm.start();                 // 回到拼豆页续上背景音乐
+    this.setData({ fillLeft: readFillLeft() });   // 一键拼豆是每天全局额度，回来刷新一下
+    if (this.fillArmed) this._setFillArmed(false); // 回到页面清掉武装态，避免误触
   },
 
-  onHide() { this._flushSave(); bgm.stop(); },
+  onHide() { this._flushSave(); bgm.stop(); if (this.fillArmed) this._setFillArmed(false); },
 
   onUnload() {
     this._gone = true;
@@ -180,6 +204,7 @@ Page({
           audio.wrong();
           try { wx.vibrateShort({ type: 'medium' }); } catch (e) { /* 忽略 */ }
         },
+        onFill: (filled, cell) => this._onFill(filled, cell), // 一键拼豆：铺满点到的那一整片同色
       });
       this.bv.setViewport(r.width, r.height, dpr, r.left, r.top);
       // 布局稳定后复测画布位置，防止部分机型触点参照系偏移
@@ -329,6 +354,37 @@ Page({
     ui.toast(this.locateOn ? '定位开：红色就是现在要拼的地方' : '定位已关');
   },
 
+  // 一键拼豆：点一下「武装」，再点画板上想铺满的一整片同色 → 从落点向外扩散铺满那一整块。每天 3 次。
+  // 做成两步（先武装再点画板）是因为要让用户指到「哪一片」——正是「点击一次铺满连续的一整块」的意思。
+  oneKeyFill() {
+    if (this.finished || !this.bv) return;
+    if (this.fillArmed) { this._setFillArmed(false); return; } // 再点一下 = 取消武装
+    if (readFillLeft() <= 0) { ui.toast('今天的一键拼豆用完啦，明天再来～'); return; }
+    this._setFillArmed(true);
+    ui.toast('点画板上想铺满的一整片同色 ✨');
+  },
+
+  _setFillArmed(v) {
+    this.fillArmed = v;
+    this.setData({ fillArmed: v });
+    if (this.bv) this.bv.setFillArmed(v);
+  },
+
+  // 画板回调：用户在武装态轻点了画板，filled 是刚铺下的那一整片格子
+  _onFill(filled, cell) {
+    if (!filled || !filled.length) { // 点到空格 / 已拼完的片：不扣次数，保持武装让用户再点
+      ui.toast('点一片「还没拼」的同色豆试试～');
+      return;
+    }
+    this._setFillArmed(false);                 // 用掉一次，收起武装
+    this.setData({ fillLeft: useFill() });
+    // 顺手把选中色切到刚铺的那一片，色板高亮跟上
+    const tc = this.work.cells[cell];
+    if (tc >= 0 && tc !== this.sel && this.chipIdx.has(tc)) this._setSel(tc);
+    try { wx.vibrateShort({ type: 'light' }); } catch (e) { /* 忽略 */ }
+    this._applyPlacement(filled, 'fill');
+  },
+
   /* ---------- 上豆结算 ---------- */
   _onPlace(i) {
     this.pending.push(i);
@@ -362,6 +418,7 @@ Page({
     this._scheduleSave();
     if (sound === 'tap') audio.tap();
     if (sound === 'row') audio.rowFill(); // 'row' 音效仅剩调试一键完成（debugFill）在用
+    if (sound === 'fill') audio.rowFill(); // 一键拼豆：一声上扫，配扩散动画
     if (this.placedCount >= this.total) { this._finish(); return; }
     const doneNow = [...affected].filter(t => this.remaining.get(t) === 0);
     if (doneNow.length) {

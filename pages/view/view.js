@@ -1,17 +1,24 @@
-// 作品查看：完成后的展示与分享
+// 作品查看：完成后的展示、换烫法、分享
 const { store } = require('../../utils/store');
-const { BoardView, workFinish, workHole } = require('../../utils/board');
+const { BoardView, workFinish, workHole, finishList, finishInfo, getBeadShape } = require('../../utils/board');
+const { ensureFinishSwatches } = require('../../utils/finishswatch');
 const { createCode, format, markCodePrompted } = require('../../utils/importcode');
 const ui = require('../../utils/ui');
-const { buildGuide } = require('../../utils/guidance');
+const { buildGuide, guideSeen, markGuideSeen } = require('../../utils/guidance');
 
 Page({
   data: {
     insets: { top: 24, h: 44, right: 8 },
+    capW: 700,
+    capH: 900,
     title: '',
-    // 能进到这一页的都是熨烫定型完的作品，默认就展示成品的样子（熨烫质感，
-    // 含熨烫时选的纹理）；点一下「熨烫效果」可切回网格图纸看格子
-    fusedOn: true,
+    // 已定型作品：可在「未烫成品 / 烫后效果」间切看，并横滑换烫法、保存
+    fusedOn: true,      // true 烫后效果（融合+烫法） / false 未烫成品（原豆）
+    finish: 'smooth',
+    finishName: '',
+    cats: [],           // 三类 Tab [{cat,label}]
+    finishTab: 'common',
+    cards: [],          // 当前 Tab 的烫法卡片
     shareShow: false,
     workId: '',
     codeShow: false,
@@ -27,11 +34,32 @@ Page({
       return;
     }
     this.work = work;
+    this.uq = ui.serialQueue();
+    this.finishImg = {};
+    const finish = workFinish(work);
     this.setData({
       insets: ui.navInsets(),
       title: work.name,
       workId: work.id,
+      finish,
+      finishName: finishInfo(finish).name,
+      finishTab: finishInfo(finish).cat,
+      cats: finishList().map(g => ({ cat: g.cat, label: g.label })),
+      cards: this._cardsFor(finishInfo(finish).cat, finish),
     });
+  },
+
+  // 某分类下的卡片（带预览图与选中态）
+  _cardsFor(cat, finish) {
+    const g = finishList().find(x => x.cat === cat) || { items: [] };
+    return g.items.map(it => ({ key: it.key, name: it.name, sub: it.sub, img: (this.finishImg && this.finishImg[it.key]) || '', active: it.key === finish }));
+  },
+  // 切换分类 Tab
+  switchFinishTab(e) {
+    const cat = e.currentTarget.dataset.cat;
+    if (!cat || cat === this.data.finishTab) return;
+    this.setData({ finishTab: cat, cards: this._cardsFor(cat, this.data.finish) });
+    this._loadSwatches();
   },
 
   onReady() {
@@ -51,15 +79,35 @@ Page({
       this.bv.setViewport(r.width, r.height, dpr, r.left, r.top);
       setTimeout(() => ui.syncBoardRect(this, this.bv), 600);
     });
-    // 首次看成品：讲清这页能做的三件事（切图纸 / 分享 / 导入码）
-    buildGuide(this, 'view', [
-      { text: '这里收着你烫好的成品～双指放大能细看每一颗豆子的质感。' },
-      { sel: '.vt-effect', text: '想看每格的颜色和位置？点这里切回「图纸」模式，再点一下切回成品。' },
-      { sel: '.vt-share', text: '「分享」生成一张带小程序码的作品卡片，发好友或朋友圈都行；「导入码」是给好友拼同款用的口令。' },
-    ]);
+    ui.queryNode(this, '#util').then(r => { if (r) { this.utilCanvas = r.node; this._loadSwatches(); } });
+    // 首次看成品：讲清这页能做的事；换烫法是后加的，老用户单步补看（view-finish）
+    if (!guideSeen('view')) {
+      buildGuide(this, 'view', [
+        { text: '这里收着你烫好的成品～双指放大能细看每一颗豆子的质感。' },
+        { sel: '.vt-toggle', text: '「未烫成品 / 烫后效果」随时切看：一边是原豆，一边是熨烫定型后的样子。' },
+        { sel: '.fp-tabs', text: '底下能换烫法：点「常用 / 特殊工艺 / 闪粉」切类，再选卡片，选中就即时预览，满意点「保存这个效果」。' },
+      ]);
+    } else {
+      buildGuide(this, 'view-finish', [
+        { sel: '.fp-tabs', text: '新增：成品也能换烫法啦——点「常用 / 特殊工艺 / 闪粉」切类选卡片，即时预览，满意点「保存这个效果」。' },
+      ]);
+    }
   },
 
-  onGuideDone() { this.setData({ guideSteps: [] }); },
+  // 渲染所有烫法卡片的预览图（会话内缓存，渲染完 patch 进对应卡片）
+  _loadSwatches() {
+    const keys = this.data.cards.filter(c => c.key).map(c => c.key);
+    ensureFinishSwatches(this, keys, (key, path) => {
+      this.finishImg[key] = path;
+      const i = this.data.cards.findIndex(c => c.key === key);
+      if (i >= 0) this.setData({ ['cards[' + i + '].img']: path });
+    });
+  },
+
+  onGuideDone() {
+    if (this.data.guideId === 'view') markGuideSeen('view-finish'); // 完整版已含换烫法讲解，别再补看
+    this.setData({ guideSteps: [] });
+  },
 
   onResize() {
     this.setData({ insets: ui.navInsets() });
@@ -76,12 +124,39 @@ Page({
 
   goBack() { ui.backHome(); },
 
-  // 图纸显示 ↔ 熨烫效果 切换
-  toggleFused() {
-    if (!this.bv) return;
-    const showEffect = this.bv.chart; // 当前是图纸 → 切到熨烫效果
-    this.bv.setChart(!showEffect);
-    this.setData({ fusedOn: showEffect });
+  // 未烫成品 ↔ 烫后效果 切换（seg：data-v '1' 烫后 / '0' 未烫）
+  toggleFused(e) {
+    const on = e.currentTarget.dataset.v === '1';
+    if (on === this.data.fusedOn) return;
+    this.setData({ fusedOn: on });
+    if (this.bv) { this.bv.setChart(false); this.bv.setFused(on); }
+  },
+
+  // 选烫法（底部横滑卡片）：即时预览 + 落盘烫法（分享/导出跟着一致）；封面缩略图留给「保存这个效果」刷新
+  pickFinish(e) {
+    const f = e.currentTarget.dataset.f;
+    if (!f || f === this.data.finish) return;
+    const patch = { finish: f, finishName: finishInfo(f).name };
+    this.data.cards.forEach((c, i) => { if (!c.key) return; const on = c.key === f; if (c.active !== on) patch['cards[' + i + '].active'] = on; });
+    if (!this.data.fusedOn) patch.fusedOn = true; // 选了就切到烫后效果看
+    this.setData(patch);
+    this._thumbDirty = true; // 封面还没跟上，提示保存
+    if (this.work) { this.work.finish = f; store.update(this.work.id, { finish: f }); }
+    if (this.bv) { this.bv.setChart(false); this.bv.setFused(true); this.bv.setFinish(f); }
+  },
+
+  // 保存这个效果：重刷封面缩略图（首页/作品册按新烫法显示）——烫法本身在选时已落盘
+  saveFinish() {
+    const work = this.work;
+    if (!work) return;
+    if (!this.utilCanvas) { ui.toast('已保存 ✨'); return; }
+    this.uq(() => ui.makeThumb(this, this.utilCanvas, work, true))
+      .then(path => {
+        store.update(work.id, { thumb: path, thumbV: ui.THUMB_V, thumbShape: getBeadShape() }, true);
+        this._thumbDirty = false;
+        ui.toast('已保存这个效果 ✨');
+      })
+      .catch(() => ui.toast('保存失败，再试一次'));
   },
 
   openShare() { this.setData({ shareShow: true }); },

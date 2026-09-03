@@ -28,23 +28,19 @@
 .set-lb { font-size: 15px; font-weight: 700; color: var(--ink); }
 .set-sub { font-size: 11px; font-weight: 400; color: var(--ink2); }
 
-/* 分段控件：一整条描边，内部竖线分隔，选中项樱粉底 */
-.seg {
-  display: flex;
-  border: 2px solid var(--ink);
-  overflow: hidden;
-  flex-shrink: 0;
-}
-.seg-i {
-  padding: 7px 13px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--ink2);
-  background: var(--card);
-  border-left: 2px solid var(--ink);
-  /* 不加 transition：选中即时变色，避免"慢半拍"的错觉 */
-}
-.seg-i:first-child { border-left: none; }
-.seg-i.on { background: var(--coin); color: var(--ink); }
+/* 分段控件 .seg/.seg-i 已提到 app.wxss 全局共用（设置 + 熨烫豆孔） */
 
 .set-hint { font-size: 12px; color: var(--ink2); line-height: 1.6; margin: 8px 2px 0; }
+
+/* 烫法多选：整行竖排（标签在上，分组 chip 在下） */
+.set-row.col { flex-direction: column; align-items: stretch; }
+.set-row.col .set-lb { margin-bottom: 2px; }
+.fin-groups { display: flex; flex-direction: column; gap: 10px; }
+.fin-cat { font-size: 11px; font-weight: 700; color: var(--accent-dark); letter-spacing: 1px; margin-bottom: 6px; }
+.fin-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.fin-chip {
+  padding: 7px 12px; font-size: 13px; font-weight: 700;
+  color: var(--ink2); background: var(--chipbg);
+  border: 2px solid var(--ink);
+}
+.fin-chip.on { background: var(--coin); color: var(--ink); box-shadow: 2px 2px 0 var(--coin-dark); }

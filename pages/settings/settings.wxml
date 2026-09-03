@@ -60,11 +60,17 @@
     <view class="set-sec">
       <view class="set-sec-t">熨烫成品默认</view>
       <view class="set-card">
-        <view class="set-row">
-          <view class="set-lb">质感</view>
-          <view class="seg">
-            <view class="seg-i {{finish === 'grain' ? 'on' : ''}}" hover-class="pressed" data-v="grain" bindtap="setFinish">细腻纹理</view>
-            <view class="seg-i {{finish === 'smooth' ? 'on' : ''}}" hover-class="pressed" data-v="smooth" bindtap="setFinish">光滑平面</view>
+        <view class="set-row col">
+          <view class="set-lb">烫法</view>
+          <view class="fin-groups">
+            <view wx:for="{{finishGroups}}" wx:key="cat" class="fin-group">
+              <view class="fin-cat">{{item.label}}</view>
+              <view class="fin-chips">
+                <view wx:for="{{item.items}}" wx:for-item="it" wx:key="key"
+                      class="fin-chip {{finish === it.key ? 'on' : ''}}" hover-class="pressed"
+                      data-v="{{it.key}}" bindtap="setFinish">{{it.name}}</view>
+              </view>
+            </view>
           </view>
         </view>
         <view class="set-row">
@@ -76,7 +82,7 @@
           </view>
         </view>
       </view>
-      <view class="set-hint">新作品熨烫时的默认值；每幅作品在熨烫页仍可单独调整。</view>
+      <view class="set-hint">新作品熨烫时的默认烫法与豆孔；每幅作品在熨烫页仍可单独调整。</view>
     </view>
   </view>
 </view>

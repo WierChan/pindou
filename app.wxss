@@ -325,6 +325,7 @@ button.btn-reset::after { border: none; }
   align-items: center;
   gap: 10px;
   padding: 2px 4px 8px;
+  flex-wrap: wrap;
 }
 .tool-chip {
   padding: 8px 14px;
@@ -342,6 +343,41 @@ button.btn-reset::after { border: none; }
   background: var(--coin);
   box-shadow: 3px 3px 0 var(--coin-dark);
 }
+/* 一键拼豆 chip：武装时高亮并轻轻上下浮动（提示"去点画板选一片"），用尽时灰掉 */
+.fill-chip.armed { background: var(--blue); color: #7A5A2E; box-shadow: 3px 3px 0 var(--blue-dark); animation: fillbob 1s ease-in-out infinite; }
+.fill-chip.off { opacity: .5; }
+@keyframes fillbob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+
+/* 分段控件（设置页 / 熨烫豆孔等共用）：一整条描边，内部竖线分隔，选中项绛羽粉底 */
+.seg { display: flex; border: 2px solid var(--ink); overflow: hidden; flex-shrink: 0; }
+.seg-i {
+  padding: 7px 13px; font-size: 13px; font-weight: 700;
+  color: var(--ink2); background: var(--card);
+  border-left: 2px solid var(--ink); /* 不加 transition：选中即时变色 */
+}
+.seg-i:first-child { border-left: none; }
+.seg-i.on { background: var(--coin); color: var(--ink); }
+
+/* ===== 选烫法：分类 Tab + 卡片（熨烫页 / 查看页共用） ===== */
+/* 三类 Tab：分段药丸，选中项白底 */
+.fp-tabs { display: inline-flex; background: var(--chipbg); border: 2px solid var(--ink); padding: 3px; gap: 2px; margin: 0 12px 10px; }
+.fp-tab { padding: 6px 15px; font-size: 13px; font-weight: 800; color: var(--ink2); }
+.fp-tab.on { background: var(--card); color: var(--ink); box-shadow: 2px 2px 0 #E2DAD3; }
+
+.fp-label { font-size: 12px; color: var(--ink2); font-weight: 700; margin: 2px 14px 6px; }
+.fp-scroll { width: 100%; white-space: nowrap; }
+.fp-row { display: inline-flex; align-items: stretch; gap: 8px; padding: 0 12px 2px; }
+.fp-card {
+  flex-shrink: 0; width: 100px; box-sizing: border-box;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 8px 5px; background: var(--chipbg);
+  border: 2px solid transparent; border-radius: 14px;
+}
+.fp-card.on { background: var(--card); border-color: var(--ink); box-shadow: 2px 2px 0 #E2DAD3; }
+.fp-pv { width: 54px; height: 54px; border-radius: 12px; background: #FFFFFF; box-shadow: inset 0 0 0 1px rgba(95,74,78,.12); }
+.fp-pv.ph { background: repeating-linear-gradient(45deg, #F0E7DF 0 5px, #F6EFE8 5px 10px); }
+.fp-nm { font-size: 12px; font-weight: 800; color: var(--ink); line-height: 1.15; white-space: normal; text-align: center; }
+.fp-sub { font-size: 10px; color: var(--ink2); line-height: 1.1; white-space: normal; text-align: center; }
 .tools-hint {
   font-size: 12px;
   color: var(--ink2);

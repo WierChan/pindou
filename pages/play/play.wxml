@@ -28,13 +28,14 @@
     <view class="bb-inner">
       <view class="tools-row">
         <view class="tool-chip {{paintOn ? 'active' : ''}}" bindtap="togglePaint"><image class="pxi-s" src="/assets/icons/hand.png" />连续上豆</view>
-        <view class="tools-hint">{{paintOn ? '划过格子连续上豆！' : '选颜色，点格子上豆'}}</view>
+        <view class="tool-chip fill-chip {{fillArmed ? 'armed' : ''}} {{fillLeft <= 0 ? 'off' : ''}}" hover-class="pressed" bindtap="oneKeyFill"><image class="pxi-s" src="/assets/icons/bolt.png" />一键拼豆 {{fillLeft}}</view>
         <view class="tr-btns">
           <view class="tr-btn loc {{locateOn ? 'active' : ''}}" hover-class="pressed" bindtap="toggleLocate">◎</view>
           <view class="tr-btn" hover-class="pressed" bindtap="shareMenu"><image class="pxi-l" src="/assets/icons/export.png" /></view>
           <view class="tr-btn" hover-class="pressed" bindtap="zoomFit">⛶</view>
         </view>
       </view>
+      <view class="tools-hint row2">{{fillArmed ? '点画板上想铺满的一整片同色 → 从那里扩散开～' : (paintOn ? '划过格子连续上豆！' : '选颜色点格子上豆 ·「一键拼豆」点一片同色整块铺满')}}</view>
       <scroll-view class="palette-bar" scroll-x scroll-into-view="{{scrollInto}}"
                    scroll-with-animation enhanced show-scrollbar="{{false}}">
         <view class="pchip {{item.active ? 'active' : ''}} {{item.done ? 'done' : ''}}"

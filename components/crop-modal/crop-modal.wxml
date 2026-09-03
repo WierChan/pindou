@@ -23,9 +23,12 @@
     </view>
 
     <!-- 网格磁吸模式（自由画布导出）按格吸附，比例档没有意义，隐藏 -->
-    <view class="cm-ratios" wx:if="{{!grid}}">
-      <view class="cm-ratio {{ratio === item.k ? 'active' : ''}}" wx:for="{{ratios}}" wx:key="k"
-            hover-class="pressed" data-r="{{item.k}}" catchtap="setRatio">{{item.label}}</view>
+    <view class="cm-ratio-grp" wx:if="{{!grid}}">
+      <view class="cm-ratio-lb">画布比例<text class="cm-ratio-sub">裁成什么比例，拼豆画布就是什么比例</text></view>
+      <view class="cm-ratios">
+        <view class="cm-ratio {{ratio === item.k ? 'active' : ''}}" wx:for="{{ratios}}" wx:key="k"
+              hover-class="pressed" data-r="{{item.k}}" catchtap="setRatio">{{item.label}}</view>
+      </view>
     </view>
 
     <view class="cm-hint">{{hint}}</view>

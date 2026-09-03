@@ -1,72 +1,97 @@
-<view class="playpage">
+<view class="ironflow">
   <view class="topbar" style="padding-top:{{insets.top}}px;padding-right:{{insets.right}}px">
     <view class="tb-back" hover-class="pressed" bindtap="goBack">‹</view>
-    <view class="tb-title">{{title}}</view>
+    <view class="tb-title">{{phase === 'pick' ? title : '自动熨烫机'}}</view>
     <view class="tb-actions">
+      <view class="fin-tag" wx:if="{{phase !== 'pick'}}">{{finishName}}</view>
       <view class="icon-btn" hover-class="pressed" bindtap="toggleMute"><image class="pxi-l" src="{{muted ? '/assets/icons/sndoff.png' : '/assets/icons/sndon.png'}}" /></view>
-      <view wx:if="{{debug}}" class="icon-btn" bindtap="debugFill"><image class="pxi-l" src="/assets/icons/bolt.png" /></view>
     </view>
   </view>
 
-  <view class="prog-wrap">
-    <view class="prog-bar"><view class="fill" style="width:{{pct}}%" /></view>
-    <view class="prog-txt">{{pct}}%</view>
+  <!-- 步骤标题 -->
+  <view class="fhead">
+    <block wx:if="{{phase === 'pick'}}">
+      <view class="fkick">READY TO IRON</view>
+      <view class="ftitle">选好烫法，开始熨烫</view>
+      <view class="fsub">进自动熨烫机：盖布 → 推入 → 压合 → 掀开揭晓。</view>
+    </block>
+    <block wx:else>
+      <view class="fkick">PERLER WORKSHOP</view>
+      <view class="ftitle">{{stepT}}</view>
+      <view class="fsub">{{stepS}}</view>
+    </block>
   </view>
 
-  <view class="board-area">
-    <canvas type="2d" id="board" class="board"
-            bindtouchstart="onTS" bindtouchmove="onTM"
-            bindtouchend="onTE" bindtouchcancel="onTE"></canvas>
-  </view>
+  <view class="stage">
+    <!-- 机器（推入 / 压合 时出现） -->
+    <view class="machine" wx:if="{{phase === 'insert' || phase === 'press'}}">
+      <view class="mled">
+        <view class="mdot"></view>
+        <text class="mtext">{{ledText}}</text>
+        <text class="mlab">PERLER LAB</text>
+      </view>
+      <view class="mdots">
+        <view class="{{phase === 'insert' ? 'on' : ''}}"></view>
+        <view class="{{phase === 'press' ? 'on' : ''}}"></view>
+        <view></view>
+      </view>
+      <view class="mmouth"></view>
+    </view>
+    <view class="marrow" wx:if="{{phase === 'insert'}}">↑</view>
 
-  <view class="bottom-bar">
-    <view class="iron-tr">
-      <view class="tr-btns">
-        <view class="tr-btn" hover-class="pressed" bindtap="exportChart"><image class="pxi-l" src="/assets/icons/export.png" /></view>
-        <view class="tr-btn" hover-class="pressed" bindtap="zoomFit">⛶</view>
+    <!-- 压合进度 -->
+    <view class="pressbox" wx:if="{{phase === 'press'}}">
+      <view class="pbadge">{{ledText === 'HEAT' ? '正在受热融合…' : '豆豆正在就位…'}}</view>
+      <view class="pbar"><view class="pfill" style="width:{{pressPct}}%"></view></view>
+    </view>
+
+    <!-- 托盘：一直在 DOM（压合时上移出视野），承载画布 + 烘焙布 -->
+    <view class="tray {{phase}} {{trayDrag ? 'dragging' : ''}}" style="transform:translateY(-{{trayLift}}px) scale({{trayScale}});opacity:{{trayOp}}"
+          bindtouchstart="onTrayTS" bindtouchmove="onTrayTM" bindtouchend="onTrayTE" bindtouchcancel="onTrayTE">
+      <view class="pan" bindtouchstart="onClothTS" bindtouchmove="onClothTM" bindtouchend="onClothTE" bindtouchcancel="onClothTE">
+        <canvas type="2d" id="tray" class="traycv" style="width:{{trayW}}px;height:{{trayH}}px"></canvas>
+        <view class="cloth {{phase === 'cover' || phase === 'insert' ? 'covered' : ''}} {{phase === 'peel' ? 'peeling' : ''}}"
+              style="{{phase === 'peel' ? 'opacity:' + (1 - peelPct/100) + ';transform:translate(' + (peelPct*1.7) + '%,' + (peelPct*1.7) + '%) rotate(' + (peelPct*0.16) + 'deg)' : ''}}"></view>
+        <view class="peelgrip" wx:if="{{phase === 'peel'}}">↖</view>
       </view>
     </view>
-    <!-- 熨烫质感：开烫前先选，烫的过程中也能随时换（已烫的格子即时变） -->
-    <view class="tex-row">
-      <view class="tex-label">质感</view>
-      <view class="tool-chip {{finish === 'grain' ? 'active' : ''}}" hover-class="pressed"
-            data-f="grain" bindtap="pickFinish"><image class="pxi-s" src="/assets/icons/sparkle.png" />细腻纹理</view>
-      <view class="tool-chip {{finish === 'smooth' ? 'active' : ''}}" hover-class="pressed"
-            data-f="smooth" bindtap="pickFinish"><image class="pxi-s" src="/assets/icons/smooth.png" />光滑平面</view>
-    </view>
-    <!-- 成品豆孔：熨烫前选大小、甚至无孔（已烫的融合豆即时反映） -->
-    <view class="tex-row tex-hole">
-      <view class="tex-label">豆孔</view>
-      <view class="tool-chip {{hole === 'none' ? 'active' : ''}}" hover-class="pressed" data-h="none" bindtap="pickHole">无孔</view>
-      <view class="tool-chip {{hole === 'small' ? 'active' : ''}}" hover-class="pressed" data-h="small" bindtap="pickHole">小孔</view>
-      <view class="tool-chip {{hole === 'large' ? 'active' : ''}}" hover-class="pressed" data-h="large" bindtap="pickHole">大孔</view>
-    </view>
-    <view class="tools-hint iron-hint"><image class="pxi-s" src="/assets/icons/flame.png" />按住熨斗，慢慢划过每一颗豆子，把它们烫平定型</view>
+  </view>
+
+  <!-- 底部 -->
+  <view class="fbottom">
+    <block wx:if="{{phase === 'pick'}}">
+      <view class="fp-label">选择烫法</view>
+      <view class="fp-tabs">
+        <view wx:for="{{cats}}" wx:key="cat" class="fp-tab {{finishTab === item.cat ? 'on' : ''}}"
+              data-cat="{{item.cat}}" bindtap="switchFinishTab">{{item.label}}</view>
+      </view>
+      <scroll-view scroll-x class="fp-scroll" enhanced show-scrollbar="{{false}}">
+        <view class="fp-row">
+          <view wx:for="{{cards}}" wx:key="key" class="fp-card {{item.active ? 'on' : ''}}"
+                data-f="{{item.key}}" bindtap="pickFinish" hover-class="pressed">
+            <image wx:if="{{item.img}}" class="fp-pv" src="{{item.img}}" mode="aspectFit" />
+            <view wx:else class="fp-pv ph"></view>
+            <view class="fp-nm">{{item.name}}</view>
+            <view class="fp-sub">{{item.sub}}</view>
+          </view>
+        </view>
+      </scroll-view>
+      <view class="tex-row tex-hole">
+        <view class="tex-label">豆孔</view>
+        <view class="seg">
+          <view class="seg-i {{hole === 'none' ? 'on' : ''}}" hover-class="pressed" data-h="none" bindtap="pickHole">无孔</view>
+          <view class="seg-i {{hole === 'small' ? 'on' : ''}}" hover-class="pressed" data-h="small" bindtap="pickHole">小孔</view>
+          <view class="seg-i {{hole === 'large' ? 'on' : ''}}" hover-class="pressed" data-h="large" bindtap="pickHole">大孔</view>
+        </view>
+      </view>
+      <view class="start-btn" hover-class="pressed" bindtap="startIron">开始熨烫 →</view>
+    </block>
+    <view wx:elif="{{phase === 'insert'}}" class="insert-tip" hover-class="pressed" bindtap="doInsert">↑ 手指上滑推入托盘（或点这里）</view>
+    <view wx:elif="{{phase === 'peel'}}" class="peel-tip">按住右下角布角，往左上拖，掀开揭晓 ✨</view>
   </view>
 
   <canvas wx:if="{{celebrating}}" type="2d" id="confetti" class="confetti"></canvas>
-
-  <share-modal workId="{{workId}}" show="{{shareShow}}" bind:close="closeShare" bind:built="onCardBuilt" />
+  <guide gid="{{guideId}}" steps="{{guideSteps}}" bind:done="onGuideDone" />
 </view>
 
 <canvas type="2d" id="util" class="util-canvas" style="width:{{capW}}px;height:{{capH}}px"></canvas>
-
-<!-- 完成弹窗：页面顶层 + 提升层级，确保盖住画板 canvas -->
-<view wx:if="{{modal.show}}" class="overlay hi">
-  <view class="modal">
-    <view class="modal-title"><image class="pxi-l" src="/assets/icons/sparkle.png" />大功告成！</view>
-    <view class="modal-art" wx:if="{{modal.img}}">
-      <image src="{{modal.img}}" style="width:{{modal.imgW}}px;height:{{modal.imgH}}px" />
-    </view>
-    <view class="modal-sub">
-      <view>「{{workName}}」熨烫定型完毕</view>
-      <view>这就是你亲手拼出来的作品！</view>
-    </view>
-    <view class="modal-btns">
-      <view class="btn-primary" hover-class="pressed" bindtap="openShare">分享</view>
-    </view>
-    <view class="btn-link" hover-class="pressed" bindtap="goHome">回到首页</view>
-  </view>
-</view>
-
-<guide gid="{{guideId}}" steps="{{guideSteps}}" bind:done="onGuideDone" />
