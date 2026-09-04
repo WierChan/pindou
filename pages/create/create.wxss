@@ -125,6 +125,8 @@
 .recolor-btn.ghost { background: var(--card); box-shadow: 2px 2px 0 #E2DAD3; }
 .cchip.edit { border-color: var(--accent-dark); }
 .cchip.swapped .dot { border: 2px solid var(--accent-dark); box-shadow: 0 0 0 1.5px #fff inset; }
+/* 色块折叠开关 */
+.chips-toggle { display: block; width: fit-content; margin: 10px auto 2px; padding: 5px 16px; text-align: center; font-size: 12px; font-weight: 700; color: var(--accent-dark); background: var(--chipbg); border: 1.5px solid var(--line); border-radius: 14px; }
 
 /* 换色取色器 */
 .swap-modal { max-width: 400px; text-align: left; }

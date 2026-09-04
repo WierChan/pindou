@@ -26,6 +26,7 @@ let TPL_THUMBS = null;
 
 // 画布长边上限：受 wx storage 单 key 1MB 与画板渲染性能约束
 const SIZE_CAP = 256;
+const CHIP_N = 12; // 色块默认折叠时显示前几个（按用量降序，覆盖主色），其余「展开」再看
 
 Page({
   data: {
@@ -64,6 +65,9 @@ Page({
     total: 0,
     colorN: 0,
     chips: [],
+    chipsOpen: false,     // 色块折叠：默认只显示前 CHIP_N 个
+    chipsTotal: 0,
+    chipsCollapsible: false,
     canEdit: false,       // 照片转的图纸可改色（模板/图纸导入不可）
     swapShow: false,      // 单个换色的取色器
     swapPal: null,
@@ -477,17 +481,32 @@ Page({
     this._renderConfig();
   },
 
+  // 松手（bindchange）：这时才重算图纸、重画预览/色块（imageToPattern 重，只在松手跑一次）
   onSizeSlider(e) {
     const v = +e.detail.value;
-    if (v === this.data.size) return;
     this._resetColorEdits();
     this.setData({ size: v });
     this._renderConfig();
   },
-
+  // 拖动中（bindchanging）：只把数字跟手更新，不重画——拖着重算会卡
+  onSizeChanging(e) {
+    const v = +e.detail.value;
+    if (v !== this.data.size) this.setData({ size: v });
+  },
   onColorSlider(e) {
     this.colorLimit = +e.detail.value;
+    this.setData({ colorVal: +e.detail.value });
     this._renderConfig();
+  },
+  onColorChanging(e) {
+    const v = +e.detail.value;
+    if (v !== this.data.colorVal) this.setData({ colorVal: v });
+  },
+  // 色块折叠：展开看全部 / 收起只留前 CHIP_N 个
+  toggleChips() {
+    const open = !this.data.chipsOpen;
+    const all = this._chipsAll || [];
+    this.setData({ chipsOpen: open, chips: open ? all : all.slice(0, CHIP_N) });
   },
 
   // 手动输入画布大小：右侧数字可直接打字（超范围自动收进 sizeMin~sizeMax）
@@ -627,6 +646,8 @@ Page({
         .map(s => ({ pal: s.pal, hex: p.palette ? p.palette[s.pal] : PALETTE[s.pal].hex, count: s.count }));
     }
 
+    this._chipsAll = chips; // 全量色块留存，折叠时只发前 CHIP_N 个给视图
+
     const ins = ui.navInsets();
     const maxPx = Math.min(340, ins.winW - 72);
     const cellPx = ui.clamp(Math.floor(maxPx / Math.max(p.w, p.h)), 1, 14);
@@ -642,7 +663,9 @@ Page({
       dimText: p.w + ' × ' + p.h + ' 板',
       total,
       colorN: stats.length,
-      chips,
+      chips: this.data.chipsOpen ? chips : chips.slice(0, CHIP_N),
+      chipsTotal: chips.length,
+      chipsCollapsible: chips.length > CHIP_N,
       pvW: size.width,
       pvH: size.height,
     }), () => {
@@ -677,10 +700,30 @@ Page({
       name, w: p.w, h: p.h, cells: p.cells, palette: p.palette,
       fromCode: this._importedCode || undefined,
     });
+    // 照片/表情作品：把量化源存下来，拼阶段可高质量重调大小/颜色（图纸/模板不存——本就 1:1、不可调）
+    const editable = this.srcData && !this.fromChart && !this.fromTpl;
     const go = () => wx.redirectTo({ url: '/pages/play/play?id=' + work.id });
     this.uq(() => ui.makeThumb(this, this.utilCanvas, work, false))
-      .then(path => { store.update(work.id, { thumb: path, thumbV: ui.THUMB_V, thumbShape: getBeadShape() }, true); go(); })
-      .catch(go);
+      .then(path => store.update(work.id, { thumb: path, thumbV: ui.THUMB_V, thumbShape: getBeadShape() }, true))
+      .then(() => (editable ? this._saveSource(work.id) : null))
+      .then(go).catch(go);
+  },
+
+  // 把 srcData（≤512 的量化源像素）存成 PNG，随作品留档；拼阶段据此高质量重调大小/颜色
+  _saveSource(workId) {
+    const sd = this.srcData;
+    if (!sd || !this.utilCanvas) return Promise.resolve();
+    const draw = () => {
+      const cv = this.utilCanvas;
+      cv.width = sd.w; cv.height = sd.h;
+      const ctx = cv.getContext('2d');
+      const img = ctx.createImageData(sd.w, sd.h);
+      img.data.set(sd.data);
+      ctx.putImageData(img, 0, 0);
+    };
+    return ui.captureCanvas(this, this.utilCanvas, draw)
+      .then(tmp => { store.update(workId, { src: ui.persistFile(tmp, 'src-' + workId + '.png'), whiteEmpty: !!this.data.whiteEmpty }, true); })
+      .catch(() => { /* 存原图失败不影响创建 */ });
   },
 
   onShareAppMessage() {

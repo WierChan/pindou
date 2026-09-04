@@ -514,8 +514,8 @@ function renderPatternTo(canvas, p, opts) {
  *   getTool: () => null | 'row' | 'erase'(free 模式橡皮),
  *   canSwipe: () => bool,  // play 模式：是否允许划动连续上豆；不允许时单指拖动改为平移（不传 = 允许）
  *   onPlace(i), onWrong(i), onToolTap(i), onIron(n), onErase(i)
- *   一键拼豆：页面用 setFillArmed(true) 武装，武装后轻点画板 → fillBlockAt 铺满整片同色，
- *     回调 onFill(filled, cell)（filled = 实际铺下的格子；空数组表示点到空格或该片已拼完，页面据此不扣次数）
+ *   一键拼豆：页面用 setFillArmed(true) 武装，武装后轻点画板 → fillBlockAt 铺满点击处周围一块（各色一起），
+ *     回调 onFill(filled, cell)（filled = 实际铺下的格子；空数组表示这块没有可拼的豆，页面据此不扣次数）
  *   onFill(filled, cell)
  *   free 模式：cells 就是用户作品本身（可改写），点/划任意格上当前色，可覆盖换色；橡皮擦除。
  *   onExpand(cx, cy)：free 模式画到数据网格外时回调，页面负责扩容数组并调整 ox/oy，
@@ -536,7 +536,7 @@ class BoardView {
     this.holeR = holeRatio(opts.hole);
     this.chart = !!opts.chart; // 图纸显示模式（view）
     this.locate = !!opts.locate; // 定位模式（play）：高亮当前色未拼格、其余变淡
-    this.fillArmed = false;      // 一键拼豆武装中：下一次轻点画板 → 铺满点到的那一整片同色
+    this.fillArmed = false;      // 一键拼豆武装中：下一次轻点画板 → 铺满点击处周围一块（各色）
     this.scale = 20; this.ox = 0; this.oy = 0;
     this.vw = 0; this.vh = 0; this.dpr = 1;
     this.rl = 0; this.rt = 0; // canvas 在视口中的位置（把 clientX/Y 换算成画布坐标）
@@ -572,8 +572,10 @@ class BoardView {
   setChart(v) { this.chart = !!v; this.dirty = true; }
   // 定位模式（play 模式用）：当前选中色的未拼格高亮红、其余变淡，方便找位置
   setLocate(v) { this.locate = !!v; this.dirty = true; }
-  // 一键拼豆武装开关（play 模式用）：武装后轻点画板不再单颗上豆，而是铺满点到的那一整片同色
+  // 一键拼豆武装开关（play 模式用）：武装后轻点画板不再单颗上豆，而是铺满点击处周围一块（各色）
   setFillArmed(v) { this.fillArmed = !!v; }
+  // 换色后刷新（play 换色工具用）：cells 已就地改好，这里重算色板 RGB 缓存 + 数字标号映射，即时反映
+  setColors(palette, numbers) { this.pal = palRGB(palette); if (numbers) this.o.numbers = numbers; this.dirty = true; }
 
   // 页面布局完成 / 窗口尺寸变化（iPad 分屏、转屏）时调用
   setViewport(w, h, dpr, left, top) {
@@ -839,28 +841,31 @@ class BoardView {
   // 一键拼豆：从落点那一格出发，4-邻接收同色连成「一整片」，把这片里还没拼的格子
   // 按到落点的图距（BFS 层数）错开落下 → 从点到的地方向外一圈圈扩散铺满。
   // 返回实际铺下的格子下标（页面据此结算进度/扣次数；片里已拼的不重复计）。
+  // 一键拼豆：以点击格为中心，把半径 R 内一块圆形区域里所有「还没拼的」豆子（各色一起）铺上，
+  // 按到中心的距离向外扩散动画。返回实际铺下的格子（空 = 这块没有可拼的豆，页面据此不扣次数）。
   fillBlockAt(cell) {
     const o = this.o, w = o.w, h = o.h, cells = o.cells, placed = o.placed;
     if (cell < 0 || cell >= cells.length) return [];
-    const tc = cells[cell];
-    if (tc < 0) return []; // 空格：这里没有豆子，不算一整片
-    const seen = new Uint8Array(cells.length);
-    const queue = [cell], qd = [0]; // 同步的下标 / 图距队列（不用 Map，省得大图慢）
-    seen[cell] = 1;
+    const R = 7; // 半径（格）≈ 15 格宽的一块
+    const cx0 = cell % w, cy0 = (cell / w) | 0;
     const filled = [], fd = [];
-    for (let qi = 0; qi < queue.length; qi++) {
-      const i = queue[qi], d = qd[qi];
-      if (!placed[i]) { filled.push(i); fd.push(d); } // 这一片里还没拼的才铺
-      const cx = i % w, cy = (i / w) | 0;
-      if (cx > 0 && !seen[i - 1] && cells[i - 1] === tc) { seen[i - 1] = 1; queue.push(i - 1); qd.push(d + 1); }
-      if (cx < w - 1 && !seen[i + 1] && cells[i + 1] === tc) { seen[i + 1] = 1; queue.push(i + 1); qd.push(d + 1); }
-      if (cy > 0 && !seen[i - w] && cells[i - w] === tc) { seen[i - w] = 1; queue.push(i - w); qd.push(d + 1); }
-      if (cy < h - 1 && !seen[i + w] && cells[i + w] === tc) { seen[i + w] = 1; queue.push(i + w); qd.push(d + 1); }
+    const y0 = Math.max(0, cy0 - R), y1 = Math.min(h - 1, cy0 + R);
+    const x0 = Math.max(0, cx0 - R), x1 = Math.min(w - 1, cx0 + R);
+    for (let cy = y0; cy <= y1; cy++) {
+      for (let cx = x0; cx <= x1; cx++) {
+        const dx = cx - cx0, dy = cy - cy0;
+        const r2 = dx * dx + dy * dy;
+        if (r2 > R * R) continue;                 // 圆形一块，比方角自然
+        const i = cy * w + cx;
+        if (cells[i] < 0 || placed[i]) continue;  // 空格 / 已拼：跳过
+        filled.push(i);
+        fd.push(Math.round(Math.sqrt(r2)));       // 到中心的环层 → 向外扩散
+      }
     }
-    if (!filled.length) return []; // 这一整片已经拼完了
+    if (!filled.length) return []; // 这一块没有可拼的豆
     let maxd = 0; for (const d of fd) if (d > maxd) maxd = d;
     const t0 = now();
-    const step = maxd > 0 ? Math.min(38, 640 / maxd) : 0; // 按到落点的图距错开 → 向外扩散；大片时压缩总时长
+    const step = maxd > 0 ? Math.min(38, 640 / maxd) : 0; // 按到落点的距离错开 → 向外扩散
     for (let k = 0; k < filled.length; k++) { placed[filled[k]] = 1; this.anims.set(filled[k], t0 + fd[k] * step); }
     this.dirty = true;
     return filled;

@@ -91,6 +91,7 @@
           <view class="dot" style="background:{{item.hex}}" />{{item.count}}
         </view>
       </view>
+      <view wx:if="{{chipsCollapsible}}" class="chips-toggle" hover-class="pressed" bindtap="toggleChips">{{chipsOpen ? '收起 ▲' : '展开全部 · 共 ' + chipsTotal + ' 种 ▼'}}</view>
 
       <block wx:if="{{!fixed}}">
         <view class="opt-col sz-opt">
@@ -104,7 +105,7 @@
           </view>
           <slider class="opt-slider" min="{{sizeMin}}" max="{{sizeMax}}" value="{{size}}" step="1"
                   activeColor="#EABFC3" backgroundColor="#F0E4E0" block-size="20"
-                  bindchange="onSizeSlider" />
+                  bindchanging="onSizeChanging" bindchange="onSizeSlider" />
           <view class="opt-hint">{{sizeHint}}</view>
         </view>
         <view class="opt-col cl-opt" wx:if="{{showColor}}">
@@ -114,7 +115,7 @@
           </view>
           <slider class="opt-slider" min="2" max="{{colorMax}}" value="{{colorVal}}" step="1"
                   activeColor="#EABFC3" backgroundColor="#F0E4E0" block-size="20"
-                  bindchange="onColorSlider" />
+                  bindchanging="onColorChanging" bindchange="onColorSlider" />
         </view>
         <view class="switch-row">
           <view class="sw-label">白色背景不拼豆<text class="sw-small">适合白底图片</text></view>

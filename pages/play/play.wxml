@@ -31,11 +31,13 @@
         <view class="tool-chip fill-chip {{fillArmed ? 'armed' : ''}} {{fillLeft <= 0 ? 'off' : ''}}" hover-class="pressed" bindtap="oneKeyFill"><image class="pxi-s" src="/assets/icons/bolt.png" />一键拼豆 {{fillLeft}}</view>
         <view class="tr-btns">
           <view class="tr-btn loc {{locateOn ? 'active' : ''}}" hover-class="pressed" bindtap="toggleLocate">◎</view>
+          <view class="tr-btn" hover-class="pressed" bindtap="openSwap">🎨</view>
+          <view class="tr-btn" hover-class="pressed" bindtap="openResize">📐</view>
           <view class="tr-btn" hover-class="pressed" bindtap="shareMenu"><image class="pxi-l" src="/assets/icons/export.png" /></view>
           <view class="tr-btn" hover-class="pressed" bindtap="zoomFit">⛶</view>
         </view>
       </view>
-      <view class="tools-hint row2">{{fillArmed ? '点画板上想铺满的一整片同色 → 从那里扩散开～' : (paintOn ? '划过格子连续上豆！' : '选颜色点格子上豆 ·「一键拼豆」点一片同色整块铺满')}}</view>
+      <view class="tools-hint row2">{{fillArmed ? '点画板上想拼的位置 → 周围一块向外扩散铺上～' : (paintOn ? '划过格子连续上豆！' : '选颜色点格子上豆 ·「一键拼豆」点哪、哪周围一块都铺上')}}</view>
       <scroll-view class="palette-bar" scroll-x scroll-into-view="{{scrollInto}}"
                    scroll-with-animation enhanced show-scrollbar="{{false}}">
         <view class="pchip {{item.active ? 'active' : ''}} {{item.done ? 'done' : ''}}"
@@ -49,6 +51,50 @@
   </view>
 
   <canvas wx:if="{{celebrating}}" type="2d" id="confetti" class="confetti"></canvas>
+
+  <!-- 换色取色器 -->
+  <view wx:if="{{swapShow}}" class="swap-mask" bindtap="closeSwap">
+    <view class="swap-sheet" catchtap="noop">
+      <view class="swap-head">
+        <text class="swap-title">把「{{swapFromName}}」换成…</text>
+        <text class="swap-x" catchtap="closeSwap">✕</text>
+      </view>
+      <scroll-view scroll-y class="swap-grid" enhanced show-scrollbar="{{false}}">
+        <view class="swap-wrap">
+          <view wx:for="{{swapChips}}" wx:key="pal" class="swap-c" style="background:{{item.hex}}"
+                data-pal="{{item.pal}}" catchtap="pickSwapColor" hover-class="pressed"></view>
+        </view>
+      </scroll-view>
+      <view class="swap-tip">选一个颜色，整幅图里这个色都会换过去（已拼的豆也跟着变，进度不丢）</view>
+    </view>
+  </view>
+
+  <!-- 改大小 / 颜色数（从留档原图高质量重生成） -->
+  <view wx:if="{{sizeShow}}" class="rz-mask" bindtap="closeResize">
+    <view class="rz-sheet" catchtap="noop">
+      <view class="swap-head">
+        <text class="swap-title">{{rzHasColor ? '改图纸大小 / 颜色数' : '改图纸大小'}}</text>
+        <text class="swap-x" catchtap="closeResize">✕</text>
+      </view>
+      <view class="rz-pv-wrap"><canvas type="2d" id="rzpv" class="rz-pv" style="width:{{rzPvW}}px;height:{{rzPvH}}px"></canvas></view>
+      <view class="rz-info">{{rzW}} × {{rzH}} 板 · {{rzTotal}} 颗 · {{rzColorN}} 色</view>
+      <view class="rz-row">
+        <text class="rz-lab">大小</text>
+        <slider class="rz-slider" min="{{rzSizeMin}}" max="{{rzSizeMax}}" value="{{rzSize}}" block-size="20" activeColor="#E86A7A" bindchanging="onRzSize" bindchange="onRzSize" />
+        <input class="rz-input" type="number" value="{{rzSize}}" bindblur="onRzSizeInput" bindconfirm="onRzSizeInput" />
+      </view>
+      <view wx:if="{{rzHasColor}}" class="rz-row">
+        <text class="rz-lab">颜色</text>
+        <slider class="rz-slider" min="2" max="{{rzColorMax}}" value="{{rzColor}}" block-size="20" activeColor="#E86A7A" bindchanging="onRzColor" bindchange="onRzColor" />
+        <input class="rz-input" type="number" value="{{rzColor}}" bindblur="onRzColorInput" bindconfirm="onRzColorInput" />
+      </view>
+      <view class="rz-warn">⚠ 应用后按新图纸重拼，当前进度会清空{{rzHasColor ? '' : '；这个作品没原图，放大会变糊'}}</view>
+      <view class="rz-btns">
+        <view class="rz-cancel" hover-class="pressed" bindtap="closeResize">取消</view>
+        <view class="rz-apply" hover-class="pressed" bindtap="confirmResize">应用</view>
+      </view>
+    </view>
+  </view>
 </view>
 
 <canvas type="2d" id="util" class="util-canvas" style="width:{{capW}}px;height:{{capH}}px"></canvas>

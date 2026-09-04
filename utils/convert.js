@@ -222,4 +222,32 @@ function reduceColors(cells, n) {
   return cells.map(t => (t >= 0 ? resolve(t) : -1));
 }
 
-module.exports = { rgb2oklab, nearestPalette, loadImageToData, emojiToData, imageToPattern, colorStats, reduceColors, variantPal, variantCount };
+// 把 cells 网格从 (w,h) 重采样到长边 = longSide 的新网格，保留色板下标（不重新量化）。
+// 缩小：每个新格取覆盖区域里出现最多的格（含空格一起竞争，保住图案疏密）；放大：最近邻。
+// 用于没有原图的作品（模板 / 图纸导入）改大小——放大会变糊、缩小会并色，属预期效果。
+function resampleCells(cells, w, h, longSide) {
+  const k = longSide / Math.max(w, h);
+  const nw = Math.max(1, Math.round(w * k));
+  const nh = Math.max(1, Math.round(h * k));
+  const out = new Array(nw * nh);
+  for (let ny = 0; ny < nh; ny++) {
+    const y0 = Math.floor(ny * h / nh), y1 = Math.min(h, Math.max(y0 + 1, Math.floor((ny + 1) * h / nh)));
+    for (let nx = 0; nx < nw; nx++) {
+      const x0 = Math.floor(nx * w / nw), x1 = Math.min(w, Math.max(x0 + 1, Math.floor((nx + 1) * w / nw)));
+      const count = new Map();
+      let best = -1, bestN = -1;
+      for (let oy = y0; oy < y1; oy++) {
+        for (let ox = x0; ox < x1; ox++) {
+          const c = cells[oy * w + ox];
+          const n = (count.get(c) || 0) + 1;
+          count.set(c, n);
+          if (n > bestN) { bestN = n; best = c; }
+        }
+      }
+      out[ny * nw + nx] = best;
+    }
+  }
+  return { w: nw, h: nh, cells: out };
+}
+
+module.exports = { rgb2oklab, nearestPalette, loadImageToData, emojiToData, imageToPattern, colorStats, reduceColors, resampleCells, variantPal, variantCount };

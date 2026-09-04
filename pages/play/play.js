@@ -1,8 +1,8 @@
 // 拼豆界面
 const { store } = require('../../utils/store');
 const { PALETTE, textColorFor, hexToRgb } = require('../../utils/palette');
-const { colorStats, nearestPalette } = require('../../utils/convert');
-const { BoardView, renderPatternTo, getBeadShape, setBeadShape } = require('../../utils/board');
+const { colorStats, nearestPalette, loadImageToData, imageToPattern, reduceColors, resampleCells } = require('../../utils/convert');
+const { BoardView, renderPatternTo, patternSize, getBeadShape, setBeadShape } = require('../../utils/board');
 const { audio, bgm } = require('../../utils/audio');
 const { celebrate } = require('../../utils/confetti');
 const ui = require('../../utils/ui');
@@ -12,6 +12,7 @@ const ads = require('../../utils/ads');
 const { buildChartExportTo } = require('../../utils/share');
 const { createCode, format, markCodePrompted } = require('../../utils/importcode');
 
+const SIZE_CAP = 256; // 画布长边上限（同 create 页），改大小时的最大豆数
 const PAINT_KEY = 'pindou.paintMode.v1'; // 划动模式:1 = 连续上豆 / 其余 = 拖动平移（跨作品记忆）
 const LOCATE_KEY = 'pindou.locate.v1';   // 定位高亮:1 = 开（当前色未拼格标红、其余变淡，跨作品记忆）
 
@@ -56,6 +57,17 @@ Page({
     celebrating: false,
     modal: { show: false, img: '', imgW: 0, imgH: 0 },
     guideSteps: [],
+    // 换色：把选中的颜色整幅换成另一个（已拼的豆也跟着变，不丢进度）
+    swapShow: false,
+    swapChips: [],
+    swapFromName: '',
+    // 改大小/颜色数（会清空进度）。有原图(work.src)=高质量重量化(size+颜色数)；没原图=重采样现图(仅 size)
+    sizeShow: false,
+    rzMode: 'source',   // source 照片/表情高质量 / resample 模板·图纸重采样
+    rzHasColor: true,   // 是否显示颜色数滑杆（仅 source 模式）
+    rzSize: 52, rzSizeMin: 8, rzSizeMax: 104,
+    rzColor: 12, rzColorMax: 48,
+    rzW: 0, rzH: 0, rzTotal: 0, rzColorN: 0, rzPvW: 0, rzPvH: 0,
   },
 
   onLoad(q) {
@@ -141,22 +153,29 @@ Page({
     this._initBoard();
     ui.queryNode(this, '#util').then(r => { if (r) this.utilCanvas = r.node; });
     // 首次拼豆：讲核心几件事（选色 → 点格子 → 工具 → 右下按钮）。
-    // 右下这排按钮是后加的：看过老版 play 引导的用户单步补看（play-tools）
-    const toolsStep = { sel: '.tr-btns', text: '右下角这排：红色🔴是「定位」——把当前颜色还没拼的格子标红，一眼找到该拼哪；中间是「分享」——导出图纸、或邀请好友接着拼；最后一个是复位视角/大小。' };
-    if (guideSeen('play')) {
-      buildGuide(this, 'play-tools', [toolsStep]);
-    } else {
+    // 分层补看：新用户看完整 play；看过 play 的补 play-tools（右下这排按钮后加的）；
+    // 都看过的老用户补 play-edit（🎨换色 / 📐改大小 是更晚加的编辑工具，否则老用户发现不了）
+    const toolsStep = { sel: '.tr-btns', text: '右下这排小工具：「◎」定位当前颜色没拼的格子；「🎨」把某个颜色整幅换掉（已拼的也跟着变）；「📐」改图纸大小/颜色数；另外两个是分享、复位视角。' };
+    const editStep = { sel: '.tr-btns', text: '右下角两个编辑工具：「🎨」把某个颜色整幅换成别的（已拼的豆也跟着变）、「📐」改图纸大小和颜色数～' };
+    if (!guideSeen('play')) {
       buildGuide(this, 'play', [
         { sel: '.palette-bar', text: '先在这里选颜色！每种颜色有编号，下面的数字是还差几颗' },
         { text: '板上淡淡的格子就是图纸。点亮所有跟选中颜色一样的格子吧！点错了我会晃一晃提醒你。双指可以缩放看细节～' },
-        { sel: '.tools-row', text: '开「连续上豆」手指划过就能连着拼；旁边「一键拼豆」每天 3 次——点一下它，再点画板上想铺满的一整片同色，就会从那里扩散着铺满～' },
+        { sel: '.tools-row', text: '开「连续上豆」手指划过就能连着拼；旁边「一键拼豆」每天有限次——点一下它，再点画板上想拼的位置，就会以那里为中心、把周围一块（各色）都铺上～' },
         toolsStep,
       ]);
+    } else if (!guideSeen('play-tools')) {
+      buildGuide(this, 'play-tools', [toolsStep]);
+    } else if (!guideSeen('play-edit')) {
+      buildGuide(this, 'play-edit', [editStep]);
     }
   },
 
   onGuideDone() {
-    if (this.data.guideId === 'play') markGuideSeen('play-tools');
+    // 上层引导已含下层内容，别再让这些用户重复补看
+    const id = this.data.guideId;
+    if (id === 'play') { markGuideSeen('play-tools'); markGuideSeen('play-edit'); }
+    else if (id === 'play-tools') { markGuideSeen('play-edit'); }
     this.setData({ guideSteps: [] });
   },
 
@@ -177,6 +196,8 @@ Page({
   onUnload() {
     this._gone = true;
     clearTimeout(this.flushTimer);
+    clearTimeout(this._rzTimer);
+    clearTimeout(this._thumbTimer);
     this._flushSave();
     if (this.bv) this.bv.destroy();
     bgm.stop();
@@ -334,6 +355,214 @@ Page({
     if (this.bv) this.bv.requestRender();
   },
 
+  /* ---------- 换色：把当前选中的颜色，整幅换成另一个（已拼的豆跟着变，进度不丢） ---------- */
+  noop() { /* 挡住蒙层点击穿透 */ },
+  openSwap() {
+    if (this.finished) return;
+    if (this.sel == null) { ui.toast('先在下面选一个要换的颜色'); return; }
+    if (!this.data.swapChips.length) this._buildSwapChips();
+    this.setData({ swapShow: true, swapFromName: this.palName(this.sel) });
+  },
+  closeSwap() { this.setData({ swapShow: false }); },
+  // 取色器：全色板按色系排序（白灰黑→红→粉→橙棕→黄→绿→蓝青→紫→莫兰迪），同 create 页
+  _buildSwapChips() {
+    const chips = PALETTE.map((c, i) => ({
+      pal: i, hex: c.hex,
+      k: 'HFEGABCDM'.indexOf(c.code[0]) * 1000 + parseInt(c.code.slice(1), 10),
+    })).sort((a, b) => a.k - b.k);
+    this.setData({ swapChips: chips });
+  },
+  pickSwapColor(e) {
+    const to = +e.currentTarget.dataset.pal;
+    const from = this.sel;
+    this.setData({ swapShow: false });
+    this._applySwap(from, to);
+  },
+  // fromPal：当前选中色；toGlobalIdx：选的 MARD 全局色号
+  _applySwap(fromPal, toGlobalIdx) {
+    const work = this.work;
+    if (work.palette) {
+      // 图纸作品：cells 里是自带色板的下标，改这个下标的实际颜色即可（下标不变、不合并）
+      const newHex = PALETTE[toGlobalIdx].hex;
+      if (work.palette[fromPal] === newHex) return;
+      work.palette[fromPal] = newHex;
+      this._rebuildColors(fromPal);           // 色号没变，选中还是它
+    } else {
+      // 照片作品：cells 里是全局色号，把 fromPal 全部改成 toGlobalIdx（可能与已有色合并）
+      if (toGlobalIdx === fromPal) return;
+      const cells = work.cells;
+      for (let i = 0; i < cells.length; i++) if (cells[i] === fromPal) cells[i] = toGlobalIdx;
+      this._rebuildColors(toGlobalIdx);        // 选中切到换成的新色
+    }
+    if (this.bv) { this.bv.setColors(work.palette || null, this.numbers); this.bv.requestRender(); }
+    this._savePattern();
+    this._refreshThumb();
+    ui.toast('换好啦 ✨');
+  },
+  // 换色后整套重算颜色相关状态（同 onLoad 里那段），preferSel 为换完后想选中的色
+  _rebuildColors(preferSel) {
+    const work = this.work;
+    const stats = colorStats(work.cells);
+    this.colorsUsed = stats.map(s => s.pal);
+    this.numbers = new Map(this.colorsUsed.map((p, i) => [p, i + 1]));
+    this.chipIdx = new Map(this.colorsUsed.map((p, i) => [p, i]));
+    this.remaining = new Map(stats.map(s => [s.pal, s.count]));
+    for (let i = 0; i < work.cells.length; i++) {
+      if (work.placed[i] && work.cells[i] >= 0) this.remaining.set(work.cells[i], this.remaining.get(work.cells[i]) - 1);
+    }
+    this.total = stats.reduce((a, s) => a + s.count, 0);
+    let left = 0; this.remaining.forEach(v => { left += v; });
+    this.placedCount = this.total - left;
+    if (preferSel != null && this.chipIdx.has(preferSel)) this.sel = preferSel;
+    else { this.sel = this.colorsUsed.find(p => this.remaining.get(p) > 0); if (this.sel == null) this.sel = this.colorsUsed[0]; }
+    const chips = this.colorsUsed.map((pal, i) => {
+      const n = this.remaining.get(pal);
+      return {
+        pal, num: i + 1, hex: this.palHex(pal), tcol: textColorFor(this.palHex(pal)),
+        left: n > 0 ? n : '✓', done: n === 0, active: pal === this.sel,
+      };
+    });
+    this.setData({ chips, total: this.total, left: this.total - this.placedCount, colorN: this.colorsUsed.length, pct: this._pct() });
+    if (this.total > 0 && this.placedCount >= this.total && !this.finished) this._finish();
+  },
+  _savePattern() {
+    if (!this.work) return;
+    const patch = { cells: this.work.cells };
+    if (this.work.palette) patch.palette = this.work.palette;
+    store.update(this.work.id, patch);
+  },
+  // 改了颜色/尺寸后刷新首页缩略图（缩略图是本地按当前 cells/palette 生成的文件，无需后端）；
+  // debounce 防连续换色反复重画
+  _refreshThumb() {
+    if (!this.utilCanvas || !this.work) return;
+    clearTimeout(this._thumbTimer);
+    this._thumbTimer = setTimeout(() => {
+      if (this._gone || !this.work) return;
+      this.uq(() => ui.makeThumb(this, this.utilCanvas, this.work, false))
+        .then(path => store.update(this.work.id, { thumb: path, thumbV: ui.THUMB_V, thumbShape: getBeadShape() }, true))
+        .catch(() => { /* 缩略图刷新失败不影响 */ });
+    }, 450);
+  },
+
+  /* ---------- 改大小 / 颜色数：从留档的原图高质量重新生成（换网格 → 清空进度） ---------- */
+  openResize() {
+    const work = this.work;
+    if (!work) return;
+    if (work.src) {
+      // 照片/表情：有留档原图 → 高质量重量化（size + 颜色数）
+      this._rzMode = 'source';
+      if (this._srcData) { this._openResizeSheet(); return; }
+      wx.showLoading({ title: '读取原图', mask: true });
+      (this.utilCanvas ? Promise.resolve(this.utilCanvas) : ui.queryNode(this, '#util').then(r => (this.utilCanvas = r && r.node)))
+        .then(cv => this.uq(() => loadImageToData(cv, work.src, 512))) // 串到 util canvas 队列，避开缩略图重画
+        .then(d => { wx.hideLoading(); this._srcData = d; this._openResizeSheet(); })
+        .catch(() => { wx.hideLoading(); ui.toast('原图读取失败，换不了大小'); });
+      return;
+    }
+    // 模板 / 图纸导入（没原图）：重采样现有豆子图，仅调大小、保留原色板
+    this._rzMode = 'resample';
+    this._openResizeSheet();
+  },
+  _openResizeSheet() {
+    const work = this.work;
+    const source = this._rzMode === 'source';
+    // 有原图：上限=原图长边；重采样：可放大到 SIZE_CAP（放大会糊）
+    const max = source ? Math.min(SIZE_CAP, Math.max(this._srcData.w, this._srcData.h)) : SIZE_CAP;
+    this._rzBase = null; this._rzBaseSize = 0; this._rzPv = null;
+    this.setData({
+      sizeShow: true,
+      rzMode: this._rzMode,
+      rzHasColor: source,
+      rzSize: ui.clamp(Math.max(work.w, work.h), 8, max),
+      rzSizeMin: 8, rzSizeMax: max,
+      rzColor: this.colorsUsed.length, rzColorMax: 48,
+    }, () => this._rzRender());
+  },
+  closeResize() { this._rzPv = null; this.setData({ sizeShow: false }); },
+  // 生成给定大小/颜色数的图纸。source：imageToPattern 重量化（按 size 缓存 base、只改色数时复用）；
+  // resample：直接重采样现有 cells（保留原色板，忽略颜色数）
+  _rzGen(size, colorVal) {
+    if (this._rzMode === 'resample') {
+      const work = this.work;
+      const r = resampleCells(work.cells, work.w, work.h, size);
+      return { w: r.w, h: r.h, cells: r.cells, palette: work.palette || null,
+        total: r.cells.filter(c => c >= 0).length, colorN: colorStats(r.cells).length };
+    }
+    const sd = this._srcData;
+    if (!this._rzBase || this._rzBaseSize !== size) {
+      this._rzBase = imageToPattern(sd.data, sd.w, sd.h, size, { whiteEmpty: !!this.work.whiteEmpty });
+      this._rzBaseSize = size;
+    }
+    const base = this._rzBase;
+    let cells = base.cells;
+    const natural = colorStats(cells).length;
+    const cn = Math.min(colorVal, natural);
+    if (cn < natural) cells = reduceColors(cells, cn);
+    return { w: base.w, h: base.h, cells, palette: null, total: cells.filter(c => c >= 0).length, colorN: colorStats(cells).length };
+  },
+  _rzRender() {
+    const g = this._rzGen(this.data.rzSize, this.data.rzColor);
+    this._rzPattern = { w: g.w, h: g.h, cells: g.cells, palette: g.palette || undefined };
+    const ins = ui.navInsets();
+    const maxPx = Math.min(300, ins.winW - 96);
+    const cellPx = ui.clamp(Math.floor(maxPx / Math.max(g.w, g.h)), 1, 12);
+    const size = patternSize(this._rzPattern, { cellPx });
+    this.setData({ rzW: g.w, rzH: g.h, rzTotal: g.total, rzColorN: g.colorN, rzPvW: size.width, rzPvH: size.height }, () => {
+      const paint = node => renderPatternTo(node, this._rzPattern, { cellPx, scale: Math.min(2, ins.dpr) });
+      if (this._rzPv) { paint(this._rzPv); return; }
+      ui.queryNode(this, '#rzpv').then(r => { if (r && r.node) { this._rzPv = r.node; paint(r.node); } });
+    });
+  },
+  onRzSize(e) { const v = e.detail.value; if (v === this.data.rzSize) return; this.setData({ rzSize: v }); this._rzDebounce(); },
+  onRzColor(e) { const v = e.detail.value; if (v === this.data.rzColor) return; this.setData({ rzColor: v }); this._rzDebounce(); },
+  // 手动输入大小/颜色数（超范围自动收进 min~max，回写纠正显示；失焦/回车触发）
+  onRzSizeInput(e) {
+    let v = parseInt(e.detail.value, 10);
+    if (!(v > 0)) v = this.data.rzSize;
+    v = ui.clamp(v, this.data.rzSizeMin, this.data.rzSizeMax);
+    const changed = v !== this.data.rzSize;
+    this.setData({ rzSize: v });
+    if (changed) this._rzRender();
+  },
+  onRzColorInput(e) {
+    let v = parseInt(e.detail.value, 10);
+    if (!(v > 0)) v = this.data.rzColor;
+    v = ui.clamp(v, 2, this.data.rzColorMax);
+    const changed = v !== this.data.rzColor;
+    this.setData({ rzColor: v });
+    if (changed) this._rzRender();
+  },
+  _rzDebounce() { clearTimeout(this._rzTimer); this._rzTimer = setTimeout(() => { if (!this._gone) this._rzRender(); }, 130); },
+  confirmResize() {
+    wx.showModal({
+      title: '按新图纸重拼？',
+      content: '会把图纸改成 ' + this.data.rzW + '×' + this.data.rzH + ' 板、' + this.data.rzColorN + ' 色。当前拼豆进度会清空、从头开始。',
+      confirmText: '确定改', cancelText: '再想想', confirmColor: '#E86A7A',
+      success: r => { if (r.confirm) this._applyResize(); },
+    });
+  },
+  _applyResize() {
+    clearTimeout(this._rzTimer);
+    const g = this._rzGen(this.data.rzSize, this.data.rzColor);
+    const work = this.work;
+    work.w = g.w; work.h = g.h; work.cells = g.cells;
+    work.placed = new Array(g.cells.length).fill(0);       // 换网格 → 进度全清
+    work.ironed = new Array(g.cells.length).fill(0);
+    work.completed = false; work.ironDone = false;
+    store.update(work.id, {
+      w: work.w, h: work.h, cells: work.cells, placed: work.placed, ironed: work.ironed,
+      completed: false, ironDone: false,
+    });
+    this.finished = false;
+    this._rzPv = null;
+    this.setData({ sizeShow: false });
+    this._rebuildColors();                                  // 重算颜色/进度（全部未拼）
+    if (this.bv) { this.bv.destroy(); this.bv = null; }
+    this._initBoard();                                      // 按新网格重建画板
+    this._refreshThumb();                                   // 刷新首页缩略图
+    ui.toast('图纸已更新，重新拼吧 ✨');
+  },
+
   /* ---------- 划动模式：拖动平移 ↔ 连续上豆 ---------- */
   // 单指划动二选一（常驻开关，跨作品记忆）：关 = 平移画布，开 = 划过格子连续上豆
   togglePaint() {
@@ -354,14 +583,14 @@ Page({
     ui.toast(this.locateOn ? '定位开：红色就是现在要拼的地方' : '定位已关');
   },
 
-  // 一键拼豆：点一下「武装」，再点画板上想铺满的一整片同色 → 从落点向外扩散铺满那一整块。每天 3 次。
-  // 做成两步（先武装再点画板）是因为要让用户指到「哪一片」——正是「点击一次铺满连续的一整块」的意思。
+  // 一键拼豆：点一下「武装」，再点画板上想拼的位置 → 以落点为中心，周围一块（各色）向外扩散铺满。每天有限次。
+  // 做成两步（先武装再点画板）是因为要让用户指到「哪个位置」——点哪，哪的周围一块就拼上。
   oneKeyFill() {
     if (this.finished || !this.bv) return;
     if (this.fillArmed) { this._setFillArmed(false); return; } // 再点一下 = 取消武装
     if (readFillLeft() <= 0) { ui.toast('今天的一键拼豆用完啦，明天再来～'); return; }
     this._setFillArmed(true);
-    ui.toast('点画板上想铺满的一整片同色 ✨');
+    ui.toast('点画板上想拼的位置，周围一块都拼上 ✨');
   },
 
   _setFillArmed(v) {
@@ -370,15 +599,15 @@ Page({
     if (this.bv) this.bv.setFillArmed(v);
   },
 
-  // 画板回调：用户在武装态轻点了画板，filled 是刚铺下的那一整片格子
+  // 画板回调：用户在武装态轻点了画板，filled 是刚铺下的那一块格子（各色）
   _onFill(filled, cell) {
-    if (!filled || !filled.length) { // 点到空格 / 已拼完的片：不扣次数，保持武装让用户再点
-      ui.toast('点一片「还没拼」的同色豆试试～');
+    if (!filled || !filled.length) { // 这块没有可拼的豆（全空 / 已拼完）：不扣次数，保持武装让用户再点
+      ui.toast('点画板上还没拼的地方试试～');
       return;
     }
     this._setFillArmed(false);                 // 用掉一次，收起武装
     this.setData({ fillLeft: useFill() });
-    // 顺手把选中色切到刚铺的那一片，色板高亮跟上
+    // 顺手把选中色切到点到的那颗，色板高亮跟上
     const tc = this.work.cells[cell];
     if (tc >= 0 && tc !== this.sel && this.chipIdx.has(tc)) this._setSel(tc);
     try { wx.vibrateShort({ type: 'light' }); } catch (e) { /* 忽略 */ }

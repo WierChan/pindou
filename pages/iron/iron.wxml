@@ -1,9 +1,10 @@
 <view class="ironflow">
   <view class="topbar" style="padding-top:{{insets.top}}px;padding-right:{{insets.right}}px">
     <view class="tb-back" hover-class="pressed" bindtap="goBack">‹</view>
-    <view class="tb-title">{{phase === 'pick' ? title : '自动熨烫机'}}</view>
+    <view class="tb-title">{{phase === 'pick' ? title : (method === 'manual' ? '手动熨斗' : '自动熨烫机')}}</view>
     <view class="tb-actions">
       <view class="fin-tag" wx:if="{{phase !== 'pick'}}">{{finishName}}</view>
+      <view class="icon-btn" hover-class="pressed" bindtap="toggleBgm"><image class="pxi-l" src="{{bgmOn ? '/assets/icons/musicon.png' : '/assets/icons/musicoff.png'}}" /></view>
       <view class="icon-btn" hover-class="pressed" bindtap="toggleMute"><image class="pxi-l" src="{{muted ? '/assets/icons/sndoff.png' : '/assets/icons/sndon.png'}}" /></view>
     </view>
   </view>
@@ -12,8 +13,13 @@
   <view class="fhead">
     <block wx:if="{{phase === 'pick'}}">
       <view class="fkick">READY TO IRON</view>
-      <view class="ftitle">选好烫法，开始熨烫</view>
-      <view class="fsub">进自动熨烫机：盖布 → 推入 → 压合 → 掀开揭晓。</view>
+      <view class="ftitle">选好方式，开始熨烫</view>
+      <view class="fsub">自动熨烫机全自动，手动熨斗自己划——都行。</view>
+    </block>
+    <block wx:elif="{{phase === 'manual'}}">
+      <view class="fkick">HAND IRON</view>
+      <view class="ftitle">手动熨烫 · {{pct}}%</view>
+      <view class="mprog"><view class="mprog-fill" style="width:{{pct}}%"></view></view>
     </block>
     <block wx:else>
       <view class="fkick">PERLER WORKSHOP</view>
@@ -23,8 +29,8 @@
   </view>
 
   <view class="stage">
-    <!-- 机器（推入 / 压合 时出现） -->
-    <view class="machine" wx:if="{{phase === 'insert' || phase === 'press'}}">
+    <!-- 机器（盖布起就在场，和托盘一起出现，避免"先只有托盘、机器晚几秒才来") -->
+    <view class="machine" wx:if="{{phase === 'cover' || phase === 'insert' || phase === 'press'}}">
       <view class="mled">
         <view class="mdot"></view>
         <text class="mtext">{{ledText}}</text>
@@ -35,9 +41,11 @@
         <view class="{{phase === 'press' ? 'on' : ''}}"></view>
         <view></view>
       </view>
+      <view class="mbody"><view class="mvent"></view><view class="mvent"></view><view class="mvent"></view></view>
       <view class="mmouth"></view>
     </view>
-    <view class="marrow" wx:if="{{phase === 'insert'}}">↑</view>
+    <!-- 箭头：盖布起就占位（cover 时隐形），机器和托盘的间距从一开始就是最终间距，不再"先贴紧再弹开" -->
+    <view class="marrow {{phase === 'insert' ? 'on' : ''}}" wx:if="{{phase === 'cover' || phase === 'insert'}}">↑</view>
 
     <!-- 压合进度 -->
     <view class="pressbox" wx:if="{{phase === 'press'}}">
@@ -45,21 +53,50 @@
       <view class="pbar"><view class="pfill" style="width:{{pressPct}}%"></view></view>
     </view>
 
-    <!-- 托盘：一直在 DOM（压合时上移出视野），承载画布 + 烘焙布 -->
-    <view class="tray {{phase}} {{trayDrag ? 'dragging' : ''}}" style="transform:translateY(-{{trayLift}}px) scale({{trayScale}});opacity:{{trayOp}}"
+    <!-- 托盘：选烫法 / 盖布 / 推入 / 压合 时在场（压合时上移出视野被机器吞掉）；掀开、手动阶段退场 -->
+    <view wx:if="{{phase !== 'peel' && phase !== 'manual'}}" class="tray {{phase}} {{trayDrag ? 'dragging' : ''}}" style="transform:translateY(-{{trayLift}}px) scale({{trayScale}});opacity:{{trayOp}}"
           bindtouchstart="onTrayTS" bindtouchmove="onTrayTM" bindtouchend="onTrayTE" bindtouchcancel="onTrayTE">
-      <view class="pan" bindtouchstart="onClothTS" bindtouchmove="onClothTM" bindtouchend="onClothTE" bindtouchcancel="onClothTE">
+      <view class="pan">
         <canvas type="2d" id="tray" class="traycv" style="width:{{trayW}}px;height:{{trayH}}px"></canvas>
-        <view class="cloth {{phase === 'cover' || phase === 'insert' ? 'covered' : ''}} {{phase === 'peel' ? 'peeling' : ''}}"
-              style="{{phase === 'peel' ? 'opacity:' + (1 - peelPct/100) + ';transform:translate(' + (peelPct*1.7) + '%,' + (peelPct*1.7) + '%) rotate(' + (peelPct*0.16) + 'deg)' : ''}}"></view>
-        <view class="peelgrip" wx:if="{{phase === 'peel'}}">↖</view>
+        <view class="cloth {{phase === 'cover' || phase === 'insert' ? 'covered' : ''}}">
+          <view class="cloth-frame"></view>
+          <text class="cloth-label">BAKING CLOTH</text>
+        </view>
       </view>
+      <view class="handle"></view>
+    </view>
+
+    <!-- 掀开揭晓：整张拼板 + 成品，盖一整张烘焙布，从右下角捏起、往左上掀，布会翻出折角露背面 -->
+    <view wx:if="{{phase === 'peel'}}" class="peelboard"
+          bindtouchstart="onClothTS" bindtouchmove="onClothTM" bindtouchend="onClothTE" bindtouchcancel="onClothTE">
+      <canvas type="2d" id="peelcv" class="peelcv" style="width:{{peelW}}px;height:{{peelH}}px"></canvas>
+      <!-- 布正面（平铺部分）：沿对角线裁掉右下三角 → 露出成品；完成时整张淡出，露全貌 -->
+      <view class="pcloth-face {{revealed ? 'off' : ''}}" style="clip-path:polygon(0 0,100% 0,100% {{100-peelPct}}%,{{100-peelPct}}% 100%,0 100%)">
+        <view class="pcloth-frame"></view>
+        <text class="pcloth-label">BAKING CLOTH</text>
+      </view>
+      <!-- 折起来的布角（露背面，较浅、带折痕阴影）：贴着对角线的反射三角 -->
+      <view class="pcloth-flap {{revealed ? 'off' : ''}}" style="clip-path:polygon(100% {{100-peelPct}}%,{{100-peelPct}}% 100%,{{100-peelPct}}% {{100-peelPct}}%)"></view>
+      <view class="peelgrip" style="opacity:{{peelPct >= 80 || revealed ? 0 : 1}}">↖</view>
+    </view>
+
+    <!-- 手动熨斗：画板（BoardView），手指按住划过豆子熔合 -->
+    <view wx:if="{{phase === 'manual'}}" class="board-area">
+      <canvas type="2d" id="board" class="board"
+              bindtouchstart="onTS" bindtouchmove="onTM" bindtouchend="onTE" bindtouchcancel="onTE"></canvas>
     </view>
   </view>
 
   <!-- 底部 -->
   <view class="fbottom">
     <block wx:if="{{phase === 'pick'}}">
+      <view class="tex-row tex-method">
+        <view class="tex-label">方式</view>
+        <view class="seg">
+          <view class="seg-i {{method === 'machine' ? 'on' : ''}}" hover-class="pressed" data-m="machine" bindtap="pickMethod">自动熨烫机</view>
+          <view class="seg-i {{method === 'manual' ? 'on' : ''}}" hover-class="pressed" data-m="manual" bindtap="pickMethod">手动熨斗</view>
+        </view>
+      </view>
       <view class="fp-label">选择烫法</view>
       <view class="fp-tabs">
         <view wx:for="{{cats}}" wx:key="cat" class="fp-tab {{finishTab === item.cat ? 'on' : ''}}"
@@ -88,6 +125,10 @@
     </block>
     <view wx:elif="{{phase === 'insert'}}" class="insert-tip" hover-class="pressed" bindtap="doInsert">↑ 手指上滑推入托盘（或点这里）</view>
     <view wx:elif="{{phase === 'peel'}}" class="peel-tip">按住右下角布角，往左上拖，掀开揭晓 ✨</view>
+    <view wx:elif="{{phase === 'manual'}}" class="manual-tip">
+      <text class="mt-txt">🔥 按住熨斗，慢慢划过每颗豆子，全部烫完就完成</text>
+      <view class="mt-fit" hover-class="pressed" bindtap="zoomFit">⛶ 复位</view>
+    </view>
   </view>
 
   <canvas wx:if="{{celebrating}}" type="2d" id="confetti" class="confetti"></canvas>

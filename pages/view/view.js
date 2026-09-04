@@ -3,6 +3,7 @@ const { store } = require('../../utils/store');
 const { BoardView, workFinish, workHole, finishList, finishInfo, getBeadShape } = require('../../utils/board');
 const { ensureFinishSwatches } = require('../../utils/finishswatch');
 const { createCode, format, markCodePrompted } = require('../../utils/importcode');
+const { bgm } = require('../../utils/audio');
 const ui = require('../../utils/ui');
 const { buildGuide, guideSeen, markGuideSeen } = require('../../utils/guidance');
 
@@ -114,6 +115,7 @@ Page({
     setTimeout(() => ui.syncBoardRect(this, this.bv), 120);
   },
 
+  onShow() { bgm.stop(); }, // 查看页是安静的展示页：进来就把熨烫带过来的 BGM 停掉
   onUnload() {
     if (this.bv) this.bv.destroy();
   },

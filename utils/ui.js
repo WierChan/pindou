@@ -95,6 +95,8 @@ function captureCanvas(host, canvas, draw, sel) {
   return Promise.resolve().then(() => {
     draw();
     const W = canvas.width, H = canvas.height;
+    // 尺寸和上次一样就别再 setData（重复设同值也会触发整页重渲，多张预览连着来会卡）
+    if (host.data && host.data.capW === W && host.data.capH === H) return;
     return new Promise(resolve => host.setData({ capW: W, capH: H }, resolve))
       .then(() => waitLayout(host, sel || '#util', W, H));
   }).then(() => {

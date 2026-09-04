@@ -1,3 +1,30 @@
 /* 拼豆界面：主体样式在 app.wxss 的 playpage 骨架里 */
 /* 工具提示挪到单独一行（给「一键拼豆」腾位）：全宽显示，不再被挤成省略号 */
 .tools-hint.row2 { padding: 0 6px 8px; }
+
+/* 换色取色器（底部弹层 + 全色板网格） */
+.swap-mask { position: fixed; left: 0; right: 0; top: 0; bottom: 0; background: rgba(30,20,15,.42); z-index: 200; display: flex; align-items: flex-end; }
+.swap-sheet { width: 100%; box-sizing: border-box; background: var(--card); border-radius: 20px 20px 0 0; padding: 16px 14px calc(14px + env(safe-area-inset-bottom)); max-height: 70vh; display: flex; flex-direction: column; box-shadow: 0 -6px 22px rgba(0,0,0,.18); }
+.swap-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-shrink: 0; }
+.swap-title { font-size: 15px; font-weight: 800; color: var(--ink); }
+.swap-x { font-size: 16px; color: var(--ink2); padding: 4px 10px; }
+.swap-grid { height: 46vh; flex-shrink: 0; } /* scroll-view 需要确定高度才能滚动（flex 高度在真机上不滚） */
+.swap-wrap { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px; }
+.swap-c { width: 42px; height: 42px; border-radius: 9px; border: 1.5px solid rgba(0,0,0,.10); box-sizing: border-box; }
+.swap-tip { flex-shrink: 0; margin-top: 12px; font-size: 12px; color: var(--ink2); text-align: center; line-height: 1.5; }
+
+/* 改大小 / 颜色数弹层 */
+.rz-mask { position: fixed; left: 0; right: 0; top: 0; bottom: 0; background: rgba(30,20,15,.42); z-index: 200; display: flex; align-items: flex-end; }
+.rz-sheet { width: 100%; box-sizing: border-box; background: var(--card); border-radius: 20px 20px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 -6px 22px rgba(0,0,0,.18); }
+.rz-pv-wrap { display: flex; align-items: center; justify-content: center; min-height: 130px; padding: 6px 0 2px; }
+.rz-pv { display: block; }
+.rz-info { text-align: center; font-size: 13px; font-weight: 700; color: var(--ink); margin: 4px 0 6px; }
+.rz-row { display: flex; align-items: center; gap: 12px; padding: 3px 2px; }
+.rz-lab { flex-shrink: 0; width: 34px; font-size: 13px; color: var(--ink2); }
+.rz-slider { flex: 1; margin: 0; }
+.rz-input { flex-shrink: 0; width: 50px; min-height: 30px; text-align: center; font-size: 14px; font-weight: 800; color: var(--accent-dark); border: 2px solid var(--ink); border-radius: 7px; padding: 3px 0; background: #fff; box-sizing: border-box; }
+.rz-warn { text-align: center; font-size: 12px; color: #C9838F; margin: 8px 0 12px; }
+.rz-btns { display: flex; gap: 12px; }
+.rz-cancel, .rz-apply { flex: 1; text-align: center; padding: 12px; font-size: 15px; font-weight: 800; border: 2px solid var(--ink); box-sizing: border-box; }
+.rz-cancel { background: var(--card); color: var(--ink); }
+.rz-apply { background: var(--accent); color: #7A4A55; box-shadow: 3px 3px 0 var(--accent-dark); }
