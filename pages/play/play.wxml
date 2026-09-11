@@ -61,8 +61,8 @@
       </view>
       <scroll-view scroll-y class="swap-grid" enhanced show-scrollbar="{{false}}">
         <view class="swap-wrap">
-          <view wx:for="{{swapChips}}" wx:key="pal" class="swap-c" style="background:{{item.hex}}"
-                data-pal="{{item.pal}}" catchtap="pickSwapColor" hover-class="pressed"></view>
+          <view wx:for="{{swapChips}}" wx:key="pal" class="swap-c" style="background:{{item.hex}};color:{{item.tcol}}"
+                data-pal="{{item.pal}}" catchtap="pickSwapColor" hover-class="pressed">{{item.code}}</view>
         </view>
       </scroll-view>
       <view class="swap-tip">选一个颜色，整幅图里这个色都会换过去（已拼的豆也跟着变，进度不丢）</view>

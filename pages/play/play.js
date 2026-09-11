@@ -367,7 +367,7 @@ Page({
   // 取色器：全色板按色系排序（白灰黑→红→粉→橙棕→黄→绿→蓝青→紫→莫兰迪），同 create 页
   _buildSwapChips() {
     const chips = PALETTE.map((c, i) => ({
-      pal: i, hex: c.hex,
+      pal: i, hex: c.hex, code: c.code, tcol: textColorFor(c.hex),
       k: 'HFEGABCDM'.indexOf(c.code[0]) * 1000 + parseInt(c.code.slice(1), 10),
     })).sort((a, b) => a.k - b.k);
     this.setData({ swapChips: chips });
@@ -386,36 +386,54 @@ Page({
       const newHex = PALETTE[toGlobalIdx].hex;
       if (work.palette[fromPal] === newHex) return;
       work.palette[fromPal] = newHex;
-      this._rebuildColors(fromPal);           // 色号没变，选中还是它
+      // 下标没动 → 沿用原色块顺序，选中还是它、位置不跳
+      this._rebuildColors(fromPal, this.colorsUsed.slice());
     } else {
       // 照片作品：cells 里是全局色号，把 fromPal 全部改成 toGlobalIdx（可能与已有色合并）
       if (toGlobalIdx === fromPal) return;
       const cells = work.cells;
       for (let i = 0; i < cells.length; i++) if (cells[i] === fromPal) cells[i] = toGlobalIdx;
-      this._rebuildColors(toGlobalIdx);        // 选中切到换成的新色
+      // 保序：换成的色顶替原色原本的位置（整套不重排），换的这块色块不跳位；
+      // 若换成的色本就在用则并入它原本的位置
+      const order = [], seen = new Set();
+      for (const p of this.colorsUsed) {
+        const q = p === fromPal ? toGlobalIdx : p;
+        if (!seen.has(q)) { seen.add(q); order.push(q); }
+      }
+      this._rebuildColors(toGlobalIdx, order);  // 选中切到换成的新色
     }
     if (this.bv) { this.bv.setColors(work.palette || null, this.numbers); this.bv.requestRender(); }
     this._savePattern();
     this._refreshThumb();
     ui.toast('换好啦 ✨');
   },
-  // 换色后整套重算颜色相关状态（同 onLoad 里那段），preferSel 为换完后想选中的色
-  _rebuildColors(preferSel) {
+  // 换色后整套重算颜色相关状态（同 onLoad 里那段），preferSel 为换完后想选中的色；
+  // order 为想保持的色块排列（换色前的顺序）——传了就不重排，选中色不跳位；
+  // 其中已消失的色剔除、新冒出的色补到末尾。不传则按色号从小到大（同 colorStats）
+  _rebuildColors(preferSel, order) {
     const work = this.work;
-    const stats = colorStats(work.cells);
-    this.colorsUsed = stats.map(s => s.pal);
-    this.numbers = new Map(this.colorsUsed.map((p, i) => [p, i + 1]));
-    this.chipIdx = new Map(this.colorsUsed.map((p, i) => [p, i]));
-    this.remaining = new Map(stats.map(s => [s.pal, s.count]));
+    const counts = new Map();
+    for (const t of work.cells) if (t >= 0) counts.set(t, (counts.get(t) || 0) + 1);
+    let used;
+    if (order) {
+      used = order.filter(p => counts.has(p));
+      for (const p of counts.keys()) if (used.indexOf(p) < 0) used.push(p);
+    } else {
+      used = [...counts.keys()].sort((a, b) => a - b);
+    }
+    this.colorsUsed = used;
+    this.numbers = new Map(used.map((p, i) => [p, i + 1]));
+    this.chipIdx = new Map(used.map((p, i) => [p, i]));
+    this.remaining = new Map(used.map(p => [p, counts.get(p)]));
     for (let i = 0; i < work.cells.length; i++) {
       if (work.placed[i] && work.cells[i] >= 0) this.remaining.set(work.cells[i], this.remaining.get(work.cells[i]) - 1);
     }
-    this.total = stats.reduce((a, s) => a + s.count, 0);
+    this.total = used.reduce((a, p) => a + counts.get(p), 0);
     let left = 0; this.remaining.forEach(v => { left += v; });
     this.placedCount = this.total - left;
     if (preferSel != null && this.chipIdx.has(preferSel)) this.sel = preferSel;
-    else { this.sel = this.colorsUsed.find(p => this.remaining.get(p) > 0); if (this.sel == null) this.sel = this.colorsUsed[0]; }
-    const chips = this.colorsUsed.map((pal, i) => {
+    else { this.sel = used.find(p => this.remaining.get(p) > 0); if (this.sel == null) this.sel = used[0]; }
+    const chips = used.map((pal, i) => {
       const n = this.remaining.get(pal);
       return {
         pal, num: i + 1, hex: this.palHex(pal), tcol: textColorFor(this.palHex(pal)),

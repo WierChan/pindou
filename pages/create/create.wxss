@@ -141,7 +141,7 @@
 /* scroll-view 上直接 flex-wrap 真机不认（会竖排）→ 里面包一层普通 view 做换行 */
 .swap-scroll { max-height: 46vh; }
 .swap-grid { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px; }
-.swap-sw { width: 34px; height: 34px; flex-shrink: 0; border: 2px solid rgba(95, 74, 78, .28); }
+.swap-sw { width: 34px; height: 34px; flex-shrink: 0; border: 2px solid rgba(95, 74, 78, .28); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; }
 
 .opt-row {
   display: flex;

@@ -10,7 +10,7 @@ const hex2rgb = hx => [parseInt(hx.slice(1, 3), 16), parseInt(hx.slice(3, 5), 16
 function makeAppExport(cells, w, h, paletteHex, opts) {
   opts = opts || {};
   const maxSide = opts.maxSide || 1600;
-  const cellPx = clamp(Math.floor(maxSide / Math.max(w, h)), 8, 32);
+  const cellPx = clamp(Math.floor(maxSide / Math.max(w, h)), 12, 32);
   // share.js 真实规则是「按最宽色号实测缩字号，塞不下不印」；镜像没有字体，
   // 用 cellPx>=10 近似（M 用例 cellPx=32 两边都印，笔画应力与真实 2-3 字符色号相当）
   const labelOn = cellPx >= 10;
@@ -36,7 +36,7 @@ function makeAppExport(cells, w, h, paletteHex, opts) {
   const lgRows = lgCols ? Math.ceil(stats.length / lgCols) : 0;
   const lgH = lgRows ? lgRows * PILL_H + (lgRows - 1) * PILL_GAP : 0;
   const H = lgY + lgH + FOOT;
-  const scale = Math.max(1, Math.min(opts.scale || 2, 4050 / Math.max(W, H)));
+  const scale = Math.min(opts.scale || 2, 4050 / Math.max(W, H));
 
   const S = v => Math.round(v * scale);
   const lw = Math.max(1, Math.round(scale)); // 1 逻辑像素线宽

@@ -548,7 +548,7 @@ Page({
   // 取色器：全色板按色系排序（白灰黑→红→粉→橙棕→黄→绿→蓝青→紫→莫兰迪）
   _buildSwapChips() {
     const chips = PALETTE.map((c, i) => ({
-      pal: i, hex: c.hex, tcol: textColorFor(c.hex),
+      pal: i, hex: c.hex, code: c.code, tcol: textColorFor(c.hex),
       k: 'HFEGABCDM'.indexOf(c.code[0]) * 1000 + parseInt(c.code.slice(1), 10),
     })).sort((a, b) => a.k - b.k);
     this.setData({ swapChips: chips });

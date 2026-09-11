@@ -10,7 +10,7 @@
 .swap-x { font-size: 16px; color: var(--ink2); padding: 4px 10px; }
 .swap-grid { height: 46vh; flex-shrink: 0; } /* scroll-view 需要确定高度才能滚动（flex 高度在真机上不滚） */
 .swap-wrap { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px; }
-.swap-c { width: 42px; height: 42px; border-radius: 9px; border: 1.5px solid rgba(0,0,0,.10); box-sizing: border-box; }
+.swap-c { width: 42px; height: 42px; border-radius: 9px; border: 1.5px solid rgba(0,0,0,.10); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; letter-spacing: .3px; }
 .swap-tip { flex-shrink: 0; margin-top: 12px; font-size: 12px; color: var(--ink2); text-align: center; line-height: 1.5; }
 
 /* 改大小 / 颜色数弹层 */

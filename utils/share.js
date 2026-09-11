@@ -237,7 +237,9 @@ function buildChartExportTo(canvas, work, opts) {
   opts = opts || {};
   const w = work.w, h = work.h, cells = work.cells;
   const maxSide = opts.maxSide || 1600;
-  const cellPx = clamp(Math.floor(maxSide / Math.max(w, h)), opts.minCell || 8, opts.maxCell || 32);
+  // 格内要塞 2-3 字符 MARD 色号：格子太小（大画布）色号会整幅印不出 → 下限抬到 12
+  // 逻辑像素（6px 字号下 3 字符约 10-11px 才塞得进），大画布靠 scale 收进 4096 画布上限
+  const cellPx = clamp(Math.floor(maxSide / Math.max(w, h)), opts.minCell || 12, opts.maxCell || 32);
   const hexOf = t => (work.palette ? work.palette[t] : PALETTE[t].hex);
 
   const stats = colorStats(cells);
@@ -265,7 +267,8 @@ function buildChartExportTo(canvas, work, opts) {
   const H = lgY + lgH + FOOT;
 
   // 分辨率目标 2x；超出 canvas 安全边（~4096）整体降清晰度而不是砍版式
-  const scale = Math.max(1, Math.min(opts.scale || 2, 4050 / Math.max(W, H)));
+  // （抬高 cellPx 后大画布逻辑尺寸变大，不再 floor 到 1，允许 <1 缩进画布上限内、别溢出）
+  const scale = Math.min(opts.scale || 2, 4050 / Math.max(W, H));
   canvas.width = Math.round(W * scale);
   canvas.height = Math.round(H * scale);
   const ctx = canvas.getContext('2d');
@@ -320,7 +323,9 @@ function buildChartExportTo(canvas, work, opts) {
     return m;
   };
   while (lf > 6 && widest() > cellPx - 2) lf--;
-  if (widest() <= cellPx - 1) {
+  // 缩到 6px 的地板后用「塞进整格」判定（居中标签宽 ≤ 格宽即算能印）：
+  // cellPx 下限 12，3 字符色号 6px 约 10-11px，能稳稳印出，别再被 -1 的余量卡掉
+  if (widest() <= cellPx) {
     ctx.font = lf + 'px sans-serif';
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
