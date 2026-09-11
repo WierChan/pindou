@@ -62,12 +62,26 @@ function makeAppExport(cells, w, h, paletteHex, opts) {
       fill(im, x0, y0, S(gridX + (x + 1) * cellPx) - x0, S(gridY + (y + 1) * cellPx) - y0, rgbOf(t));
     }
   }
-  // 格线画在豆色上层：每格淡灰 + 5 格淡青（#E6E9EB / #C9E4DE）
+  // 格线画在豆色上层：每格淡灰 + 5 格淡青（#E6E9EB / #C9E4DE），半透明叠在豆色上。
+  // 细线用 A_FINE、5 格参考线用较重的 A_MAJOR（与 share.js 的 GRID_LINE_A / GRID_MAJOR_A 一致）。
+  const A_FINE = 0.5, A_MAJOR = 0.85;
+  const blendLine = (x, y, ww, hh, rgb, a) => {
+    const x0 = Math.max(0, Math.round(x)), y0 = Math.max(0, Math.round(y));
+    const x1 = Math.min(im.w, Math.round(x + ww)), y1 = Math.min(im.h, Math.round(y + hh));
+    for (let yy = y0; yy < y1; yy++) for (let xx = x0; xx < x1; xx++) {
+      const o = (yy * im.w + xx) * 4;
+      im.data[o] = Math.round(im.data[o] * (1 - a) + rgb[0] * a);
+      im.data[o + 1] = Math.round(im.data[o + 1] * (1 - a) + rgb[1] * a);
+      im.data[o + 2] = Math.round(im.data[o + 2] * (1 - a) + rgb[2] * a);
+    }
+  };
   for (let k = 0; k <= w; k++) {
-    fill(im, S(gridX + k * cellPx), S(gridY), lw, S(gridH), k % 5 === 0 ? [201, 228, 222] : [230, 233, 235]);
+    const major = k % 5 === 0;
+    blendLine(S(gridX + k * cellPx), S(gridY), lw, S(gridH), major ? [201, 228, 222] : [230, 233, 235], major ? A_MAJOR : A_FINE);
   }
   for (let k = 0; k <= h; k++) {
-    fill(im, S(gridX), S(gridY + k * cellPx), S(gridW), lw, k % 5 === 0 ? [201, 228, 222] : [230, 233, 235]);
+    const major = k % 5 === 0;
+    blendLine(S(gridX), S(gridY + k * cellPx), S(gridW), lw, major ? [201, 228, 222] : [230, 233, 235], major ? A_MAJOR : A_FINE);
   }
 
   // 逐格色号伪笔画：同号固定种子 → 跨格笔画对齐（与 chart-real 的 cellLabels 同思路，

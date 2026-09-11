@@ -251,6 +251,8 @@ function buildChartExportTo(canvas, work, opts) {
   // 版式（逻辑像素）—— 常量改动要同步 tests/export-synth.js
   const P = 30, HEADER = 56, COORD = 30, CARD_PAD = 14;
   const INFO_H = 46, PILL_H = 42, PILL_GAP = 12, FOOT = 54;
+  const GRID_LINE_A = 0.5;   // 细格线透明度：小=豆色更实、大=分格更清（再导入靠这条占多数的细线认格）
+  const GRID_MAJOR_A = 0.85; // 每 5 格参考线透明度：加重便于数格；只占 1/5 洗色有限
   const gridW = w * cellPx, gridH = h * cellPx;
   const cardW = gridW + CARD_PAD * 2, cardH = gridH + CARD_PAD * 2;
   const lgCols = Math.min(5, stats.length);
@@ -302,15 +304,23 @@ function buildChartExportTo(canvas, work, opts) {
       ctx.fillRect(gridX + x * cellPx, gridY + y * cellPx, cellPx, cellPx);
     }
   }
-  // 格线画在豆色上层（真图纸同款，同色区域靠它分格）：每格淡灰、5 格淡青参考线
+  // 格线画在豆色上层（真图纸同款，同色区域靠它分格）：细格线半透明（GRID_LINE_A）让豆色透出、
+  // 图纸不发白；每 5 格的淡青参考线加重（GRID_MAJOR_A）便于数格定位。参考线虽强但只占 1/5，
+  // 洗色有限；再导入的格距靠占多数的细线周期锁定，配合 analyzeChart 的谐波纠偏不会误锁 5×。
+  ctx.save();
   for (let k = 0; k <= w; k++) {
-    ctx.fillStyle = k % 5 === 0 ? '#C9E4DE' : '#E6E9EB';
+    const major = k % 5 === 0;
+    ctx.globalAlpha = major ? GRID_MAJOR_A : GRID_LINE_A;
+    ctx.fillStyle = major ? '#C9E4DE' : '#E6E9EB';
     ctx.fillRect(gridX + k * cellPx, gridY, 1, gridH);
   }
   for (let k = 0; k <= h; k++) {
-    ctx.fillStyle = k % 5 === 0 ? '#C9E4DE' : '#E6E9EB';
+    const major = k % 5 === 0;
+    ctx.globalAlpha = major ? GRID_MAJOR_A : GRID_LINE_A;
+    ctx.fillStyle = major ? '#C9E4DE' : '#E6E9EB';
     ctx.fillRect(gridX, gridY + k * cellPx, gridW, 1);
   }
+  ctx.restore();
   // 逐格标签（深浅字按格色亮度选）。色号 2-3 字符比编号宽：从理想字号起，
   // 按本作品最宽的标签实测收缩到能塞进格子；缩到 6px 还不行（大板小格）就不印
   ctx.textAlign = 'center';
