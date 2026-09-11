@@ -517,6 +517,7 @@ function renderPatternTo(canvas, p, opts) {
  *   一键拼豆：页面用 setFillArmed(true) 武装，武装后轻点画板 → fillBlockAt 铺满点击处周围一块（各色一起），
  *     回调 onFill(filled, cell)（filled = 实际铺下的格子；空数组表示这块没有可拼的豆，页面据此不扣次数）
  *   onFill(filled, cell)
+ *   拼满此色：页面直接调 fillColorAll(pal) 铺满某色号全部未拼豆（返回 filled，无回调），自行结算
  *   free 模式：cells 就是用户作品本身（可改写），点/划任意格上当前色，可覆盖换色；橡皮擦除。
  *   onExpand(cx, cy)：free 模式画到数据网格外时回调，页面负责扩容数组并调整 ox/oy，
  *   返回 true 表示已扩容（会重新取格）；无边平移，底板铺满视口。
@@ -866,6 +867,32 @@ class BoardView {
     let maxd = 0; for (const d of fd) if (d > maxd) maxd = d;
     const t0 = now();
     const step = maxd > 0 ? Math.min(38, 640 / maxd) : 0; // 按到落点的距离错开 → 向外扩散
+    for (let k = 0; k < filled.length; k++) { placed[filled[k]] = 1; this.anims.set(filled[k], t0 + fd[k] * step); }
+    this.dirty = true;
+    return filled;
+  }
+
+  // 拼满此色：把整幅里某个色号所有未拼的豆一次拼上（各处一起、从质心向外扩散）。返回实际铺下的格子。
+  fillColorAll(pal) {
+    const o = this.o, w = o.w, cells = o.cells, placed = o.placed;
+    const filled = [];
+    for (let i = 0; i < cells.length; i++) {
+      if (cells[i] === pal && cells[i] >= 0 && !placed[i]) filled.push(i);
+    }
+    if (!filled.length) return [];
+    // 质心 → 每格到质心的距离，按距离错开成向外扩散（同 fillBlockAt 的级联动画机制）
+    let sx = 0, sy = 0;
+    for (const i of filled) { sx += i % w; sy += (i / w) | 0; }
+    const cx = sx / filled.length, cy = sy / filled.length;
+    const fd = new Array(filled.length);
+    let maxd = 0;
+    for (let k = 0; k < filled.length; k++) {
+      const i = filled[k], dx = (i % w) - cx, dy = ((i / w) | 0) - cy;
+      const d = Math.sqrt(dx * dx + dy * dy);
+      fd[k] = d; if (d > maxd) maxd = d;
+    }
+    const t0 = now();
+    const step = maxd > 0 ? Math.min(20, 700 / maxd) : 0; // 整幅铺开：总时长约 700ms 封顶
     for (let k = 0; k < filled.length; k++) { placed[filled[k]] = 1; this.anims.set(filled[k], t0 + fd[k] * step); }
     this.dirty = true;
     return filled;

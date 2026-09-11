@@ -121,6 +121,10 @@
           <view class="sw-label">白色背景不拼豆<text class="sw-small">适合白底图片</text></view>
           <switch checked="{{whiteEmpty}}" color="#EABFC3" bindchange="onWhiteChange" />
         </view>
+        <view class="switch-row" wx:if="{{removeBgShow}}">
+          <view class="sw-label">去掉背景<text class="sw-small">只留人物/主体·纯色简单背景最好</text></view>
+          <switch checked="{{removeBg}}" color="#EABFC3" bindchange="onRemoveBgChange" />
+        </view>
       </block>
 
       <view class="name-row">

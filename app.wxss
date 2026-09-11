@@ -346,6 +346,8 @@ button.btn-reset::after { border: none; }
 /* 一键拼豆 chip：武装时高亮并轻轻上下浮动（提示"去点画板选一片"），用尽时灰掉 */
 .fill-chip.armed { background: var(--blue); color: #7A5A2E; box-shadow: 3px 3px 0 var(--blue-dark); animation: fillbob 1s ease-in-out infinite; }
 .fill-chip.off { opacity: .5; }
+/* 拼满此色 chip：用尽时灰掉（无武装态，点一下即整幅铺满当前色） */
+.fillc-chip.off { opacity: .5; }
 @keyframes fillbob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
 
 /* 分段控件（设置页 / 熨烫豆孔等共用）：一整条描边，内部竖线分隔，选中项绛羽粉底 */

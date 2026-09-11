@@ -29,6 +29,7 @@
       <view class="tools-row">
         <view class="tool-chip {{paintOn ? 'active' : ''}}" bindtap="togglePaint"><image class="pxi-s" src="/assets/icons/hand.png" />连续上豆</view>
         <view class="tool-chip fill-chip {{fillArmed ? 'armed' : ''}} {{fillLeft <= 0 ? 'off' : ''}}" hover-class="pressed" bindtap="oneKeyFill"><image class="pxi-s" src="/assets/icons/bolt.png" />一键拼豆 {{fillLeft}}</view>
+        <view class="tool-chip fillc-chip {{fillColorLeft <= 0 ? 'off' : ''}}" hover-class="pressed" bindtap="fillColor"><image class="pxi-s" src="/assets/icons/star.png" />拼满此色 {{fillColorLeft}}</view>
         <view class="tr-btns">
           <view class="tr-btn loc {{locateOn ? 'active' : ''}}" hover-class="pressed" bindtap="toggleLocate">◎</view>
           <view class="tr-btn" hover-class="pressed" bindtap="openSwap">🎨</view>

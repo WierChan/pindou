@@ -16,21 +16,24 @@ const SIZE_CAP = 256; // 画布长边上限（同 create 页），改大小时�
 const PAINT_KEY = 'pindou.paintMode.v1'; // 划动模式:1 = 连续上豆 / 其余 = 拖动平移（跨作品记忆）
 const LOCATE_KEY = 'pindou.locate.v1';   // 定位高亮:1 = 开（当前色未拼格标红、其余变淡，跨作品记忆）
 
-// 一键拼豆：每天 3 次（全局，跨作品共享，隔天自动重置；不接激励视频补次数——避免被当小游戏审）
+// 一键拼豆 / 拼满此色：各每天 3 次（全局跨作品，隔天自动重置；不接激励视频补次数——避免被当小游戏审）。
+// 两个功能各用一套 day/n 存储键、额度互相独立。
 const FILL_PER_DAY = 3;
-const FILL_DAY_KEY = 'pindou.fillDay';
+const FILL_DAY_KEY = 'pindou.fillDay';        // 一键拼豆（点一片圆盘扩散，各色一起）
 const FILL_N_KEY = 'pindou.fillLeft';
+const FILLC_DAY_KEY = 'pindou.fillColorDay';  // 拼满此色（当前选中色号整幅铺满）
+const FILLC_N_KEY = 'pindou.fillColorLeft';
 function _fillToday() { const d = new Date(); return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); }
-function readFillLeft() {
+function readFillLeft(dayKey, nKey) {
   try {
-    if (wx.getStorageSync(FILL_DAY_KEY) !== _fillToday()) return FILL_PER_DAY; // 新的一天：满额
-    const n = wx.getStorageSync(FILL_N_KEY);
+    if (wx.getStorageSync(dayKey) !== _fillToday()) return FILL_PER_DAY; // 新的一天：满额
+    const n = wx.getStorageSync(nKey);
     return (n === '' || n == null) ? FILL_PER_DAY : n;
   } catch (e) { return FILL_PER_DAY; }
 }
-function useFill() {
-  const left = Math.max(0, readFillLeft() - 1);
-  try { wx.setStorageSync(FILL_DAY_KEY, _fillToday()); wx.setStorageSync(FILL_N_KEY, left); } catch (e) { /* 忽略 */ }
+function useFill(dayKey, nKey) {
+  const left = Math.max(0, readFillLeft(dayKey, nKey) - 1);
+  try { wx.setStorageSync(dayKey, _fillToday()); wx.setStorageSync(nKey, left); } catch (e) { /* 忽略 */ }
   return left;
 }
 
@@ -45,6 +48,7 @@ Page({
     paintOn: false,
     locateOn: false,
     fillLeft: 3,        // 一键拼豆今日剩余次数
+    fillColorLeft: 3,   // 拼满此色今日剩余次数（独立额度）
     fillArmed: false,   // 一键拼豆武装中：等用户点画板选一整片同色
     beadShape: 'square',
     muted: false,
@@ -137,7 +141,8 @@ Page({
       chips,
       paintOn: this.paintOn,
       locateOn: this.locateOn,
-      fillLeft: readFillLeft(),
+      fillLeft: readFillLeft(FILL_DAY_KEY, FILL_N_KEY),
+      fillColorLeft: readFillLeft(FILLC_DAY_KEY, FILLC_N_KEY),
       beadShape: getBeadShape(),
       muted: audio.muted,
       bgmOn: bgm.enabled,
@@ -161,7 +166,7 @@ Page({
       buildGuide(this, 'play', [
         { sel: '.palette-bar', text: '先在这里选颜色！每种颜色有编号，下面的数字是还差几颗' },
         { text: '板上淡淡的格子就是图纸。点亮所有跟选中颜色一样的格子吧！点错了我会晃一晃提醒你。双指可以缩放看细节～' },
-        { sel: '.tools-row', text: '开「连续上豆」手指划过就能连着拼；旁边「一键拼豆」每天有限次——点一下它，再点画板上想拼的位置，就会以那里为中心、把周围一块（各色）都铺上～' },
+        { sel: '.tools-row', text: '开「连续上豆」手指划过就能连着拼；「一键拼豆」点一下再点画板，把落点周围一块（各色）都铺上；「拼满此色」一下把当前选中颜色整幅拼满——后两个都每天有限次～' },
         toolsStep,
       ]);
     } else if (!guideSeen('play-tools')) {
@@ -187,7 +192,8 @@ Page({
   onShow() {
     if (!this.work) return;
     if (bgm.enabled) bgm.start();                 // 回到拼豆页续上背景音乐
-    this.setData({ fillLeft: readFillLeft() });   // 一键拼豆是每天全局额度，回来刷新一下
+    // 一键拼豆 / 拼满此色都是每天全局额度，回来各刷新一下
+    this.setData({ fillLeft: readFillLeft(FILL_DAY_KEY, FILL_N_KEY), fillColorLeft: readFillLeft(FILLC_DAY_KEY, FILLC_N_KEY) });
     if (this.fillArmed) this._setFillArmed(false); // 回到页面清掉武装态，避免误触
   },
 
@@ -606,9 +612,23 @@ Page({
   oneKeyFill() {
     if (this.finished || !this.bv) return;
     if (this.fillArmed) { this._setFillArmed(false); return; } // 再点一下 = 取消武装
-    if (readFillLeft() <= 0) { ui.toast('今天的一键拼豆用完啦，明天再来～'); return; }
+    if (readFillLeft(FILL_DAY_KEY, FILL_N_KEY) <= 0) { ui.toast('今天的一键拼豆用完啦，明天再来～'); return; }
     this._setFillArmed(true);
     ui.toast('点画板上想拼的位置，周围一块都拼上 ✨');
+  },
+
+  // 拼满此色：把整幅里「当前选中色号」的所有未拼豆一次拼上（每天独立 3 次，无需选位置）
+  fillColor() {
+    if (this.finished || !this.bv) return;
+    if (this.fillArmed) this._setFillArmed(false);      // 顺手收掉一键拼豆的武装态，避免误会
+    if (this.sel == null) { ui.toast('先在下面选一个颜色'); return; }
+    if ((this.remaining.get(this.sel) || 0) <= 0) { ui.toast('这个颜色已经拼完啦，换一个色试试～'); return; }
+    if (readFillLeft(FILLC_DAY_KEY, FILLC_N_KEY) <= 0) { ui.toast('今天的「拼满此色」用完啦，明天再来～'); return; }
+    const filled = this.bv.fillColorAll(this.sel);
+    if (!filled || !filled.length) { ui.toast('这个颜色已经拼完啦～'); return; }
+    this.setData({ fillColorLeft: useFill(FILLC_DAY_KEY, FILLC_N_KEY) });
+    try { wx.vibrateShort({ type: 'light' }); } catch (e) { /* 忽略 */ }
+    this._applyPlacement(filled, 'fill');
   },
 
   _setFillArmed(v) {
@@ -624,7 +644,7 @@ Page({
       return;
     }
     this._setFillArmed(false);                 // 用掉一次，收起武装
-    this.setData({ fillLeft: useFill() });
+    this.setData({ fillLeft: useFill(FILL_DAY_KEY, FILL_N_KEY) });
     // 顺手把选中色切到点到的那颗，色板高亮跟上
     const tc = this.work.cells[cell];
     if (tc >= 0 && tc !== this.sel && this.chipIdx.has(tc)) this._setSel(tc);

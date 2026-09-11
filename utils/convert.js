@@ -185,6 +185,51 @@ function imageToPattern(data, iw, ih, longSide, opts) {
   return { w, h, cells };
 }
 
+// 端上轻量去背景：从四边漫水填充，圈出「与边缘背景色相近、且和画面边缘连通」的一片当背景，
+// 返回 mask（1=背景）。data 为 RGBA、iw×ih。纯色/简单背景效果最好；复杂背景、主体贴四边、
+// 或主体与背景同色时会抠不干净——这是无 AI 纯本地方案的固有局限。
+// 只把足够不透明的边缘像素当背景种子：emoji 等透明边不会误触发（返回全 0 mask）。
+function bgMask(data, iw, ih) {
+  const N = iw * ih;
+  const mask = new Uint8Array(N); // 1 = 背景
+  const A_MIN = 128;
+  // 遍历四边一圈的像素下标
+  const borderEach = fn => {
+    for (let x = 0; x < iw; x++) { fn(x); fn((ih - 1) * iw + x); }
+    for (let y = 1; y < ih - 1; y++) { fn(y * iw); fn(y * iw + iw - 1); }
+  };
+  // 1) 背景基准色 = 四边不透明像素均值
+  let sr = 0, sg = 0, sb = 0, cnt = 0;
+  borderEach(i => { const o = i * 4; if (data[o + 3] >= A_MIN) { sr += data[o]; sg += data[o + 1]; sb += data[o + 2]; cnt++; } });
+  if (cnt < iw + ih) return mask; // 边缘大多透明（如 emoji）→ 不做背景处理
+  const cr = sr / cnt, cg = sg / cnt, cb = sb / cnt;
+  // 2) 容差：边缘对基准色的平均偏差，噪声大就放宽（单通道最大差，钳 30~90）
+  let dev = 0;
+  borderEach(i => { const o = i * 4; if (data[o + 3] >= A_MIN) dev += Math.abs(data[o] - cr) + Math.abs(data[o + 1] - cg) + Math.abs(data[o + 2] - cb); });
+  const mad = dev / (cnt * 3);
+  const TOL = Math.max(30, Math.min(90, 24 + mad * 2.4));
+  // 与基准色相近（且够不透明）才算背景——用全局基准而非邻域，避免顺着渐变漏进主体
+  const near = i => {
+    const o = i * 4;
+    return data[o + 3] >= A_MIN &&
+      Math.abs(data[o] - cr) <= TOL && Math.abs(data[o + 1] - cg) <= TOL && Math.abs(data[o + 2] - cb) <= TOL;
+  };
+  // 3) 从四边种子做 4 邻接漫水（每格最多入栈一次）
+  const stack = new Int32Array(N);
+  let sp = 0;
+  const push = i => { if (!mask[i] && near(i)) { mask[i] = 1; stack[sp++] = i; } };
+  borderEach(push);
+  while (sp > 0) {
+    const i = stack[--sp];
+    const x = i % iw, y = (i / iw) | 0;
+    if (x > 0) push(i - 1);
+    if (x < iw - 1) push(i + 1);
+    if (y > 0) push(i - iw);
+    if (y < ih - 1) push(i + iw);
+  }
+  return mask;
+}
+
 // 统计每种颜色的豆子数，按色板顺序返回 [{pal, count}]
 function colorStats(cells) {
   const m = new Map();
@@ -250,4 +295,4 @@ function resampleCells(cells, w, h, longSide) {
   return { w: nw, h: nh, cells: out };
 }
 
-module.exports = { rgb2oklab, nearestPalette, loadImageToData, emojiToData, imageToPattern, colorStats, reduceColors, resampleCells, variantPal, variantCount };
+module.exports = { rgb2oklab, nearestPalette, loadImageToData, emojiToData, imageToPattern, bgMask, colorStats, reduceColors, resampleCells, variantPal, variantCount };

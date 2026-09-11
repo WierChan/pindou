@@ -1,7 +1,7 @@
 // 创建作品：图片转图纸 / 图案库 / 表情图案
 const { store } = require('../../utils/store');
 const { PALETTE, textColorFor } = require('../../utils/palette');
-const { loadImageToData, emojiToData, imageToPattern, colorStats, reduceColors, variantPal } = require('../../utils/convert');
+const { loadImageToData, emojiToData, imageToPattern, bgMask, colorStats, reduceColors, variantPal } = require('../../utils/convert');
 const { analyzeChart } = require('../../utils/chart');
 const { fetchTemplates, templatePattern } = require('../../utils/templates');
 const { renderPatternTo, patternSize, getBeadShape } = require('../../utils/board');
@@ -47,6 +47,8 @@ Page({
     colorMax: 48,
     colorVal: 48,
     whiteEmpty: false,
+    removeBg: false,       // 去背景：只对真实照片开放（emoji 本就透明底）
+    removeBgShow: false,
     fixed: false,
     fromChart: false,
     cropShow: false,
@@ -392,6 +394,8 @@ Page({
       this.name = '我的拼豆';
       this._base = null;
       this.colorLimit = null;
+      this._srcAlpha0 = null;                                  // 换了图 → 清掉去背景的原始 alpha 备份
+      this.setData({ removeBg: false, removeBgShow: true });   // 真实照片才给「去背景」开关
       this._resetColorEdits();
       this._renderConfig();
       wx.hideLoading();
@@ -461,6 +465,8 @@ Page({
       this.name = ch + ' 拼豆';
       this._base = null;
       this.colorLimit = null;
+      this._srcAlpha0 = null;
+      this.setData({ removeBg: false, removeBgShow: false });  // emoji 本就透明底，不给去背景
       this._resetColorEdits();
       this._renderConfig();
     }).catch(() => ui.toast('生成失败，换一个试试'));
@@ -533,6 +539,38 @@ Page({
     this._renderConfig();
   },
 
+  // 去背景：漫水填充圈出边缘背景 → 把这些像素的 alpha 抹成 0（imageToPattern 会当空格留白）；
+  // 关掉时从备份的原始 alpha 还原。改的是源像素的 alpha，改色/缓存都要重来
+  onRemoveBgChange(e) {
+    const on = e.detail.value;
+    const sd = this.srcData;
+    if (!sd) { this.setData({ removeBg: on }); return; }
+    this._resetColorEdits();
+    if (!this._srcAlpha0) { // 首次备份原始 alpha，供关掉时还原
+      this._srcAlpha0 = new Uint8Array(sd.w * sd.h);
+      for (let i = 0; i < this._srcAlpha0.length; i++) this._srcAlpha0[i] = sd.data[i * 4 + 3];
+    }
+    this._base = null;
+    if (!on) {
+      for (let i = 0; i < this._srcAlpha0.length; i++) sd.data[i * 4 + 3] = this._srcAlpha0[i];
+      this.setData({ removeBg: false });
+      this._renderConfig();
+      return;
+    }
+    // 漫水可能几十毫秒：先让加载框渲染出来再跑（同 _importChart 的 _yield 思路）
+    wx.showLoading({ title: '去背景中', mask: true });
+    this._yield().then(() => {
+      const mask = bgMask(sd.data, sd.w, sd.h);
+      for (let i = 0; i < mask.length; i++) sd.data[i * 4 + 3] = mask[i] ? 0 : this._srcAlpha0[i];
+      this.setData({ removeBg: true });
+      this._renderConfig();
+      wx.hideLoading();
+      // 主体贴满四边等情形会一颗都去不掉，给个反馈别让用户以为没生效
+      let bgN = 0; for (let i = 0; i < mask.length; i++) bgN += mask[i];
+      if (bgN === 0) ui.toast('这张背景不够干净，没能自动去掉');
+    });
+  },
+
   /* ---------- 改色（照片转的图纸）---------- */
   _resetColorEdits() { this.colorSwap.clear(); this.variantIdx = 0; },
 
@@ -598,7 +636,7 @@ Page({
       const size = ui.clamp(this.data.size, sizeMin, sizeMax);
       // 基础图纸缓存：只在大小 / 白底选项变化时重新采样，拖颜色滑杆不重算。
       // 源图已在解码时缩到 ≤512，重采样只有 ~26 万像素，切换尺寸不卡
-      const key = size + '|' + this.data.whiteEmpty;
+      const key = size + '|' + this.data.whiteEmpty + '|' + this.data.removeBg;
       if (!this._base || this._baseKey !== key) {
         this._base = imageToPattern(this.srcData.data, this.srcData.w, this.srcData.h,
           size, { whiteEmpty: this.data.whiteEmpty });
