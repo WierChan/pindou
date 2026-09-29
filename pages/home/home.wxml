@@ -29,6 +29,13 @@
 
   <view class="cta-new {{ctaAnim}}" hover-class="pressed" bindtap="goCreate">＋ 开始新作品</view>
 
+  <!-- 代拼服务入口：不想自己拼的把图纸交给商家；有订单时带数量 -->
+  <view wx:if="{{orderOn}}" class="home-order" hover-class="pressed" bindtap="goOrders">
+    <image class="pxi" src="/assets/icons/parcel.png" />
+    <view class="ho-txt">代拼服务 · 不想自己拼？交给商家拼好寄给你</view>
+    <view class="ho-r">我的订单{{orderN ? ' · ' + orderN : ''}} ›</view>
+  </view>
+
   <view class="tabs home-tabs">
     <view class="tab {{tab === 'doing' ? 'active' : ''}}" bindtap="switchTab" data-tab="doing"><image class="pxi" src="/assets/icons/basket.png" />进行中{{doing.length ? ' · ' + doing.length : ''}}</view>
     <view class="tab {{tab === 'done' ? 'active' : ''}}" bindtap="switchTab" data-tab="done"><image class="pxi" src="/assets/icons/trophy.png" />已完成{{done.length ? ' · ' + done.length : ''}}</view>

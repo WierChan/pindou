@@ -1,0 +1,82 @@
+<view class="olpage">
+  <view class="topbar" style="padding-top:{{insets.top}}px;padding-right:{{insets.right}}px">
+    <view class="tb-back" hover-class="pressed" bindtap="goBack">‹</view>
+    <view class="tb-title">我的订单</view>
+    <view class="tb-actions"></view>
+  </view>
+
+  <scroll-view scroll-y class="ol-scroll" enhanced show-scrollbar="{{false}}">
+    <view wx:if="{{loading}}" class="ol-empty">加载中…</view>
+    <view wx:elif="{{!list.length}}" class="ol-empty">
+      <view>还没有代拼订单～</view>
+      <view>在作品页点「代拼」，把图纸交给商家拼好寄给你 <image class="pxi-s" src="/assets/icons/parcel.png" /></view>
+    </view>
+    <view wx:else class="ol-list">
+      <view wx:for="{{list}}" wx:key="id" class="ol-card" hover-class="pressed" bindtap="openDetail" data-id="{{item.id}}">
+        <view class="ol-top">
+          <view class="ol-name">{{item.name}}</view>
+          <view class="ol-st {{item.stCls}}">{{item.stText}}</view>
+        </view>
+        <view class="ol-meta">{{item.dims}} · {{item.deliveryText}}</view>
+        <view class="ol-bot">
+          <view class="ol-time">{{item.timeText}}</view>
+          <view class="ol-total">¥{{item.totalYuan}}</view>
+        </view>
+        <view wx:if="{{item.canPay}}" class="ol-act">
+          <view class="btn-primary slim" hover-class="pressed" catchtap="payAgain" data-id="{{item.id}}">继续支付</view>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{offline && list.length}}" class="ol-hint">网络不通，显示的是本机记录的订单</view>
+    <view class="ol-pad"></view>
+  </scroll-view>
+
+  <!-- 订单详情（底部弹层） -->
+  <view wx:if="{{detail}}" class="ol-mask" bindtap="closeDetail">
+    <view class="ol-sheet" catchtap="noop">
+      <view class="ol-sheet-head">
+        <text class="ol-sheet-title">订单详情</text>
+        <text class="ol-sheet-x" catchtap="closeDetail">✕</text>
+      </view>
+      <scroll-view scroll-y class="ol-sheet-body" enhanced show-scrollbar="{{false}}">
+        <view class="ol-status {{detail.stCls}}">
+          <view class="ol-status-t">{{detail.stText}}</view>
+          <view class="ol-status-d">{{detail.stDesc}}</view>
+        </view>
+
+        <view class="ol-sec-t">作品</view>
+        <view class="ol-kv"><text class="k">名称</text><text class="v">{{detail.name}}</text></view>
+        <view class="ol-kv"><text class="k">规格</text><text class="v">{{detail.dims}}</text></view>
+        <view wx:if="{{detail.finishText}}" class="ol-kv"><text class="k">烫法</text><text class="v">{{detail.finishText}}{{detail.holeText ? ' · ' + detail.holeText : ''}}</text></view>
+        <view wx:if="{{detail.note}}" class="ol-kv"><text class="k">备注</text><text class="v">{{detail.note}}</text></view>
+
+        <view class="ol-sec-t">配送</view>
+        <view class="ol-kv"><text class="k">方式</text><text class="v">{{detail.deliveryText}}</text></view>
+        <block wx:if="{{detail.delivery === 'express'}}">
+          <view wx:if="{{detail.address}}" class="ol-kv"><text class="k">收货</text><view class="v"><view>{{detail.address.name}} {{detail.address.tel}}</view><view>{{detail.address.full}}</view></view></view>
+          <view wx:if="{{detail.trackingNo}}" class="ol-kv" bindtap="copyText" data-t="{{detail.trackingNo}}"><text class="k">快递</text><text class="v">{{detail.carrier || ''}} {{detail.trackingNo}} <text class="ol-copy">复制</text></text></view>
+        </block>
+        <block wx:else>
+          <view wx:if="{{detail.pickupAddress}}" class="ol-kv" bindtap="copyText" data-t="{{detail.pickupAddress}}"><text class="k">地址</text><text class="v">{{detail.pickupAddress}} <text class="ol-copy">复制</text></text></view>
+          <view wx:else class="ol-kv"><text class="k">地址</text><text class="v">{{pickupArea}}，派单后在这里显示具体地址</text></view>
+          <view wx:if="{{detail.phone}}" class="ol-kv"><text class="k">手机</text><text class="v">{{detail.phone}}</text></view>
+        </block>
+
+        <view class="ol-sec-t">费用</view>
+        <view wx:for="{{detail.items}}" wx:key="key" class="ol-kv"><text class="k">{{item.label}}</text><text class="v">¥{{item.yuan}}</text></view>
+        <view class="ol-kv total"><text class="k">合计</text><text class="v">¥{{detail.totalYuan}}</text></view>
+
+        <view class="ol-kv dim" bindtap="copyText" data-t="{{detail.id}}"><text class="k">订单号</text><text class="v">{{detail.id}} <text class="ol-copy">复制</text></text></view>
+        <view class="ol-kv dim"><text class="k">下单</text><text class="v">{{detail.timeText}}</text></view>
+        <view wx:if="{{detail.paidText}}" class="ol-kv dim"><text class="k">支付</text><text class="v">{{detail.paidText}}</text></view>
+
+        <view class="ol-btns">
+          <view wx:if="{{detail.canPay}}" class="btn-primary ol-btn" hover-class="pressed" bindtap="payAgain">继续支付</view>
+          <view wx:if="{{detail.canConfirm}}" class="btn-primary ol-btn" hover-class="pressed" bindtap="confirmReceipt">确认收货</view>
+          <button wx:if="{{detail.canContact}}" class="btn-ghost slim2 c-green ol-btn" hover-class="pressed" open-type="contact" session-from="order:{{detail.id}}">联系客服</button>
+          <view wx:if="{{detail.canCancel}}" class="btn-ghost slim2 c-mute ol-btn" hover-class="pressed" bindtap="cancelOrder">取消订单</view>
+        </view>
+      </scroll-view>
+    </view>
+  </view>
+</view>

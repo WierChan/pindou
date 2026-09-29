@@ -420,6 +420,21 @@ const ICONS = {
     '............',
     '............',
   ],
+  // 代拼 / 我的订单（牛皮纸包裹：浅盖 + 深箱身 + 金色封箱胶带）
+  parcel: [
+    '............',
+    'KKKKKKKKKKKK',
+    'KhhhhgGhhhhK',
+    'KhhhhgGhhhhK',
+    'KKKKKKKKKKKK',
+    '.KBBBgGBBBK.',
+    '.KBBBgGBBBK.',
+    '.KBBBgGBBBK.',
+    '.KBBBgGBBBK.',
+    '.KmmmgGmmmK.',
+    '.KKKKKKKKKK.',
+    '............',
+  ],
 };
 
 /* ---------- 渲染 ---------- */

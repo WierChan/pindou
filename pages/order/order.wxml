@@ -1,0 +1,142 @@
+<view class="odpage">
+  <view class="topbar" style="padding-top:{{insets.top}}px;padding-right:{{insets.right}}px">
+    <view class="tb-back" hover-class="pressed" bindtap="goBack">‹</view>
+    <view class="tb-title">找商家代拼</view>
+    <view class="tb-actions"></view>
+  </view>
+
+  <scroll-view scroll-y class="od-scroll" enhanced show-scrollbar="{{false}}">
+    <!-- 作品 -->
+    <view class="od-sec">
+      <view class="od-card od-work">
+        <view class="od-pv-wrap">
+          <image wx:if="{{preview}}" class="od-pv" src="{{preview}}" mode="aspectFit" />
+          <view wx:else class="od-pv ph"></view>
+        </view>
+        <view class="od-work-info">
+          <view class="od-work-name">{{title}}</view>
+          <view class="od-work-meta">{{dims}} · {{beads}} 颗 · {{colorN}} 色</view>
+          <view class="od-work-sub">商家备豆、按这张图纸拼好并熨烫定型，寄给你或到店自取；豆子和熨烫都含在代拼费里</view>
+        </view>
+      </view>
+      <view wx:if="{{blocked}}" class="od-block">{{blocked}}</view>
+    </view>
+
+    <!-- 成品要求 -->
+    <view class="od-sec">
+      <view class="od-sec-t">成品要求</view>
+      <view class="od-card">
+        <view class="od-row col">
+          <view class="od-lb">烫法<text class="od-sub">点小图看成品实拍；闪粉按板子档加收，款式写在备注</text></view>
+          <view class="fin-groups">
+            <view wx:for="{{finishGroups}}" wx:key="cat" class="fin-group">
+              <view class="fin-cat">{{item.label}}</view>
+              <view class="fin-chips">
+                <!-- 卡片 = 示例实拍缩略图 + 名称：点名称/卡片选中，点小图放大看 -->
+                <view wx:for="{{item.items}}" wx:for-item="it" wx:key="key"
+                      class="fin-card {{finish === it.key ? 'on' : ''}}" hover-class="pressed"
+                      data-v="{{it.key}}" bindtap="pickFinish">
+                  <view class="fin-pv" data-v="{{it.key}}" data-n="{{it.name}}" data-s="{{it.sub}}" data-fee="{{it.fee}}" catchtap="previewFinish">
+                    <image class="fin-img" src="{{it.img}}" mode="aspectFill" />
+                    <view class="fin-zoom">放大</view>
+                  </view>
+                  <view class="fin-nm">{{it.name}}<text wx:if="{{it.fee}}" class="fin-fee">{{it.fee}}</text></view>
+                </view>
+              </view>
+            </view>
+          </view>
+        </view>
+        <!-- 商家只做单面无孔：只展示、不可选（hole 固定 none 随单提交） -->
+        <view class="od-row">
+          <view class="od-lb">豆孔<text class="od-sub">默认单面无孔</text></view>
+          <view class="seg"><view class="seg-i on">无孔</view></view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 配送 -->
+    <view class="od-sec">
+      <view class="od-sec-t">配送方式</view>
+      <view class="od-card">
+        <view class="od-row">
+          <view class="od-lb">方式</view>
+          <view class="seg">
+            <view class="seg-i {{delivery === 'pickup' ? 'on' : ''}}" hover-class="pressed" data-v="pickup" bindtap="setDelivery">到店自取</view>
+            <view class="seg-i {{delivery === 'express' ? 'on' : ''}}" hover-class="pressed" data-v="express" bindtap="setDelivery">快递到家</view>
+          </view>
+        </view>
+        <block wx:if="{{delivery === 'pickup'}}">
+          <view class="od-row col">
+            <view class="od-lb">自取<text class="od-sub">运费 0</text></view>
+            <view class="od-addr">
+              <view class="od-addr-l1">{{pickupArea}}</view>
+              <view class="od-addr-l2">{{pickupHint}}</view>
+            </view>
+          </view>
+          <view class="od-row">
+            <view class="od-lb"><text class="od-req">*</text>联系手机</view>
+            <input class="od-input" type="number" maxlength="11" placeholder="必填，商家做好后联系你" placeholder-class="od-ph" value="{{phone}}" bindinput="onPhone" />
+          </view>
+        </block>
+        <block wx:else>
+          <view class="od-row col" hover-class="pressed" bindtap="chooseAddress">
+            <view class="od-lb">收货地址<text class="od-sub">运费按地区计算</text></view>
+            <view wx:if="{{addr}}" class="od-addr">
+              <view class="od-addr-l1">{{addr.name}} {{addr.tel}}<text class="od-copy">更换</text></view>
+              <view class="od-addr-l2">{{addr.full}}</view>
+            </view>
+            <view wx:else class="od-addr empty">点击选择微信收货地址 ›</view>
+          </view>
+        </block>
+        <view class="od-row col">
+          <view class="od-lb">备注<text class="od-sub">选填，≤100 字</text></view>
+          <textarea class="od-textarea" maxlength="100" placeholder="给商家的话，比如闪粉款式（彩虹粗闪格利特、彩虹细闪格利特…）、颜色替换等" value="{{note}}" bindinput="onNote" auto-height />
+        </view>
+      </view>
+    </view>
+
+    <!-- 费用 -->
+    <view class="od-sec">
+      <view class="od-sec-t">费用明细</view>
+      <view class="od-card">
+        <view wx:for="{{items}}" wx:key="key" class="od-fee">
+          <view class="od-fee-l">
+            <text class="od-fee-nm">{{item.label}}</text>
+            <text class="od-fee-desc">{{item.desc}}</text>
+          </view>
+          <view class="od-fee-v">¥{{item.yuan}}</view>
+        </view>
+      </view>
+      <view class="od-hint">代拼费已包含豆子、熨烫定型与平台服务费，按颗数分档计价；闪粉烫法另加格利特费，快递另加运费。下单时服务器复核，以支付时显示的金额为准。</view>
+      <view class="od-hint">退款政策：商家接单前可全额退款；接单后按制作进度协商；确认收货或订单自动完成后款项结算给商家，不再支持退款，收到成品请先检查再确认。</view>
+      <view wx:if="{{notice}}" class="od-hint">{{notice}}</view>
+    </view>
+    <view class="od-pad"></view>
+  </scroll-view>
+
+  <view class="od-bar">
+    <view class="od-total"><text class="od-total-lb">合计</text><text class="od-total-v">¥{{totalYuan}}</text></view>
+    <view class="btn-primary od-pay {{canPay ? '' : 'off'}}" hover-class="pressed" bindtap="submit">{{submitting ? '提交中…' : '去支付'}}</view>
+  </view>
+</view>
+
+<canvas type="2d" id="util" class="util-canvas" style="width:{{capW}}px;height:{{capH}}px"></canvas>
+
+<!-- 烫法示例实拍放大（页面根节点、高层级，盖住一切） -->
+<view wx:if="{{zoom}}" class="fz-mask" bindtap="closeZoom">
+  <view class="fz-box" catchtap="noop">
+    <!-- 双指缩放：movable-view 原生支持 scale，1~4 倍，放大后可拖动看细节；弹层每次重建所以自动复位 -->
+    <movable-area class="fz-area" scale-area>
+      <movable-view class="fz-mv" direction="all" scale scale-min="1" scale-max="4" scale-value="1" inertia>
+        <image class="fz-img" src="{{zoom.img}}" mode="aspectFit" />
+      </movable-view>
+    </movable-area>
+    <view class="fz-hint">双指缩放看细节</view>
+    <view class="fz-t">{{zoom.name}}<text class="fz-sub">{{zoom.sub}}</text><text wx:if="{{zoom.fee}}" class="fin-fee">{{zoom.fee}}</text></view>
+    <view class="fz-d">{{zoom.desc}}</view>
+    <view class="fz-btns">
+      <view class="btn-ghost slim2 c-mute" hover-class="pressed" catchtap="closeZoom">关闭</view>
+      <view class="btn-primary slim" hover-class="pressed" data-v="{{zoom.key}}" catchtap="pickFromZoom">就选这个</view>
+    </view>
+  </view>
+</view>

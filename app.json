@@ -7,7 +7,9 @@
     "pages/free/free",
     "pages/iron/iron",
     "pages/view/view",
-    "pages/settings/settings"
+    "pages/settings/settings",
+    "pages/order/order",
+    "pages/orders/orders"
   ],
   "window": {
     "navigationStyle": "custom",

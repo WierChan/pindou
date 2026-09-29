@@ -1,6 +1,7 @@
 // 运行时配置:来自后端 /api/config(不再内置业务数值)
 // 启动时拉取并缓存;离线时沿用上一次服务端下发的缓存,拉到前相关功能保持关闭态
 const api = require('./api');
+const pricing = require('./pricing');
 
 const KEY = 'pindou.config.v1';
 
@@ -20,9 +21,46 @@ function pickAd(src) {
   return out;
 }
 
+// 代拼服务配置(/api/config 的 order 字段,契约见 docs/order-api.md):
+//   enabled        总开关。缺省 = 开;后端下发 false 可整体收起入口,不用发版
+//   pickupArea     自取范围文案(合作商家都在杭州;具体哪家由平台派单后决定,客户端不展示商家)
+//   pickupHint     自取补充说明
+//   notice         下单页展示的说明(可空)
+//   finishImages   烫法示例放大图的高清 URL {finishKey: url}(可空;缺省用包内 assets/finish/<key>-l.jpg)
+//   pricing        报价表覆盖 {minBeads, maxSide, tiers, shipping},缺省用 utils/pricing.js 内置表
+const ORDER_DEF = {
+  enabled: true,
+  pickupArea: '杭州市内到店自取',
+  pickupHint: '具体取货地址在派单后的订单详情里显示，做好后商家会电话联系你约时间',
+  notice: '',
+  finishImages: {},
+  pricing: null,
+};
+
+function pickOrder(src) {
+  const o = Object.assign({}, ORDER_DEF);
+  if (src && typeof src === 'object') {
+    if (typeof src.enabled === 'boolean') o.enabled = src.enabled;
+    ['pickupArea', 'pickupHint', 'notice'].forEach(k => {
+      if (typeof src[k] === 'string' && src[k]) o[k] = src[k];
+    });
+    if (src.finishImages && typeof src.finishImages === 'object') {
+      o.finishImages = {};
+      Object.keys(src.finishImages).forEach(k => {
+        const u = src.finishImages[k];
+        if (typeof u === 'string' && /^https:\/\//.test(u)) o.finishImages[k] = u;
+      });
+    }
+    if (src.pricing && typeof src.pricing === 'object') o.pricing = src.pricing;
+  }
+  pricing.configure(o.pricing); // 报价引擎同步(null = 内置表)
+  return o;
+}
+
 const cfg = {
   DEBUG: false,           // 调试开关:拼豆/熨烫页出现 ⚡ 一键完成按钮
   AD_UNITS: pickAd(null), // 广告位 ID 表 {slot: adUnitId}
+  ORDER: pickOrder(null), // 代拼服务配置
   loaded: false,          // 本次会话是否已从后端拉到
 };
 
@@ -32,6 +70,7 @@ try {
   if (cached && typeof cached === 'object') {
     cfg.DEBUG = !!cached.DEBUG;
     cfg.AD_UNITS = pickAd(cached.AD_UNITS);
+    cfg.ORDER = pickOrder(cached.ORDER);
   }
 } catch (e) { /* 忽略 */ }
 
@@ -39,9 +78,10 @@ function loadConfig() {
   return api.get('/api/config').then(d => {
     cfg.DEBUG = !!d.debug;
     cfg.AD_UNITS = pickAd(d.adUnits);
+    cfg.ORDER = pickOrder(d.order);
     cfg.loaded = true;
     try {
-      wx.setStorageSync(KEY, { DEBUG: cfg.DEBUG, AD_UNITS: cfg.AD_UNITS });
+      wx.setStorageSync(KEY, { DEBUG: cfg.DEBUG, AD_UNITS: cfg.AD_UNITS, ORDER: cfg.ORDER });
     } catch (e) { /* 忽略 */ }
     return cfg;
   });

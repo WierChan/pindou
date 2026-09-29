@@ -44,3 +44,6 @@
   border: 2px solid var(--ink);
 }
 .fin-chip.on { background: var(--coin); color: var(--ink); box-shadow: 2px 2px 0 var(--coin-dark); }
+
+/* 跳转行（我的订单）右侧箭头 */
+.set-arrow { font-size: 20px; font-weight: 800; color: var(--ink2); line-height: 1; }

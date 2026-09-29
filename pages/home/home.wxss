@@ -366,3 +366,20 @@
   justify-content: center;
   opacity: .92;
 }
+
+/* 代拼服务入口：CTA 下面一条细横条（曦黄底），右端「我的订单 · N」 */
+.home-order {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 9px 12px;
+  background: var(--blue);
+  border: 3px solid var(--ink);
+  box-shadow: 3px 3px 0 var(--blue-dark);
+  color: #7A5A2E;
+  transition: transform .12s;
+}
+.home-order .pxi { margin-right: 2px; flex-shrink: 0; }
+.ho-txt { flex: 1; min-width: 0; font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ho-r { flex-shrink: 0; font-size: 12px; font-weight: 800; }

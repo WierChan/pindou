@@ -111,7 +111,7 @@ function drawFused(ctx, x, y, s, rgb, holeR) {
    1/5 颗豆（屏幕上取实测的 0.2 倍更耐看）。逐像素画代价太高 —— 生成无缝贴片
    用 pattern 铺；贴片只生成一次，缩放靠绘制端 ctx.scale 适配，捏合过程中不重算 */
 const GRAIN_AMP = 0.048;  // 底纹峰值 alpha
-const GRAIN_MIN_PX = 6;   // 格子小于这个尺寸就不铺（看不见，纯浪费）
+const GRAIN_MIN_PX = 8;   // 贴片里「一颗豆」在屏幕上至少占多少**物理**像素；不够就按 LOD 合并（见 grainLod）
 const GRAIN_UNIT = 16;    // 贴片里「一颗豆」占多少像素（绘制端据此换算缩放）
 const GRAIN_BEADS = 8;    // 贴片边长（豆数）
 
@@ -241,13 +241,32 @@ function valueAt(lat, nx, ny, u, v) {
    所以贴片边长必须是 GRAIN_UNIT 的整数倍（beads 颗豆），铺出来才跟豆格对齐、无缝。 */
 const tileCache = {};             // finishKey -> 离屏画布（或 null=不支持/无贴片）
 const patCache = {};              // finishKey -> { ctx, pat }
+// 纹理 LOD：sDev 是一颗豆在屏幕上的物理像素。够大 → 1（一颗豆一格纹理）；太小 → m（m×m 颗豆
+// 合成一格纹理铺，周期仍对齐豆格，不会「游」）。以前小于门槛直接不铺 → 大图（100 格以上）整张看不出
+// 换烫法的差别，用户反馈「选哪种都一样」。返回 0 = 豆已经小到画不出（<0.5 物理像素）。
+function grainLod(sDev) {
+  if (!(sDev > 0.5)) return 0;
+  return sDev >= GRAIN_MIN_PX ? 1 : Math.min(8, Math.ceil(GRAIN_MIN_PX / sDev));
+}
+// 把已熔合豆的屏幕坐标（[x0,y0,x1,y1,...]，行优先）合成同一行连续的横条，铺 pattern 时一条一个 fillRect
+// （大图上万颗豆逐格 fillRect(pattern) 太慢；照片类图纸整行连续，合并后只剩几百条）
+function fillGrainRuns(ctx, pts, n, s, kk, ox, oy) {
+  const es = s * 0.06 / kk, cs = s / kk;
+  let rx = 0, ry = 0, rn = 0; // 当前横条起点与格数
+  for (let k = 0; k <= n; k += 2) {
+    const more = k < n;
+    if (more && rn && pts[k + 1] === ry && Math.abs(pts[k] - (rx + rn * s)) < 0.01) { rn++; continue; }
+    if (rn) ctx.fillRect((rx - ox) / kk - es, (ry - oy) / kk - es, cs * rn + es * 2, cs + es * 2);
+    if (more) { rx = pts[k]; ry = pts[k + 1]; rn = 1; }
+  }
+}
 function tileBeads(key) {
   if (key === 'glaze') return 1;  // 每颗豆一块对角釉光
   return FINISHES[key] && FINISHES[key].cat === 'glitter' ? 10 : GRAIN_BEADS; // 闪粉贴片大些，少重复感
 }
 
 // 噪声型贴片（毛巾/澡巾/纸纹）：脊线/细颗粒噪声 → 明暗微浮雕
-function paintNoiseTile(c2, T, variant) {
+function paintNoiseTile(c2, T, variant, ampMul) {
   const B = T / GRAIN_UNIT;
   const img = c2.createImageData(T, T);
   const d = img.data;
@@ -274,6 +293,7 @@ function paintNoiseTile(c2, T, variant) {
     sample = (u, v) => valueAt(l1, NX, NY, u + v * 0.5, v); // u+0.5v → 斜向拉丝（仍周期无缝）
     amp = 0.05; contrast = 1.0; bias = 0.22; // 偏亮 → 薄雾
   }
+  amp *= ampMul || 1;
   const buf = new Float64Array(T * T); let sum = 0;
   for (let y = 0; y < T; y++) for (let x = 0; x < T; x++) { const n = sample(x / T, y / T); buf[y * T + x] = n; sum += n; }
   const mean = sum / (T * T);
@@ -353,21 +373,25 @@ function getGlitterCells(key) {
   glitterCache[key] = g;
   return g;
 }
-// 在一颗豆（屏幕左上 x,y、边长 cellPx）上画它的闪片：纯 fillRect，无缩放插值 → 无黑边
-function drawGlitterCell(ctx, g, cx, cy, x, y, cellPx) {
+// 在一颗豆（屏幕左上 x,y、边长 cellPx）上画它的闪片：纯 fillRect，无缩放插值 → 无黑边。
+// dpr：逻辑像素→物理像素倍率；位置/大小按**物理**像素取整（最小 1 物理像素），任何缩放下方片都干净、密度不失真
+function drawGlitterCell(ctx, g, cx, cy, x, y, cellPx, dpr) {
   const list = g.cells[(((cy % g.TB) + g.TB) % g.TB) * g.TB + (((cx % g.TB) + g.TB) % g.TB)];
   if (!list.length) return;
-  const u = cellPx / GRAIN_UNIT;
+  const u = cellPx / GRAIN_UNIT, q = dpr > 0 ? dpr : 1;
   for (let i = 0; i < list.length; i++) {
     const f = list[i];
+    const d = Math.max(1, Math.round(f.sz * u * q)) / q;
     ctx.globalAlpha = f.a; // 每片各自透明度：有实有虚
     ctx.fillStyle = f.col;
-    ctx.fillRect(Math.round(x + f.ox * u), Math.round(y + f.oy * u), Math.max(1, Math.round(f.sz * u)), Math.max(1, Math.round(f.sz * u)));
+    ctx.fillRect(Math.round((x + f.ox * u) * q) / q, Math.round((y + f.oy * u) * q) / q, d, d);
   }
 }
 
 // 按 key 造贴片（只造一次）。闪粉不走贴片（直接画方片，见 drawGlitterCell），这里不处理。
-function buildTile(key) {
+// lod：LOD 合并铺（m>1）时用的加强版——细噪声（毛巾/纸纹）缩小后会被平均成灰，对比度加倍才看得出
+const GRAIN_LOD_AMP = 1.8;
+function buildTile(key, lod) {
   const spec = FINISHES[key];
   if (!spec || key === SMOOTH || spec.cat === 'glitter') return null;
   const T = tileBeads(key) * GRAIN_UNIT;
@@ -375,7 +399,7 @@ function buildTile(key) {
   if (!cv) return null;
   try {
     const c2 = cv.getContext('2d');
-    if (key === 'towel' || key === 'bath' || key === 'paper') paintNoiseTile(c2, T, key);
+    if (key === 'towel' || key === 'bath' || key === 'paper') paintNoiseTile(c2, T, key, lod ? GRAIN_LOD_AMP : 1);
     else if (key === 'mesh') paintMeshTile(c2, T);
     else if (key === 'glaze') paintGlazeTile(c2, T);
     return cv;
@@ -383,19 +407,21 @@ function buildTile(key) {
     return null; // 老基础库不支持离屏画布：退回无贴片（只剩融合面）
   }
 }
-function tileFor(key) {
-  if (!(key in tileCache)) tileCache[key] = buildTile(key);
-  return tileCache[key];
+function tileFor(key, lod) {
+  const ck = lod ? key + '@lod' : key;
+  if (!(ck in tileCache)) tileCache[ck] = buildTile(key, lod);
+  return tileCache[ck];
 }
-// 拿到某烫法的贴片 pattern（按 key + ctx 记忆，正常一帧只创建一次）
-function finishPattern(ctx, key) {
-  const cv = tileFor(key);
+// 拿到某烫法的贴片 pattern（按 key(+lod) + ctx 记忆，正常一帧只创建一次）
+function finishPattern(ctx, key, lod) {
+  const cv = tileFor(key, lod);
   if (!cv) return null;
-  const pc = patCache[key];
+  const ck = lod ? key + '@lod' : key;
+  const pc = patCache[ck];
   if (pc && pc.ctx === ctx && pc.pat) return pc.pat;
   let pat = null;
   try { pat = ctx.createPattern(cv, 'repeat'); } catch (e) { pat = null; }
-  patCache[key] = { ctx, pat };
+  patCache[ck] = { ctx, pat };
   return pat;
 }
 
@@ -450,38 +476,43 @@ function drawPatternInto(ctx, p, opts) {
   // 烫法贴片铺一遍（只盖在豆子上，底板保持干净）。
   // opts.finish 是作品的烫法（熨烫前选的），缩略图/分享/导出都跟着走
   const finish = normFinish(opts.finish) || SMOOTH;
-  if (fused && finish !== SMOOTH && cellPx >= GRAIN_MIN_PX) {
+  const lod = fused && finish !== SMOOTH ? grainLod(cellPx * (opts.scale || 1)) : 0; // 0 = 不铺
+  if (lod) {
+    const m = lod;
     if (isGlitter(finish)) {
-      // 闪粉：逐豆直接画方片（不走贴片缩放，任何机型无黑边）；每片自带透明度
+      // 闪粉：逐豆直接画方片（不走贴片缩放，任何机型无黑边）；每片自带透明度。
+      // LOD>1 时 m×m 颗豆当一颗撒闪片（只在块左上那颗触发），闪片密度和大图时一致，不会糊成一片白
       const g = getGlitterCells(finish);
-      for (let cy = 0; cy < h; cy++) {
-        for (let cx = 0; cx < w; cx++) {
+      const bs = cellPx * m;
+      for (let cy = 0; cy < h; cy += m) {
+        for (let cx = 0; cx < w; cx += m) {
           const i = cy * w + cx;
           if (cells[i] < 0) continue;
           if (placed && !placed[i]) continue;
-          drawGlitterCell(ctx, g, cx, cy, pad + cx * cellPx, pad + cy * cellPx, cellPx);
+          drawGlitterCell(ctx, g, cx / m, cy / m, pad + cx * cellPx, pad + cy * cellPx, bs, opts.scale || 1);
         }
       }
       ctx.globalAlpha = 1;
     } else {
-      const pat = finishPattern(ctx, finish);
+      const pat = finishPattern(ctx, finish, m > 1);
       if (pat) {
-        const e = cellPx * 0.06;
-        // 贴片按「一颗豆 = 该档位的 unit 像素」缩放，并跟着图纸原点平移
-        const k = cellPx / GRAIN_UNIT;
+        // 贴片按「一颗豆(或 m 颗) = 该档位的 unit 像素」缩放，并跟着图纸原点平移
+        const k = cellPx * m / GRAIN_UNIT;
         ctx.save();
         ctx.translate(pad, pad);
         ctx.scale(k, k);
         ctx.fillStyle = pat;
-        const cs = cellPx / k, es = e / k;
+        const pts = [];
+        let n = 0;
         for (let cy = 0; cy < h; cy++) {
           for (let cx = 0; cx < w; cx++) {
             const i = cy * w + cx;
             if (cells[i] < 0) continue;
             if (placed && !placed[i]) continue;
-            ctx.fillRect(cx * cs - es, cy * cs - es, cs + es * 2, cs + es * 2);
+            pts[n++] = cx * cellPx; pts[n++] = cy * cellPx;
           }
         }
+        fillGrainRuns(ctx, pts, n, cellPx, k, 0, 0);
         ctx.restore();
       }
     }
@@ -1047,7 +1078,8 @@ class BoardView {
     const fused = this.fused && !isPlay && !isIron && !chartView;
     const numFont = 'bold ' + Math.round(s * 0.4) + 'px sans-serif';
     // 熨好的格子先记下来，主循环跑完统一铺一遍烫法贴片（一帧只设一次 fillStyle）
-    const overlayOn = this.finish !== SMOOTH && s >= GRAIN_MIN_PX && (fused || isIron);
+    const lod = this.finish !== SMOOTH && (fused || isIron) ? grainLod(s * this.dpr) : 0; // 0 = 不铺
+    const overlayOn = lod > 0;
     const gxs = this._gxs || (this._gxs = []); // 复用数组，避免每帧新建
     let gn = 0;
 
@@ -1198,28 +1230,28 @@ class BoardView {
     // 烫法贴片：给已熔合的格子统一铺一遍（噪声/网格/釉光/闪粉）。
     // 贴片跟着图纸原点平移，平移/缩放时纹理不会在画面上"游"
     if (overlayOn && gn) {
+      const m = lod; // LOD>1：m×m 颗豆合成一格纹理（豆太小时保证纹理看得见）
       if (isGlitter(this.finish)) {
-        // 闪粉：逐豆直接画方片（gxs 里是各熔合豆的屏幕左上角），不走贴片缩放 → 无黑边；每片自带透明度
+        // 闪粉：逐豆直接画方片（gxs 里是各熔合豆的屏幕左上角），不走贴片缩放 → 无黑边；每片自带透明度。
+        // LOD>1 时只在每个 m×m 块左上那颗豆上按块大小撒一次，密度与大图一致
         const g = getGlitterCells(this.finish);
+        const bs = s * m;
         for (let k = 0; k < gn; k += 2) {
           const px = gxs[k], py = gxs[k + 1];
           const cx = Math.round((px - ox) / s), cy = Math.round((py - oy) / s);
-          drawGlitterCell(ctx, g, cx, cy, px, py, s);
+          if (m > 1 && (cx % m || cy % m)) continue;
+          drawGlitterCell(ctx, g, cx / m, cy / m, px, py, bs, this.dpr);
         }
         ctx.globalAlpha = 1;
       } else {
-        const pat = finishPattern(ctx, this.finish);
+        const pat = finishPattern(ctx, this.finish, m > 1);
         if (pat) {
-          const e = s * 0.06;
-          const kk = s / GRAIN_UNIT;
+          const kk = s * m / GRAIN_UNIT;
           ctx.save();
           ctx.translate(ox, oy);
           ctx.scale(kk, kk);
           ctx.fillStyle = pat;
-          const cs = s / kk, es = e / kk;
-          for (let k = 0; k < gn; k += 2) {
-            ctx.fillRect((gxs[k] - ox) / kk - es, (gxs[k + 1] - oy) / kk - es, cs + es * 2, cs + es * 2);
-          }
+          fillGrainRuns(ctx, gxs, gn, s, kk, ox, oy);
           ctx.restore();
         }
       }

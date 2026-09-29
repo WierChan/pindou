@@ -6,6 +6,8 @@ const { getBeadShape } = require('../../utils/board');
 const ui = require('../../utils/ui');
 const sync = require('../../utils/sync');
 const ads = require('../../utils/ads');
+const order = require('../../utils/order');
+const { cfg } = require('../../utils/config');
 const { buildGuide, guideSeen, markGuideSeen } = require('../../utils/guidance');
 
 // 从自由画布的稀疏豆表裁出密集图纸（heal 重建缩略图用）
@@ -49,6 +51,8 @@ Page({
     celebrating: false,
     guideSteps: [],
     adHome: '',       // 流量主 banner 位 ID（空 = 不渲染）
+    orderOn: true,    // 代拼服务入口（后端 order.enabled=false 可收起）
+    orderN: 0,        // 本机记录的代拼订单数（入口角标）
   },
 
   onShow() {
@@ -57,7 +61,10 @@ Page({
     this._startBlink();
     this._cloudSync();
     this._refreshAd();
+    this.setData({ orderOn: cfg.ORDER.enabled, orderN: order.localCount() });
   },
+
+  goOrders() { wx.navigateTo({ url: '/pages/orders/orders' }); },
 
   // banner 位 ID 可能在启动配置拉到后才有值，每次回首页补一次；
   // binderror 清空后下次 onShow 重新取值，相当于自然重试

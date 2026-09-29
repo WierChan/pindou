@@ -84,5 +84,17 @@
       </view>
       <view class="set-hint">新作品熨烫时的默认烫法与豆孔；每幅作品在熨烫页仍可单独调整。</view>
     </view>
+
+    <!-- 代拼服务 -->
+    <view wx:if="{{orderOn}}" class="set-sec">
+      <view class="set-sec-t">代拼服务</view>
+      <view class="set-card">
+        <view class="set-row" hover-class="pressed" bindtap="goOrders">
+          <view class="set-lb"><image class="pxi" src="/assets/icons/parcel.png" />我的订单</view>
+          <view class="set-arrow">›</view>
+        </view>
+      </view>
+      <view class="set-hint">在作品页点「代拼」，把图纸交给商家拼好、熨烫定型，快递到家或到店自取。</view>
+    </view>
   </view>
 </view>

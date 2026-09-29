@@ -9,4 +9,4 @@ const HOSTS = {
   prod: 'https://api.pindoubianlidian.com', // TODO: 部署后替换为真实域名
 };
 
-module.exports = { API_BASE: HOSTS[ENV] };
+module.exports = { ENV, API_BASE: HOSTS[ENV] };

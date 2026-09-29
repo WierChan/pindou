@@ -18,6 +18,16 @@
     </view>
   </view>
 
+  <!-- 代拼入口：画板上方通栏（工具栏里的小 chip 不够醒目，用户要求放到显眼处） -->
+  <view wx:if="{{orderOn}}" class="order-banner" hover-class="pressed" bindtap="goOrder">
+    <image class="pxi-l ob-ic" src="/assets/icons/parcel.png" />
+    <view class="ob-txt">
+      <text class="ob-t">不想自己拼？找商家代拼</text>
+      <text class="ob-sub">含豆子和熨烫定型，寄到家或到店自取</text>
+    </view>
+    <text class="ob-arrow">›</text>
+  </view>
+
   <view class="board-area">
     <canvas type="2d" id="board" class="board"
             bindtouchstart="onTS" bindtouchmove="onTM"

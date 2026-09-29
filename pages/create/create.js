@@ -533,10 +533,15 @@ Page({
     this._renderConfig();
   },
 
+  // 白色背景不拼豆：开时首次要对源图做一遍「连通白」漫水（convert.whiteMask，之后按源图缓存），
+  // 真机几十到几百毫秒，先把加载框渲染出来再算（同去背景的 _yield 思路）；关掉是纯重采样，直接渲染
   onWhiteChange(e) {
+    const on = e.detail.value;
     this._resetColorEdits();
-    this.setData({ whiteEmpty: e.detail.value });
-    this._renderConfig();
+    this.setData({ whiteEmpty: on });
+    if (!on || !this.srcData) { this._renderConfig(); return; }
+    wx.showLoading({ title: '处理中', mask: true });
+    this._yield().then(() => { this._renderConfig(); wx.hideLoading(); });
   },
 
   // 去背景：漫水填充圈出边缘背景 → 把这些像素的 alpha 抹成 0（imageToPattern 会当空格留白）；

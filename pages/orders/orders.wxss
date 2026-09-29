@@ -1,0 +1,68 @@
+/* 我的订单：列表卡片 + 详情底部弹层 */
+.olpage { height: 100vh; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+.olpage .topbar { padding-left: 16px; background: var(--bg); position: relative; }
+.ol-scroll { flex: 1; min-height: 0; }
+.ol-pad { height: 30px; }
+
+.ol-empty {
+  max-width: 560px; margin: 8px auto; padding: 48px 20px;
+  text-align: center; color: var(--ink2); line-height: 1.9; font-size: 15px;
+  border: 3px dashed rgba(95, 74, 78, .3);
+}
+.ol-hint { text-align: center; font-size: 12px; color: var(--ink2); padding: 10px; }
+
+.ol-list { max-width: 560px; margin: 0 auto; padding: 4px 16px; display: flex; flex-direction: column; gap: 14px; }
+.ol-card {
+  background: var(--card); border: 3px solid var(--ink); box-shadow: 4px 4px 0 #E2DAD3;
+  padding: 12px 14px; transition: transform .12s;
+}
+.ol-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ol-name { flex: 1; min-width: 0; font-size: 15px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ol-meta { font-size: 12px; color: var(--ink2); margin-top: 4px; }
+.ol-bot { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.ol-time { font-size: 12px; color: var(--ink2); }
+.ol-total { font-size: 16px; font-weight: 900; color: var(--accent-dark); }
+.ol-act { display: flex; justify-content: flex-end; margin-top: 10px; }
+
+/* 状态徽标 */
+.ol-st { flex-shrink: 0; font-size: 11px; font-weight: 800; padding: 3px 8px; border: 2px solid var(--ink); background: var(--chipbg); color: var(--ink); }
+.ol-st.unpaid { background: #FFE39A; color: #7A5A2E; }
+.ol-st.paid { background: #CDE3F2; color: #3D5A78; }
+.ol-st.making { background: var(--coin); color: var(--ink); }
+.ol-st.ship { background: #B7E6A6; color: #2F6B2A; }
+.ol-st.done { background: #9EB995; color: #fff; }
+.ol-st.off { background: #ECE4DC; color: var(--ink2); }
+
+/* 详情弹层 */
+.ol-mask { position: fixed; left: 0; right: 0; top: 0; bottom: 0; background: rgba(30, 20, 15, .42); z-index: 200; display: flex; align-items: flex-end; }
+.ol-sheet {
+  width: 100%; box-sizing: border-box; background: var(--card);
+  border-top: 3px solid var(--ink); box-shadow: 0 -4px 0 #F0E5DE;
+  padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+  max-height: 84vh; display: flex; flex-direction: column;
+}
+.ol-sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-shrink: 0; }
+.ol-sheet-title { font-size: 16px; font-weight: 800; }
+.ol-sheet-x { font-size: 16px; color: var(--ink2); padding: 4px 10px; }
+.ol-sheet-body { height: 66vh; } /* scroll-view 要有确定高度才能滚（flex 派生高度真机不滚） */
+
+.ol-status { padding: 12px 14px; border: 3px solid var(--ink); background: var(--chipbg); margin-bottom: 12px; }
+.ol-status.unpaid { background: #FFF3D0; }
+.ol-status.paid { background: #E4F0F9; }
+.ol-status.making { background: #FBEAED; }
+.ol-status.ship { background: #E6F5E0; }
+.ol-status.done { background: #E6F0E4; }
+.ol-status-t { font-size: 17px; font-weight: 900; }
+.ol-status-d { font-size: 12px; color: var(--ink2); margin-top: 4px; line-height: 1.6; white-space: pre-line; }
+
+.ol-sec-t { font-size: 12px; font-weight: 800; color: var(--accent-dark); letter-spacing: 1px; margin: 12px 2px 4px; }
+.ol-kv { display: flex; gap: 12px; padding: 6px 2px; font-size: 13px; line-height: 1.5; }
+.ol-kv .k { flex-shrink: 0; width: 44px; color: var(--ink2); font-weight: 700; }
+.ol-kv .v { flex: 1; min-width: 0; color: var(--ink); word-break: break-all; white-space: pre-line; }
+.ol-kv.total .v { font-weight: 900; color: var(--accent-dark); font-size: 15px; }
+.ol-kv.dim .v { color: var(--ink2); font-size: 12px; }
+.ol-copy { color: var(--accent-dark); font-weight: 800; font-size: 12px; margin-left: 6px; }
+
+.ol-btns { display: flex; flex-direction: column; gap: 10px; margin: 16px 0 6px; }
+.ol-btn { width: 100%; text-align: center; align-self: auto; box-sizing: border-box; }
+button.ol-btn { padding: 11px 16px; line-height: 1.45; border-radius: 0; }

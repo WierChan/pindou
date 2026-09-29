@@ -36,10 +36,11 @@
         </view>
       </view>
     </scroll-view>
-    <!-- 操作：分享 / 导入码 / 保存这个效果 -->
+    <!-- 操作：分享 / 导入码 / 代拼 / 保存这个效果 -->
     <view class="vt-mini-row">
       <view class="btn-ghost vt-mini" hover-class="pressed" bindtap="openShare"><image class="pxi-s" src="/assets/icons/export.png" />分享</view>
       <view class="btn-ghost vt-mini" hover-class="pressed" bindtap="shareCode"><image class="pxi-s" src="/assets/icons/key.png" />导入码</view>
+      <view wx:if="{{orderOn}}" class="btn-ghost vt-mini c-gold" hover-class="pressed" bindtap="goOrder"><image class="pxi-s" src="/assets/icons/parcel.png" />代拼</view>
     </view>
     <view class="btn-primary vt-save" hover-class="pressed" bindtap="saveFinish">保存这个效果 →</view>
   </view>

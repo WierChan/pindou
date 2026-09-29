@@ -3,6 +3,7 @@
 const { audio, bgm } = require('../../utils/audio');
 const { getBeadShape, setBeadShape, finishList, normFinish } = require('../../utils/board');
 const ui = require('../../utils/ui');
+const { cfg } = require('../../utils/config');
 
 const K_PAINT = 'pindou.paintMode.v1';   // 划动默认：1 连续上豆 / 其余 拖动画布
 const K_LOCATE = 'pindou.locate.v1';     // 定位高亮默认：1 开
@@ -38,10 +39,12 @@ Page({
       finish: normFinish(rd(K_FINISH, 'towel')) || 'towel',
       finishGroups: finishList(),
       hole: rd(K_HOLE, 'none'),
+      orderOn: cfg.ORDER.enabled,
     });
   },
 
   goBack() { wx.navigateBack({ fail: () => ui.backHome() }); },
+  goOrders() { wx.navigateTo({ url: '/pages/orders/orders' }); },
 
   /* ---- 声音 ---- */
   setSfx(e) {

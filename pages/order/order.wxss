@@ -1,0 +1,117 @@
+/* 代拼下单页：卡片式表单 + 底部合计栏（沿用设置页的卡片骨架与像素风控件） */
+.odpage { height: 100vh; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+.odpage .topbar { padding-left: 16px; background: var(--bg); position: relative; }
+.od-scroll { flex: 1; min-height: 0; }
+
+.od-sec { max-width: 560px; margin: 0 auto 16px; padding: 0 16px; }
+.od-sec-t { font-size: 13px; font-weight: 800; color: var(--accent-dark); letter-spacing: 1px; margin: 0 0 8px 2px; }
+.od-card { background: var(--card); border: 3px solid var(--ink); box-shadow: 4px 4px 0 #E2DAD3; }
+
+/* 作品卡 */
+.od-work { display: flex; gap: 12px; padding: 12px; align-items: center; }
+.od-pv-wrap {
+  width: 96px; height: 96px; flex-shrink: 0;
+  background: #F9F0EA; border: 2px solid var(--ink);
+  display: flex; align-items: center; justify-content: center;
+}
+.od-pv { width: 88px; height: 88px; }
+.od-pv.ph { background: repeating-linear-gradient(45deg, #F0E7DF 0 6px, #F6EFE8 6px 12px); }
+.od-work-info { flex: 1; min-width: 0; }
+.od-work-name { font-size: 16px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.od-work-meta { font-size: 13px; color: var(--ink2); margin-top: 4px; font-weight: 700; }
+.od-work-sub { font-size: 12px; color: var(--ink2); margin-top: 6px; line-height: 1.5; }
+.od-block {
+  margin-top: 10px; padding: 10px 12px;
+  background: #FFE3E3; border: 2px solid #C94A4A; color: #A32C2C;
+  font-size: 13px; font-weight: 700; line-height: 1.5;
+}
+
+/* 表单行 */
+.od-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 12px 14px; }
+.od-row + .od-row { border-top: 2px solid #F0E5DE; }
+.od-row.col { flex-direction: column; align-items: stretch; }
+.od-lb { font-size: 15px; font-weight: 700; color: var(--ink); }
+.od-sub { font-size: 11px; font-weight: 400; color: var(--ink2); margin-left: 6px; }
+.od-hint { font-size: 12px; color: var(--ink2); line-height: 1.6; margin: 8px 2px 0; }
+.od-hint.warn { color: #B0702B; }
+
+/* 烫法分组卡片：示例实拍缩略图 + 名称（一行三个），格利特加价角标 */
+.fin-groups { display: flex; flex-direction: column; gap: 10px; }
+.fin-cat { font-size: 11px; font-weight: 700; color: var(--accent-dark); letter-spacing: 1px; margin-bottom: 6px; }
+.fin-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.fin-card {
+  width: calc((100% - 16px) / 3); box-sizing: border-box;
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  padding: 6px 4px 7px; background: var(--chipbg); border: 2px solid var(--ink);
+  transition: transform .12s;
+}
+.fin-card.on { background: var(--coin); box-shadow: 2px 2px 0 var(--coin-dark); }
+.fin-pv { position: relative; width: 66px; height: 66px; border: 2px solid var(--ink); background: #F9F0EA; overflow: hidden; }
+.fin-img { width: 100%; height: 100%; display: block; }
+.fin-zoom { position: absolute; right: 0; bottom: 0; font-size: 9px; font-weight: 800; line-height: 1; padding: 2px 4px; background: rgba(95, 74, 78, .8); color: #fff; }
+.fin-nm { font-size: 12px; font-weight: 800; color: var(--ink); text-align: center; line-height: 1.2; }
+.fin-fee { font-size: 10px; color: var(--accent-dark); margin-left: 4px; font-weight: 800; }
+
+/* 示例实拍放大弹层 */
+.fz-mask { position: fixed; left: 0; right: 0; top: 0; bottom: 0; background: rgba(30, 20, 15, .6); z-index: 210; display: flex; align-items: center; justify-content: center; padding: 24px; animation: fadeIn .2s; }
+.fz-box {
+  width: 100%; max-width: 340px; background: var(--card);
+  border: 4px solid var(--ink); box-shadow: 6px 6px 0 rgba(95, 74, 78, .3);
+  padding: 12px; display: flex; flex-direction: column; gap: 10px;
+}
+/* 缩放容器：area 定尺寸并裁切，view 与 area 同尺寸（未放大时不可拖），放大后在 area 内拖动 */
+.fz-area { width: 100%; height: 300px; background: #F9F0EA; border: 2px solid var(--ink); overflow: hidden; }
+.fz-mv { width: 100%; height: 100%; }
+.fz-img { width: 100%; height: 100%; display: block; }
+.fz-hint { font-size: 11px; color: var(--ink2); text-align: center; margin-top: -4px; }
+.fz-t { font-size: 17px; font-weight: 900; }
+.fz-sub { font-size: 12px; font-weight: 400; color: var(--ink2); margin-left: 6px; }
+.fz-d { font-size: 13px; color: var(--ink); line-height: 1.6; }
+.fz-btns { display: flex; gap: 10px; }
+.fz-btns > view { flex: 1; text-align: center; align-self: auto; }
+
+/* 地址块 / 输入 */
+.od-addr {
+  padding: 10px 12px; background: var(--chipbg);
+  border: 2px dashed rgba(95, 74, 78, .35);
+  font-size: 13px; line-height: 1.5; color: var(--ink);
+}
+.od-addr.empty { color: var(--accent-dark); text-align: center; border-color: var(--accent-dark); font-weight: 700; }
+.od-addr-l1 { font-weight: 800; }
+.od-addr-l2 { color: var(--ink2); margin-top: 2px; }
+.od-copy { color: var(--accent-dark); font-weight: 800; margin-left: 8px; font-size: 12px; }
+.od-input {
+  flex: 1; min-width: 0; min-height: 34px; padding: 4px 10px;
+  border: 2px solid var(--ink); background: #fff;
+  font-size: 14px; font-weight: 700; text-align: right; box-sizing: border-box;
+}
+.od-textarea {
+  width: 100%; min-height: 64px; padding: 8px 10px;
+  border: 2px solid var(--ink); background: #fff;
+  font-size: 13px; line-height: 1.5; box-sizing: border-box;
+}
+
+/* 费用明细 */
+.od-fee { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; }
+.od-fee + .od-fee { border-top: 2px solid #F0E5DE; }
+.od-fee-l { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.od-fee-nm { font-size: 14px; font-weight: 700; }
+.od-fee-desc { font-size: 11px; color: var(--ink2); }
+.od-fee-v { font-size: 14px; font-weight: 800; flex-shrink: 0; }
+.od-pad { height: 20px; }
+
+/* 底部合计栏 */
+.od-bar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: var(--card); border-top: 3px solid var(--ink); box-shadow: 0 -4px 0 #F0E5DE;
+}
+.od-total { flex: 1; display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.od-total-lb { font-size: 13px; color: var(--ink2); font-weight: 700; }
+.od-total-v { font-size: 22px; font-weight: 900; color: var(--accent-dark); }
+.od-pay { padding: 12px 28px; font-size: 15px; flex-shrink: 0; }
+.od-pay.off { opacity: .5; }
+
+/* 必填标记（自取联系手机：标签前红星）与输入框占位色 */
+.od-req { color: #C94A4A; font-weight: 800; margin-right: 2px; }
+.od-ph { color: #B9ADA9; font-weight: 400; }

@@ -28,3 +28,23 @@
 .rz-cancel, .rz-apply { flex: 1; text-align: center; padding: 12px; font-size: 15px; font-weight: 800; border: 2px solid var(--ink); box-sizing: border-box; }
 .rz-cancel { background: var(--card); color: var(--ink); }
 .rz-apply { background: var(--accent); color: #7A4A55; box-shadow: 3px 3px 0 var(--accent-dark); }
+
+/* 代拼入口通栏：画板上方，曦黄底 + 粗描边 + 硬投影，比工具栏 chip 醒目；不盖豆子 */
+.order-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 16px 8px;
+  padding: 8px 12px;
+  background: var(--blue);
+  border: 3px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--blue-dark);
+  color: #7A5A2E;
+  transition: transform .12s;
+}
+.order-banner .ob-ic { flex-shrink: 0; width: 26px; height: 26px; margin: 0; }
+.ob-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.ob-t { font-size: 15px; font-weight: 900; letter-spacing: 1px; line-height: 1.2; }
+.ob-sub { font-size: 11px; font-weight: 700; color: #9A7A3E; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ob-arrow { flex-shrink: 0; font-size: 26px; font-weight: 900; line-height: 1; animation: obnudge 1.4s ease-in-out infinite; }
+@keyframes obnudge { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(4px); } }

@@ -5,6 +5,7 @@ const { ensureFinishSwatches } = require('../../utils/finishswatch');
 const { createCode, format, markCodePrompted } = require('../../utils/importcode');
 const { bgm } = require('../../utils/audio');
 const ui = require('../../utils/ui');
+const { cfg } = require('../../utils/config');
 const { buildGuide, guideSeen, markGuideSeen } = require('../../utils/guidance');
 
 Page({
@@ -13,6 +14,7 @@ Page({
     capW: 700,
     capH: 900,
     title: '',
+    orderOn: true,      // 代拼入口（后端 order.enabled=false 可收起）
     // 已定型作品：可在「未烫成品 / 烫后效果」间切看，并横滑换烫法、保存
     fusedOn: true,      // true 烫后效果（融合+烫法） / false 未烫成品（原豆）
     finish: 'smooth',
@@ -42,6 +44,7 @@ Page({
       insets: ui.navInsets(),
       title: work.name,
       workId: work.id,
+      orderOn: cfg.ORDER.enabled,
       finish,
       finishName: finishInfo(finish).name,
       finishTab: finishInfo(finish).cat,
@@ -163,6 +166,9 @@ Page({
 
   openShare() { this.setData({ shareShow: true }); },
   closeShare() { this.setData({ shareShow: false }); },
+
+  // 找商家代拼：把这张图纸交给商家拼好、熨烫定型（下单页选烫法 / 配送 / 支付）
+  goOrder() { if (this.work) wx.navigateTo({ url: '/pages/order/order?id=' + this.work.id }); },
   onCardBuilt(e) { this.shareImg = e.detail.path; },
 
   /* ---------- 导入码 ---------- */

@@ -150,8 +150,12 @@ Page({
       left: this.total - this.placedCount,
       colorN: this.colorsUsed.length,
       pct: this._pct(),
+      orderOn: cfg.ORDER.enabled, // 代拼入口（后端 order.enabled=false 可收起）
     });
   },
+
+  // 找商家代拼：把这张图纸交给商家拼好、熨烫定型（下单页选烫法 / 配送 / 支付）
+  goOrder() { if (this.work) wx.navigateTo({ url: '/pages/order/order?id=' + this.work.id }); },
 
   onReady() {
     if (!this.work) return;
@@ -162,25 +166,32 @@ Page({
     // 都看过的老用户补 play-edit（🎨换色 / 📐改大小 是更晚加的编辑工具，否则老用户发现不了）
     const toolsStep = { sel: '.tr-btns', text: '右下这排小工具：「◎」定位当前颜色没拼的格子；「🎨」把某个颜色整幅换掉（已拼的也跟着变）；「📐」改图纸大小/颜色数；另外两个是分享、复位视角。' };
     const editStep = { sel: '.tr-btns', text: '右下角两个编辑工具：「🎨」把某个颜色整幅换成别的（已拼的豆也跟着变）、「📐」改图纸大小和颜色数～' };
+    // 代拼是更晚加的：新用户在完整引导里顺带看，老用户单步补看（play-order）
+    const orderOn = this.data.orderOn;
+    const orderStep = { sel: '.order-banner', text: '不想自己拼？点这条「找商家代拼」，把这张图纸交给商家拼好、熨烫定型，快递到家或到店自取～' };
     if (!guideSeen('play')) {
       buildGuide(this, 'play', [
         { sel: '.palette-bar', text: '先在这里选颜色！每种颜色有编号，下面的数字是还差几颗' },
         { text: '板上淡淡的格子就是图纸。点亮所有跟选中颜色一样的格子吧！点错了我会晃一晃提醒你。双指可以缩放看细节～' },
         { sel: '.tools-row', text: '开「连续上豆」手指划过就能连着拼；「一键拼豆」点一下再点画板，把落点周围一块（各色）都铺上；「拼满此色」一下把当前选中颜色整幅拼满——后两个都每天有限次～' },
         toolsStep,
-      ]);
+      ].concat(orderOn ? [orderStep] : []));
     } else if (!guideSeen('play-tools')) {
       buildGuide(this, 'play-tools', [toolsStep]);
     } else if (!guideSeen('play-edit')) {
       buildGuide(this, 'play-edit', [editStep]);
+    } else if (orderOn && !guideSeen('play-order')) {
+      buildGuide(this, 'play-order', [orderStep]);
     }
   },
 
   onGuideDone() {
     // 上层引导已含下层内容，别再让这些用户重复补看
     const id = this.data.guideId;
-    if (id === 'play') { markGuideSeen('play-tools'); markGuideSeen('play-edit'); }
-    else if (id === 'play-tools') { markGuideSeen('play-edit'); }
+    if (id === 'play') {
+      markGuideSeen('play-tools'); markGuideSeen('play-edit');
+      if (this.data.orderOn) markGuideSeen('play-order');
+    } else if (id === 'play-tools') { markGuideSeen('play-edit'); }
     this.setData({ guideSteps: [] });
   },
 
