@@ -30,6 +30,7 @@ function summarize(work) {
     total, placedN,
     free: !!work.free,
     fromCode: work.fromCode || '',
+    fromOrder: work.fromOrder ? 1 : 0,
     completed: !!work.completed, ironDone: !!work.ironDone,
     thumb: work.thumb || '',
     thumbV: work.thumbV || 0,
@@ -83,6 +84,9 @@ const store = {
     if (o.palette) work.palette = o.palette;
     // 来源标记：口令导入的作品记下码（首页角标 / 溯源用）
     if (o.fromCode) work.fromCode = o.fromCode;
+    // 代拼派单码导入的（商家那边）：{no, idx, n}，首页角标「代拼单」与普通口令作品区分；烫法按客户选的预置
+    if (o.fromOrder) work.fromOrder = o.fromOrder;
+    if (o.finish) work.finish = o.finish;
     try { wx.setStorageSync(WORK_KEY(work.id), work); }
     catch (e) { console.warn('保存失败（可能空间不足）', e); }
     syncIndex(work);

@@ -10,6 +10,15 @@
   border: 3px dashed rgba(95, 74, 78, .3);
 }
 .ol-hint { text-align: center; font-size: 12px; color: var(--ink2); padding: 10px; }
+/* 代拼篮还有没下单的作品 */
+.ol-cart {
+  max-width: 528px; margin: 4px auto 10px; padding: 10px 14px; box-sizing: border-box;
+  display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700;
+  background: var(--coin); border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--coin-dark);
+}
+.olpage .ol-cart { width: calc(100% - 32px); }
+.ol-cart-go { margin-left: auto; color: var(--accent-dark); font-weight: 900; flex-shrink: 0; }
+.ol-kv-sub { font-size: 12px; color: var(--ink2); }
 
 .ol-list { max-width: 560px; margin: 0 auto; padding: 4px 16px; display: flex; flex-direction: column; gap: 14px; }
 .ol-card {

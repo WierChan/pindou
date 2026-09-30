@@ -216,4 +216,132 @@ t('配置覆盖：合法项生效、非法项忽略、null 恢复默认', () => 
   assert.deepStrictEqual(P.current(), P.DEFAULTS);
 });
 
+// ---- 多图订单 quoteCart：每张各自定档、运费整单一次（首重 + 续重，计费重 = max(实重, 体积重)） ----
+const B104 = { w: 104, h: 104, beads: 10816 };
+const B52 = { w: 52, h: 52, beads: 2704 };
+const B30 = { w: 30, h: 30, beads: 900 };
+const rep = (x, k) => Array.from({ length: k }, () => ({ ...x }));
+
+t('quoteCart 单张图 = quote()：各分区、自取、闪粉结果完全一致', () => {
+  const cases = [
+    [B30, { delivery: 'pickup' }],
+    [{ ...B104, glitter: true }, { delivery: 'express', province: '上海市' }],
+    [{ w: 10, h: 10, beads: 100 }, { delivery: 'express', province: '新疆维吾尔自治区' }],
+    [{ w: 68, h: 68, beads: 4592, glitter: true }, { delivery: 'express', province: '浙江省' }],
+    [{ w: 104, h: 20, beads: 2080 }, { delivery: 'express', province: '北京市' }],
+  ];
+  for (const [x, o] of cases) {
+    const q = P.quote({ ...x, ...o }), c = P.quoteCart([x], o);
+    assert.ok(c.ok, JSON.stringify(x));
+    assert.strictEqual(c.totalFen, q.totalFen, JSON.stringify(x));
+    assert.strictEqual(c.shippingFen, q.shippingFen);
+    assert.strictEqual(c.merchantQuoteFen, q.merchantQuoteFen);
+    assert.deepStrictEqual(c.lines[0].items, q.items.filter(i => i.key !== 'shipping'));
+  }
+});
+
+t('quoteCart 豆数不加总：3 张 900 颗各按 0.01 档（加总 2700 颗会跳到 0.015 档）', () => {
+  const c = P.quoteCart(rep(B30, 3), { delivery: 'pickup' });
+  assert.ok(c.ok);
+  assert.strictEqual(c.goodsFen, 3 * 1010);
+  assert.strictEqual(c.merchantQuoteFen, 3 * 900);
+  assert.ok(c.lines.every(l => l.rateTier.rate === 10));
+  assert.strictEqual(c.shippingFen, 0);
+  assert.strictEqual(c.totalFen, 3030);
+});
+
+t('quoteCart 小图合寄：首重内，运费和单张一样只收一次', () => {
+  const c = P.quoteCart(rep(B30, 3), { delivery: 'express', province: '浙江省' });
+  assert.strictEqual(c.parcel.box.key, 's');
+  assert.strictEqual(c.parcel.steps, 0);
+  assert.strictEqual(c.shippingFen, 600);
+  assert.strictEqual(c.shipping.desc, '浙江省内');
+  assert.strictEqual(c.totalFen, 3030 + 600);
+});
+
+t('quoteCart 实重超首重：10 张 104 满板 → 大箱，实重 1232g > 体积重 768g，续 1 份', () => {
+  const c = P.quoteCart(rep(B104, 10), { delivery: 'express', province: '北京市' });
+  assert.ok(c.ok, c.reason);
+  assert.strictEqual(c.parcel.box.key, 'l');       // 10 × 5 + 10 = 60mm 刚好大箱
+  assert.strictEqual(c.parcel.actualG, 1082 + 150);
+  assert.strictEqual(c.parcel.volG, 768);         // 32×32×6 cm ÷ 8000
+  assert.strictEqual(c.parcel.steps, 1);
+  assert.strictEqual(c.shippingFen, 1000 + 500);
+  assert.ok(/1\.2kg/.test(c.shipping.desc));
+});
+
+t('quoteCart 体积重超首重：12 张 52 板叠不进大箱 → 加高箱 1536g > 实重，续 1 份', () => {
+  P.configure({ parcel: { maxItems: 20 } });
+  const c = P.quoteCart(rep(B52, 12), { delivery: 'express', province: '浙江省' });
+  assert.ok(c.ok, c.reason);
+  assert.strictEqual(c.parcel.box.key, 'xl');
+  assert.strictEqual(c.parcel.volG, 1536);
+  assert.ok(c.parcel.actualG < c.parcel.volG);
+  assert.strictEqual(c.parcel.billedG, 1536);
+  assert.strictEqual(c.shippingFen, 600 + 200);
+  P.configure(null);
+});
+
+t('quoteCart 拦截：空单 / 超张数 / 某张不合格 / 港澳台 / 包裹装不下 / 超 maxG；未选地址不拦', () => {
+  let c = P.quoteCart([], { delivery: 'pickup' });
+  assert.strictEqual(c.ok, false);
+  c = P.quoteCart(rep(B30, 11), { delivery: 'pickup' });
+  assert.strictEqual(c.ok, false);
+  assert.ok(/最多 10 张/.test(c.reason));
+  c = P.quoteCart([B30, { w: 10, h: 10, beads: 50, name: '小猫' }, B30], { delivery: 'pickup' });
+  assert.strictEqual(c.ok, false);
+  assert.strictEqual(c.badIndex, 1);
+  assert.ok(/第 2 张「小猫」：豆子不足/.test(c.reason));
+  c = P.quoteCart([B30], { delivery: 'express', province: '澳门特别行政区' });
+  assert.strictEqual(c.ok, false);
+  assert.strictEqual(c.badIndex, -1);
+  P.configure({ parcel: { maxItems: 30 } });
+  c = P.quoteCart(rep(B104, 25), { delivery: 'express', province: '浙江省' }); // 25 × 5 + 10 = 135mm，最高的箱子 120
+  assert.strictEqual(c.ok, false);
+  assert.strictEqual(c.parcel.tooBig, true);
+  assert.ok(/分成两单/.test(c.reason));
+  P.configure({ parcel: { maxG: 1000 } });
+  c = P.quoteCart(rep(B104, 10), { delivery: 'express', province: '浙江省' });
+  assert.strictEqual(c.ok, false);
+  P.configure(null);
+  c = P.quoteCart(rep(B30, 2), { delivery: 'express' });
+  assert.strictEqual(c.ok, true);
+  assert.strictEqual(c.needAddress, true);
+  assert.strictEqual(c.totalFen, c.goodsFen);
+});
+
+t('quoteCart 分账保证：商家到手 ≥ 各张商品报价之和 + 运费 × 89.46%', () => {
+  const carts = [
+    [[B30, B52, { ...B104, glitter: true }], { delivery: 'express', province: '新疆维吾尔自治区' }],
+    [rep(B104, 10), { delivery: 'express', province: '北京市' }],
+    [[{ w: 30, h: 30, beads: 8946 }, { w: 40, h: 40, beads: 1599 }], { delivery: 'pickup' }],
+  ];
+  for (const [list, o] of carts) {
+    const c = P.quoteCart(list, o);
+    assert.ok(c.ok, c.reason);
+    const s = P.settle(c.totalFen);
+    assert.ok(s.merchantFen >= c.merchantQuoteFen + Math.floor(c.shippingFen * 0.8946) - 1);
+    assert.strictEqual(s.wxFeeFen + s.platformFen + s.merchantFen, c.totalFen);
+    assert.strictEqual(c.totalFen % 10, 0);
+  }
+});
+
+t('包裹参数覆盖：合法项生效（箱型按体积排序、长短边归一）、非法项忽略、zone 缺续重价用 baseExtra', () => {
+  P.configure({
+    shipping: { baseExtra: 700, zones: [{ key: 'zj', name: '省内', fee: 500, provinces: ['浙江'] }] },
+    parcel: { beadMg: 12, volDivisor: 0, stepG: 500, boxes: [{ key: 'big', l: 200, w: 400, h: 100 }, { key: 'tiny', l: 100, w: 100, h: 30 }] },
+  });
+  const pc = P.current().parcel;
+  assert.strictEqual(pc.beadMg, 12);
+  assert.strictEqual(pc.volDivisor, 8000);
+  assert.strictEqual(pc.stepG, 500);
+  assert.deepStrictEqual(pc.boxes.map(b => b.key), ['tiny', 'big']);
+  assert.deepStrictEqual([pc.boxes[1].l, pc.boxes[1].w], [400, 200]);
+  assert.strictEqual(P.zoneOf('浙江省').extra, 700);
+  P.configure({ parcel: { boxes: [{ l: 'x' }] } });
+  assert.strictEqual(P.current().parcel.boxes.length, 4);
+  P.configure(null);
+  assert.deepStrictEqual(P.current(), P.DEFAULTS);
+});
+
 console.log('\n全部通过：' + n + ' 组');

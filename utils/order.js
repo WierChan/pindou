@@ -66,20 +66,37 @@ function buildPayload(work) {
 
 /* ---------- 接口 ---------- */
 
-// 创建订单并预下单。o: { clientOrderId, finish, hole, delivery, phone, address, note, quote, stats }
-// 返回 { order, payParams }；服务端按 (用户, clientOrderId) 幂等
-function create(work, o) {
-  const st = o.stats || workStats(work);
-  const q = o.quote;
-  return api.post('/api/orders', {
-    clientOrderId: o.clientOrderId,
+// 单张图的下单字段（单图订单平铺在请求体里；多图订单作为 works[] 的一项）
+function workBody(work, finish, hole, st) {
+  st = st || workStats(work);
+  return {
     workId: work.id, name: work.name, w: work.w, h: work.h,
     beads: st.beads, colorN: st.colorN, colors: st.colors,
-    finish: o.finish, finishName: finishLabel(o.finish), glitter: isGlitter(o.finish), hole: o.hole,
-    delivery: o.delivery, phone: o.phone || '', address: o.address || null, note: o.note || '',
-    clientQuote: q ? { items: q.items.map(i => ({ key: i.key, fen: i.fen })), totalFen: q.totalFen } : null,
+    finish, finishName: finishLabel(finish), glitter: isGlitter(finish), hole: hole || 'none',
     payload: buildPayload(work),
-  }).then(d => {
+  };
+}
+
+// 创建订单并预下单。list: [{ work, finish, stats? }]（1 张 = 老的单图格式；多张 = works[]，docs/order-api.md §3.1b）
+// o: { clientOrderId, hole, delivery, phone, address, note, quote（quoteCart 结果） }
+// 返回 { order, payParams }；服务端按 (用户, clientOrderId) 幂等
+function create(list, o) {
+  const q = o.quote;
+  let clientQuote = null;
+  if (q) {
+    const items = [];
+    q.lines.forEach((l, i) => l.items.forEach(it => items.push({ key: it.key, fen: it.fen, work: i })));
+    if (q.shipping) items.push({ key: 'shipping', fen: q.shipping.fen });
+    clientQuote = { items, totalFen: q.totalFen };
+  }
+  const body = {
+    clientOrderId: o.clientOrderId,
+    delivery: o.delivery, phone: o.phone || '', address: o.address || null, note: o.note || '',
+    clientQuote,
+  };
+  if (list.length === 1) Object.assign(body, workBody(list[0].work, list[0].finish, o.hole, list[0].stats));
+  else body.works = list.map(x => workBody(x.work, x.finish, o.hole, x.stats));
+  return api.post('/api/orders', body).then(d => {
     if (d && d.order) remember(d.order);
     return d;
   });
@@ -130,6 +147,7 @@ function summ(o) {
   return {
     id: o.id, workId: o.workId || '', name: o.name || '', w: o.w | 0, h: o.h | 0, beads: o.beads | 0, colorN: o.colorN | 0,
     status: o.status || 'unpaid', delivery: o.delivery || 'pickup', totalFen: o.totalFen | 0, createdAt: o.createdAt || 0,
+    worksN: Array.isArray(o.works) ? o.works.length : (o.worksN | 0), // 多图订单的张数（离线列表显示「N 件」）
   };
 }
 function readLocal() {
@@ -145,6 +163,19 @@ function remember(o) {
 }
 function localList() { return readLocal().slice().sort((a, b) => b.createdAt - a.createdAt); }
 function localCount() { return readLocal().length; }
+
+/* ---------- 代拼篮（多图订单的待下单作品，cfg.ORDER.multi 开了才用） ---------- */
+// 只存作品 id 和选的烫法，不复制图纸（storage 1MB）；下单时才读作品、生成 payload 快照
+const CART_KEY = 'pindou.order.cart.v1'; // [{ id, finish }]
+
+function cartRead() {
+  try { const v = wx.getStorageSync(CART_KEY); if (Array.isArray(v)) return v.filter(x => x && x.id); } catch (e) { /* 忽略 */ }
+  return [];
+}
+function cartWrite(list) {
+  try { wx.setStorageSync(CART_KEY, list.map(x => ({ id: x.id, finish: x.finish || '' }))); } catch (e) { /* 忽略 */ }
+}
+function cartClear() { try { wx.removeStorageSync(CART_KEY); } catch (e) { /* 忽略 */ } }
 
 function lastPhone() { try { return wx.getStorageSync(PHONE_KEY) || ''; } catch (e) { return ''; } }
 function rememberPhone(p) { try { wx.setStorageSync(PHONE_KEY, p || ''); } catch (e) { /* 忽略 */ } }
@@ -165,10 +196,20 @@ function toVM(o) {
   if (o.status === 'cancelled' && o.cancelReason) desc += '：' + o.cancelReason;
   if (o.status === 'shipped' && o.trackingNo) desc = '商家已寄出 · ' + (o.carrier || '快递') + ' ' + o.trackingNo;
   if (o.merchantNote) desc += '\n商家留言：' + o.merchantNote;
+  const dimsOf = x => x.w + '×' + x.h + ' · ' + (x.beads | 0) + ' 颗' + (x.colorN ? ' · ' + x.colorN + ' 色' : '');
+  const finishOf = x => (x.finish ? finishLabel(x.finish) : (x.finishName || ''));
+  // 多图订单（works[]）：每张单列作品 / 规格 / 烫法 / 小计，顶层 items 只有运费
+  const works = Array.isArray(o.works) && o.works.length > 1 ? o.works.map(x => ({
+    name: x.name || '', dims: dimsOf(x), finishText: finishOf(x),
+    yuan: pricing.yuan((x.items || []).reduce((a, i) => a + (i.fen | 0), 0)),
+  })) : null;
   return Object.assign({}, o, {
     stText: st.text, stCls: st.cls, stDesc: desc,
-    dims: o.w + '×' + o.h + ' · ' + (o.beads | 0) + ' 颗' + (o.colorN ? ' · ' + o.colorN + ' 色' : ''),
-    finishText: o.finish ? finishLabel(o.finish) : (o.finishName || ''),
+    works,
+    name: o.name || (works ? works[0].name + ' 等 ' + works.length + ' 件' : ''),
+    dims: works ? works.length + ' 件 · 共 ' + o.works.reduce((a, x) => a + (x.beads | 0), 0) + ' 颗'
+      : (o.worksN > 1 ? o.worksN + ' 件 · 共 ' + (o.beads | 0) + ' 颗' : dimsOf(o)),
+    finishText: works ? '' : finishOf(o),
     holeText: HOLE_TEXT[o.hole] || '',
     deliveryText: o.delivery === 'express' ? '快递到家' : '到店自取',
     totalYuan: pricing.yuan(o.totalFen),
@@ -185,5 +226,6 @@ function toVM(o) {
 module.exports = {
   STATUS, ORDER_FINISH, statusInfo, isGlitter, orderFinish, finishLabel, workStats, buildPayload,
   create, requestPay, list, get, payParams, cancel, confirm, errText,
+  cartRead, cartWrite, cartClear,
   remember, localList, localCount, lastPhone, rememberPhone, fmtTime, toVM,
 };

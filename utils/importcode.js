@@ -4,6 +4,7 @@
 // 接口契约见 docs/import-code-api.md，由 pindou-server 实现。
 const api = require('./api');
 const { PALETTE } = require('./palette');
+const { normFinish } = require('./board');
 
 const CHARSET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
 const CODE_RE = new RegExp('[' + CHARSET + ']{8}');
@@ -81,11 +82,28 @@ function validatePattern(p) {
     placed = new Array(p.w * p.h);
     for (let i = 0; i < placed.length; i++) placed[i] = (raw[i] && p.cells[i] >= 0) ? 1 : 0;
   }
+  const order = orderTag(p.order);
+  const name = String(p.name || '口令拼豆');
   return {
     w: p.w, h: p.h, cells: p.cells,
     palette: hasPal ? p.palette : undefined,
-    name: String(p.name || '口令拼豆').slice(0, 20),
+    // 代拼订单的码：作品名前缀「订单号后 4 位-序号」，商家作品库里一眼对上是哪单第几张
+    name: (order ? order.no + '-' + order.idx + ' ' + name : name).slice(0, 20),
     placed, // undefined（普通图纸口令）或 0/1 数组（接力口令）
+    order,  // undefined（普通口令）或 { no, idx, n, finish }（代拼派单给商家的码，docs/order-api.md §5.3）
+  };
+}
+
+// 代拼订单标记（后端派单建码时写进 payload.order）：{ no: 订单号后 4 位, idx: 第几张, n: 共几张, finish: 烫法 key }
+function orderTag(o) {
+  if (!o || typeof o !== 'object') return undefined;
+  const no = String(o.no || '');
+  const idx = o.idx, n = o.n;
+  if (!/^[0-9A-Za-z]{1,8}$/.test(no) || !Number.isInteger(idx) || idx < 1 || idx > 99) return undefined;
+  return {
+    no, idx,
+    n: Number.isInteger(n) && n >= idx && n <= 99 ? n : idx,
+    finish: normFinish(o.finish) || '', // 客户选的烫法：导入后预选好，商家熨烫时不用再找
   };
 }
 

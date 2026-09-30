@@ -6,6 +6,9 @@
   </view>
 
   <scroll-view scroll-y class="ol-scroll" enhanced show-scrollbar="{{false}}">
+    <view wx:if="{{cartN}}" class="ol-cart" hover-class="pressed" bindtap="goCart">
+      <image class="pxi-s" src="/assets/icons/parcel.png" />代拼篮里还有 {{cartN}} 张作品没下单<text class="ol-cart-go">去下单 ›</text>
+    </view>
     <view wx:if="{{loading}}" class="ol-empty">加载中…</view>
     <view wx:elif="{{!list.length}}" class="ol-empty">
       <view>还没有代拼订单～</view>
@@ -44,10 +47,18 @@
           <view class="ol-status-d">{{detail.stDesc}}</view>
         </view>
 
-        <view class="ol-sec-t">作品</view>
-        <view class="ol-kv"><text class="k">名称</text><text class="v">{{detail.name}}</text></view>
-        <view class="ol-kv"><text class="k">规格</text><text class="v">{{detail.dims}}</text></view>
-        <view wx:if="{{detail.finishText}}" class="ol-kv"><text class="k">烫法</text><text class="v">{{detail.finishText}}{{detail.holeText ? ' · ' + detail.holeText : ''}}</text></view>
+        <view class="ol-sec-t">作品{{detail.works ? ' · ' + detail.works.length + ' 件' : ''}}</view>
+        <block wx:if="{{detail.works}}">
+          <view wx:for="{{detail.works}}" wx:key="index" class="ol-kv">
+            <text class="k">{{index + 1}}</text>
+            <view class="v"><view>{{item.name}} · ¥{{item.yuan}}</view><view class="ol-kv-sub">{{item.dims}} · {{item.finishText}}</view></view>
+          </view>
+        </block>
+        <block wx:else>
+          <view class="ol-kv"><text class="k">名称</text><text class="v">{{detail.name}}</text></view>
+          <view class="ol-kv"><text class="k">规格</text><text class="v">{{detail.dims}}</text></view>
+          <view wx:if="{{detail.finishText}}" class="ol-kv"><text class="k">烫法</text><text class="v">{{detail.finishText}}{{detail.holeText ? ' · ' + detail.holeText : ''}}</text></view>
+        </block>
         <view wx:if="{{detail.note}}" class="ol-kv"><text class="k">备注</text><text class="v">{{detail.note}}</text></view>
 
         <view class="ol-sec-t">配送</view>

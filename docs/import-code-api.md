@@ -22,7 +22,7 @@
 | name | string | 作品名（≤20 字），**须过 msgSecCheck** |
 | w, h | int | 图纸尺寸（1~256，服务端校验） |
 | total | int | 豆子数（仅统计展示用） |
-| payload | string | JSON 字符串：`{w, h, cells, palette?, name}`，≤ 256KB |
+| payload | string | JSON 字符串：`{w, h, cells, palette?, name}`，≤ 256KB。代拼派单由后端建码时另带 `order: {no, idx, n, finish}`（见 docs/order-api.md §5.3），客户端据此把作品名改成「no-idx 原名」、角标标「代拼单」 |
 
 行为：
 

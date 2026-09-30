@@ -1,6 +1,7 @@
 // 我的代拼订单：列表（服务端权威，离线退回本地索引）+ 详情弹层
 // （继续支付 / 取消未付订单 / 确认收货 / 联系客服）。刚支付完回来时轮询几次等支付回调落地。
 const order = require('../../utils/order');
+const { store } = require('../../utils/store');
 const { cfg } = require('../../utils/config');
 const ui = require('../../utils/ui');
 
@@ -12,6 +13,7 @@ Page({
     offline: false,
     detail: null,       // 当前展开的订单视图模型
     pickupArea: '',     // 自取范围文案（派单前详情里没有具体地址时显示）
+    cartN: 0,           // 代拼篮里没下单的作品数（多图订单开了才有）
   },
 
   onLoad(q) {
@@ -20,7 +22,15 @@ Page({
     this.setData({ insets: ui.navInsets(), pickupArea: cfg.ORDER.pickupArea });
   },
 
-  onShow() { this.refresh(); },
+  onShow() {
+    // 篮子里的作品可能已被删：只数还在的
+    this.cart = cfg.ORDER.multi ? order.cartRead().filter(c => store.get(c.id)) : [];
+    this.setData({ cartN: this.cart.length });
+    this.refresh();
+  },
+  goCart() {
+    if (this.cart && this.cart.length) wx.navigateTo({ url: '/pages/order/order?id=' + this.cart[this.cart.length - 1].id });
+  },
   onUnload() { this._polling = false; },
 
   goBack() { wx.navigateBack({ fail: () => ui.backHome() }); },

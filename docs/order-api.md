@@ -5,6 +5,8 @@
 **1 个配置字段 + 6 个客户接口 + 1 个支付回调 + 后台派单/状态流转 + 支付机构收款与分账**即可联调。
 统一响应 `{code, message, data}`（code 0 成功），客户接口鉴权走现有 Bearer token，与 /api/works 一致。
 
+> **2026-09-30 新增：多图订单 + 派单导入码标记。后端要做的全部改动集中在 §11**，照着 §11 逐条做即可，其他章节只是背景说明。
+
 ## 0. 业务一句话
 
 客户在小程序里把某张图纸「交给商家代拼」并付款 → **平台后台人工把单派给某个商家** → 商家拼好、熨烫定型 →
@@ -79,11 +81,37 @@ merchant = net − platform             分给商家（≈ 实付 89.46%；商�
 `merchantQuoteFen` 只算商品部分（代拼费 + 格利特）的商家报价。默认常量 `WX_FEE_RATE` / `PLATFORM_RATE` / `ROUND_FEN` 在 pricing.js 顶部，
 `feeRate` 可由 `order.pricing.feeRate` 覆盖（§2），`pricing.rates()` 取当前生效值。
 
+### 1.1 多图订单（一单多张图；客户端 / 后台已就绪，接口见 §3.1b，`order.multi` 开关见 §2）
+
+客户一次把几张图打包下单，**整单派给一个商家、合寄一个包裹、运费只收一次**。报价用 `pricing.quoteCart(list, {delivery, province})`：
+
+- 每张图各自走单图规则（代拼费按该张豆数定档、格利特按该张板子档、各自 ÷0.8946 取整到角），**豆数不加总**——
+  加总会让 3 张 900 颗跳到 0.015 档，客户反而多付。
+- 运费 = 分区首重价 `fee` + 续重份数 × 分区续重价 `extra`，计费重按快递规矩取实重和体积重的大者：
+
+```
+板子实物边长 = 格数 × pitchMm（默认 2.6mm）
+箱型   = boxes 里第一个 长 ≥ 最长边+marginMm、宽 ≥ 最宽短边+marginMm、高 ≥ 张数×sheetMm+padMm 的
+实重   = Σ豆数 × beadMg + packG
+体积重 = 箱子长×宽×高(cm³) ÷ volDivisor × 1000（克）
+计费重 = max(实重, 体积重)
+续重份数 = 计费重 ≤ firstG ? 0 : ceil((计费重 − firstG) ÷ stepG)
+```
+
+  用默认参数：单张图任何尺寸都在首重内，**`quoteCart([x])` 与 `quote(x)` 结果完全一致**；3 张 30 板合寄浙江还是 6 元；
+  10 张 104 满板寄北京实重约 1.23kg → 10 + 5 = 15 元；12 张 52 板要用加高箱，体积重 1.54kg → 续 1 份。
+- 拦截（`ok=false`）：超过 `maxItems` 张（默认 10）/ 某一张不合格（`badIndex` 指出第几张）/ 所有箱型都装不下或计费重超 `maxG`
+  （提示分两单或找客服）/ 港澳台。
+- 分账不变：整单实付先扣通道费再 90/10，商家到手 ≥ 各张商品报价之和 + 运费 × 89.46%。
+- 退款仍然只能整单、只能在分账前（§5.2），不支持退其中一张。
+- ⚠ `parcel` 里的数字（每颗豆重、箱型、抛比、续重价）**全是占位**，要商家称成品、量箱子、拿快递合同价后在 §2 下发覆盖。
+
 ## 2. `GET /api/config` 新增 `order` 字段
 
 ```json
 "order": {
   "enabled": true,
+  "multi": false,
   "pickupArea": "杭州市内到店自取",
   "pickupHint": "具体取货地址在派单后的订单详情里显示，做好后商家会电话联系你约时间",
   "notice": "下单后 3-7 天内完成制作，节假日顺延",
@@ -97,6 +125,7 @@ merchant = net − platform             分给商家（≈ 实付 89.46%；商�
 - `finishImages`（可选）：烫法示例实拍**放大图**的高清 URL，`{ "towel": "https://…/towel.jpg", … }`，key 为烫法
   key（smooth/towel/bath/glaze/paper/mesh/glitter/glitterFine），只认 https。缺省用包内 `assets/finish/<key>-l.jpg`
   （长边 640）；缩略图始终用包内 220×220 的 `<key>.jpg`。想换图不发版就下发这个。
+- `multi`：多图订单（代拼篮）开关，**缺省 `false`**。后端实现 §3.1b 的 `works[]` 后下发 `true`，下单页才出现「再加一张」。
 - `pricing`：报价表覆盖，缺省 `null` 用内置表。形状（都是可选项，只接受合法的）：
 
 ```json
@@ -105,16 +134,29 @@ merchant = net − platform             分给商家（≈ 实付 89.46%；商�
   "minBeads": 100, "maxSide": 104,
   "tiers": [{ "size": 10, "beads": 100, "rate": 10, "glitter": 50, "colors": 15 }, "…"],
   "shipping": {
-    "base": 1000, "baseName": "其他省份",
+    "base": 1000, "baseExtra": 500, "baseName": "其他省份",
     "zones": [
-      { "key": "zj",  "name": "浙江省内",       "fee": 600,  "provinces": ["浙江"] },
-      { "key": "jsh", "name": "江苏/上海/安徽", "fee": 800,  "provinces": ["江苏", "上海", "安徽"] },
-      { "key": "far", "name": "偏远地区",       "fee": 1800, "provinces": ["新疆", "西藏", "内蒙古", "青海", "甘肃", "宁夏", "海南"] }
+      { "key": "zj",  "name": "浙江省内",       "fee": 600,  "extra": 200,  "provinces": ["浙江"] },
+      { "key": "jsh", "name": "江苏/上海/安徽", "fee": 800,  "extra": 300,  "provinces": ["江苏", "上海", "安徽"] },
+      { "key": "far", "name": "偏远地区",       "fee": 1800, "extra": 1000, "provinces": ["新疆", "西藏", "内蒙古", "青海", "甘肃", "宁夏", "海南"] }
     ],
     "blocked": ["香港", "澳门", "台湾"]
+  },
+  "parcel": {
+    "maxItems": 10, "firstG": 1000, "stepG": 1000, "volDivisor": 8000, "maxG": 5000,
+    "beadMg": 10, "pitchMm": 2.6, "marginMm": 20, "sheetMm": 5, "padMm": 10, "packG": 150,
+    "boxes": [
+      { "key": "s",  "name": "小箱",     "l": 180, "w": 180, "h": 40 },
+      { "key": "m",  "name": "中箱",     "l": 250, "w": 250, "h": 50 },
+      { "key": "l",  "name": "大箱",     "l": 320, "w": 320, "h": 60 },
+      { "key": "xl", "name": "加高大箱", "l": 320, "w": 320, "h": 120 }
+    ]
   }
 }
 ```
+
+`fee` 是首重价、`extra` 是续重价（每 `stepG` 克），zone 不给 `extra` 时用 `baseExtra`；续重只有多图订单才可能用上（§1.1）。
+`parcel` 长度单位毫米、重量单位克（`beadMg` 毫克/颗），`boxes` 是箱子内径，按体积从小到大挑。
 
 单位：`rate` 厘/颗；`feeRate` 是支付通道费率（小数，0～0.05，支付机构合同不是 0.6% 时改这里，用户价与分账同步变）；其余金额分。上面就是客户端内置默认值——**运费分区是客户付的价（分账时随订单按比例切，商家得约 89.46%），
 默认值是杭州发通达系的常见价，上线前和商家定**。`provinces` 按 `wx.chooseAddress` 的 `provinceName` 前缀匹配。
@@ -163,6 +205,45 @@ merchant = net − platform             分给商家（≈ 实付 89.46%；商�
 
 客户端拿到后：若 `order.totalFen` ≠ 本地估算，先弹「金额已更新」确认；然后 `wx.requestPayment(payParams)`。`signType` 以支付机构返回为准（RSA / MD5），客户端透传。
 用户取消支付订单仍保留为 `unpaid`，可在订单页「继续支付」。
+
+### 3.1b 多图订单（客户端与管理后台已做，等后端实现后下发 `order.multi: true` 打开）
+
+> 这里是概要，后端实现以 §11 为准。
+
+客户端：下单页顶部「代拼篮」作品条（点一张切换编辑、× 移除、「再加一张」从作品库挑），每张各选烫法；
+篮子存本地 `pindou.order.cart.v1 = [{id, finish}]`（不存图纸），建单成功后清空；「我的订单」顶部有「代拼篮里还有 N 张」入口。
+**`multi` 没打开时客户端只发单图格式，老接口不受影响；只有 1 张时即便打开也照发单图格式。**
+
+同一个 `POST /api/orders`，2 张及以上时把单图字段挪进 `works[]`，订单级字段不变：
+
+| 字段 | 说明 |
+|---|---|
+| works | `[{ workId, name, w, h, beads, colorN, colors, finish, finishName, glitter, hole, payload }]`，2 ~ `parcel.maxItems` 张，每张字段含义同 §3.1；**烫法每张各选**；每张 payload 各自 ≤256KB |
+| clientOrderId / delivery / phone / address / note | 同 §3.1 |
+| clientQuote | `{ items: [{key, fen, work?}], totalFen }`，`work` 是该行属于第几张（运费行没有） |
+
+服务端逐张校验（任一张不合格 → `400`，message 里指明第几张）、用 `pricing.quoteCart()` 复算；`quoteCart().ok=false`（超张数 / 包裹装不下 / 超 maxG）→ `400` 带 reason。
+支付商品描述用「拼豆代拼·作品名等 N 件」。
+
+订单 VO（§4）多图时：
+
+```json
+{
+  "name": "爱心 等 3 件", "w": 0, "h": 0, "beads": 4333, "colorN": 0, "finish": "", "finishName": "",
+  "works": [
+    { "workId": "…", "name": "爱心", "w": 16, "h": 16, "beads": 136, "colorN": 3, "finish": "towel", "finishName": "毛巾烫", "hole": "none",
+      "items": [{ "key": "labor", "label": "代拼费", "desc": "136 颗 · 含豆子与熨烫定型", "baseFen": 136, "fen": 160 }], "goodsFen": 160,
+      "patternCode": "HMFUKXC6", "colors": ["…仅管理端"], "payload": "…仅管理端详情" },
+    { "…": "第 2、3 张同结构" }
+  ],
+  "items": [{ "key": "shipping", "label": "运费", "desc": "其他省份", "baseFen": 1000, "fen": 1000 }],
+  "goodsFen": 7190, "shippingFen": 1000, "totalFen": 8190, "merchantQuoteFen": 6410
+}
+```
+
+顶层 `name` 由服务端拼好「第一张名 等 N 件」、`beads` 为合计；顶层 `items` 只放运费，金额字段都是整单合计。单图订单没有 `works`，VO 保持现状。
+客户接口的 `works[]` 不带 `colors/payload/patternCode`。派单（§5.3）**每张建一条 pattern、各给一个导入码**（`clientWorkId = 'order:' + 订单id + ':' + 序号`），
+派单文案逐张列「作品 · 尺寸 · 烫法 · 导入码」，备豆清单按色号合并（自带色板按 hex 合并），格式照 `pindou-admin/src/lib/format.js buildDispatch`。
 
 ### 3.2 我的订单 `GET /api/orders`
 
@@ -268,11 +349,32 @@ webhook(企业微信群机器人), provider{merchantNo, status, settleName, sett
 ### 5.3 派单消息与图纸交付
 
 `payload` 与导入码（docs/import-code-api.md）的 payload **完全同构**。派单时后端为该订单建一条 pattern
-（`clientWorkId = 'order:' + 订单id`，`status = active`）得到导入码，随派单消息发给商家。商家用自己的微信打开
+（`clientWorkId = 'order:' + 订单id`，多图订单每张一条 `'order:' + 订单id + ':' + 序号`，`status = active`）得到导入码，随派单消息发给商家。商家用自己的微信打开
 小程序 → 新作品 → 输入导入码 → 拼豆页「分享 → 保存图纸」拿到带 MARD 色号的高清图纸打印。
 
+**建 pattern 时往 payload 里加 `order` 标记**（客户下单时传上来的 payload 没有，派单时由后端补）：
+
+```json
+{ "w": 30, "h": 30, "cells": [ … ], "name": "小熊",
+  "order": { "no": "0123", "idx": 1, "n": 3, "finish": "towel" } }
+```
+
+| 字段 | 说明 |
+|---|---|
+| no | 订单号后 4 位（`od_20260916_000123` → `0123`），1~8 位字母数字 |
+| idx / n | 第几张 / 共几张（单图订单 1 / 1） |
+| finish | 客户选的烫法 key |
+
+`name` 保持客户起的原名，**不用后端拼前缀**。小程序导入时认出 `order`，会做三件事：
+- 作品名自动改成「`no`-`idx` 原名」，比如「0123-1 小熊」，超过 20 字截断。商家的作品库里一眼能对上是哪一单的第几张。
+- 首页角标显示「代拼单」（包裹图标），和普通口令导入的作品（角标「口令」）区分开。
+- 烫法预先选成客户下单时选的。
+
+`order` 格式不对时，小程序会忽略这个字段，按普通口令导入，所以老版本的小程序也不受影响。
+订单完成（done）、退款（refunded）或取消后，把这些 pattern 置为 `disabled`（导入码作废）。这样客户的图纸不会一直能被人导入；商家已经导入的作品不受影响。
+
 推给商家群机器人的内容（markdown）：订单号、作品名与尺寸/豆数/色数、烫法·豆孔、配送方式与地址电话
-（自取只给电话）、备注、导入码、备豆清单（`colors` 逐色 `code×count`）。
+（自取只给电话）、备注、导入码、备豆清单（`colors` 逐色 `code×count`）。多图订单的格式见 §11.8。
 
 ### 5.4 企业微信群机器人（可选的自动通知渠道，v1 可不接）
 
@@ -412,3 +514,244 @@ webhook(企业微信群机器人), provider{merchantNo, status, settleName, sett
 | 12 | 后台 ship 填单号 → 客户确认收货 | 详情显示快递单号可复制；确认后 done，`sharing` 表出现该单记录并变 FINISHED，商家结算卡按支付机构结算周期到账 90% 净额 |
 | 13 | 接单后后台退款 | 订单 refunded，通过支付机构原路退款，`sharing` 无记录 |
 | 14 | 后端未部署订单接口（404） | 下单 toast「代拼服务还没开通」，订单页显示本机记录 |
+
+多图订单与派单导入码的验收见 §11.11。
+
+## 11. 本期后端接入清单：多图订单 + 派单导入码（2026-09-30）
+
+小程序和管理后台都已经做完，**后端做完下面 11.1～11.9 再按 11.10 打开开关**。开关打开前，小程序只会发老的单图格式，现有接口完全不受影响。
+
+| # | 改什么 | 必须 / 可选 |
+|---|---|---|
+| 11.1 | 更新服务端的 `pricing.js` | 必须 |
+| 11.2 | `/api/config` 的 `order` 加 `multi`，`pricing` 可带 `parcel` 和续重价 | 必须 |
+| 11.3 | 数据表：订单挂多张作品 | 必须 |
+| 11.4 | `POST /api/orders` 同时接受单图和多图两种请求 | 必须 |
+| 11.5 | 客户订单 VO 带 `works[]` | 必须 |
+| 11.6 | 管理端订单列表 / 详情带 `works[]` | 必须 |
+| 11.7 | 派单：每张一个导入码，payload 加 `order` 标记；订单结束后作废导入码 | 必须 |
+| 11.8 | 企业微信机器人的多图派单消息 | 接了机器人才要 |
+| 11.9 | 请求体大小与限额 | 必须 |
+| 11.10 | 上线开关 | 必须 |
+| 11.11 | 验收用例 | — |
+
+### 11.1 更新服务端的 `pricing.js`
+
+把小程序 `utils/pricing.js` **整个文件原样拷过去**，替换服务端现有那份（零依赖，Node 直接 `require`）。这次新增的函数：
+
+| 函数 | 作用 |
+|---|---|
+| `quoteCart(list, { delivery, province })` | 多图报价。`list = [{ w, h, beads, colorN, glitter, name }]`，每张各自定档计价，运费整单一次（首重 + 续重，计费重见 §1.1） |
+| `parcelOf(pieces)` | 估算包裹（箱型 / 实重 / 体积重 / 计费重），`quoteCart` 内部用，也可以单独调来展示 |
+
+`quoteCart` 的返回值：
+
+```js
+{
+  ok, reason,          // ok=false 时 reason 就是给客户看的中文提示，原样放进 400 的 message
+  badIndex,            // 出问题的是第几张（从 0 开始），-1 表示不是某一张的问题（超张数 / 包裹太大 / 港澳台）
+  lines: [{ ok, reason, name, items, goodsFen, merchantQuoteFen, tier, rateTier, colorOver }], // 每张一项
+  shipping,            // 运费行 { key:'shipping', label, desc, baseFen, fen }
+  goodsFen, shippingFen, totalFen, merchantQuoteFen,
+  zone, parcel,        // parcel = { box, actualG, volG, billedG, steps, ok, tooBig }
+  needAddress, colorOver,
+}
+```
+
+服务端启动和配置变更时，要用下发给客户端的同一份 `order.pricing` 调 `pricing.configure()`，保证两边算出来的金额一致。
+拷完先跑一遍 `node tests/pricing.test.js`（测试文件一起拷），22 组应全部通过。
+
+### 11.2 `/api/config` 的 `order` 字段
+
+- 加 `multi`（布尔，默认 `false`）。含义和上线顺序见 11.10。管理后台「配置」页已经有这个下拉，
+  `GET/PUT /admin/config/order` 要能读写它（`pindou-admin/README.md`「代拼配置」）。
+- `order.pricing` 允许带新字段（都可选，形状见 §2）：
+  - `shipping.baseExtra`：没有单独配续重价的分区，用这个续重价。
+  - `shipping.zones[].extra`：各分区的续重价。
+  - `parcel`：包裹参数，包括每颗豆重、箱型、抛比、首重、续重粒度、最多张数、计费重上限。
+- ⚠ `parcel` 和 `extra` 的默认值都是占位。商家确认实际重量、箱子尺寸和快递合同价之后，在这里下发。
+
+### 11.3 数据表
+
+推荐新建子表 `order_works`；也可以在 `orders` 上加一个 JSON 列 `works`，二选一。
+
+| 字段 | 说明 |
+|---|---|
+| order_id, idx | 所属订单、第几张（从 1 开始） |
+| work_id | 客户端作品 id（仅溯源） |
+| name, w, h, beads, color_n | 作品名、尺寸、豆数、色数（由服务端从 payload 重算） |
+| colors | JSON，备豆清单，结构同 §3.1 |
+| finish, finish_name, hole | 这一张的烫法 |
+| payload | 图纸 JSON（≤256KB） |
+| items | JSON，这一张的费用行（代拼费 / 格利特），取自 `quoteCart().lines[i].items` |
+| goods_fen, merchant_quote_fen | 这一张的用户价小计 / 商家报价小计 |
+| pattern_code | 派单时生成的导入码（11.7） |
+
+多图订单的 `orders` 主表这样填：
+
+- `name` = 「第一张名 等 N 件」，比如「小熊 等 3 件」。
+- `beads` = 各张豆数合计。
+- `w / h / color_n` = 0；`finish / finish_name / payload / colors / pattern_code` 留空。
+- `items` 只存运费一行。
+- `goods_fen / shipping_fen / total_fen / merchant_quote_fen` 存整单合计。
+- `settle(total_fen)` 算出的三个数照常存。
+
+单图订单不写 `order_works`，和现在完全一样。
+
+### 11.4 `POST /api/orders`：两种请求都要接
+
+**怎么区分：** 请求体有非空的 `works` 数组就是多图，否则按 §3.1 的单图处理。单图逻辑不用改。
+小程序只在有 2 张及以上时才发 `works`，但服务端收到只有 1 项的 `works` 也要能处理（按多图存或转成单图都行）。
+
+多图请求体：
+
+```json
+{
+  "clientOrderId": "m1abc…",
+  "delivery": "express",
+  "phone": "13900000000",
+  "address": { "name": "张三", "tel": "13900000000", "province": "北京市", "city": "北京市", "county": "海淀区", "detail": "…", "full": "…" },
+  "note": "三张一起寄",
+  "clientQuote": { "items": [ { "key": "labor", "fen": 1010, "work": 0 }, { "key": "glitter", "fen": 60, "work": 1 }, { "key": "labor", "fen": 170, "work": 1 }, { "key": "shipping", "fen": 1000 } ], "totalFen": 2240 },
+  "works": [
+    { "workId": "…", "name": "小熊", "w": 30, "h": 30, "beads": 900, "colorN": 12, "colors": [ … ],
+      "finish": "towel", "finishName": "毛巾烫", "glitter": false, "hole": "none", "payload": "{\"w\":30,…}" },
+    { "workId": "…", "name": "色块", "w": 12, "h": 12, "beads": 144, "colorN": 3, "colors": [ … ],
+      "finish": "glitter", "finishName": "闪粉（粗闪）", "glitter": true, "hole": "none", "payload": "{…}" }
+  ]
+}
+```
+
+`works[]` 每一项的字段、含义、校验规则都和 §3.1 的单图字段一样；订单级字段（`clientOrderId / delivery / phone / address / note`）也和 §3.1 一样。
+
+处理步骤：
+
+1. **幂等**：同 (userId, clientOrderId) 已有订单时直接返回它，和单图一样。
+2. **张数**：`works.length` 超过 `parcel.maxItems`（默认 10）→ `400`，message「一单最多 10 张图，请分开下单」。
+3. **逐张校验**，和单图一样：
+   - 解析 payload，尺寸、豆数、色数以服务端重算为准，不信客户端传的数字。
+   - `name` 过 msgSecCheck。
+   - 闪粉按 `finish` 判断，不看客户端的 `glitter`。
+   - 任何一张不合格 → `400`，message 带上是哪一张，格式和客户端一致：「第 2 张「小猫」：豆子不足 100 颗，暂不支持代拼」。
+4. `note` 过 msgSecCheck；快递单校验 `address`，自取单校验 `phone`，和单图一样。
+5. **复算**：`q = pricing.quoteCart(works.map(w => ({ w, h, beads, colorN, glitter: 按 finish 判断, name })), { delivery, province: address?.province })`。
+   `q.ok === false` → `400`，message = `q.reason`。可能的原因：包裹太大（「这些图装一个包裹太大了，请分成两单或联系客服」）、港澳台、某一张不合格。
+6. **落库**：主表按 11.3 写；每张写 `order_works`，`items = q.lines[i].items`，`goods_fen = q.lines[i].goodsFen`，`merchant_quote_fen = q.lines[i].merchantQuoteFen`；
+   主表 `items = [q.shipping]`，金额取 `q.goodsFen / q.shippingFen / q.totalFen / q.merchantQuoteFen`，再存 `settle(q.totalFen)`。
+7. **支付下单**：和单图一样，金额用 `q.totalFen`。商品描述用「拼豆代拼·小熊等3件」，超过支付机构的长度限制就截断作品名。
+8. **响应**：`{ order: VO（11.5）, payParams }`。如果服务端金额和 `clientQuote.totalFen` 不一样，客户端会弹「金额已更新」让客户确认，服务端不用额外处理。
+
+错误码：业务校验失败都用 `400` + 中文 `message`，客户端直接 toast 出来；其他错误码的含义不变。
+
+### 11.5 客户订单 VO（`POST /api/orders`、`GET /api/orders`、`GET /api/orders/:id` 都一样）
+
+多图订单在 §4 的基础上：主表字段按 11.3 下发，另外加 `works[]`：
+
+```json
+{
+  "id": "od_20260930_000140", "status": "paid",
+  "name": "爱心 等 3 件", "w": 0, "h": 0, "beads": 4333, "colorN": 0, "finish": "", "finishName": "", "hole": "none",
+  "works": [
+    { "workId": "…", "name": "爱心", "w": 16, "h": 16, "beads": 136, "colorN": 3, "finish": "towel", "finishName": "毛巾烫", "hole": "none",
+      "items": [ { "key": "labor", "label": "代拼费", "desc": "136 颗 · 含豆子与熨烫定型", "baseFen": 136, "fen": 160 } ],
+      "goodsFen": 160 },
+    { "…": "第 2 张：色块 12×12 · 144 颗 · 闪粉（粗闪），代拼费 170 + 格利特 60；第 3 张：76×78 · 4053 颗 · 普通烫，代拼费 6800" }
+  ],
+  "items": [ { "key": "shipping", "label": "运费", "desc": "其他省份", "baseFen": 1000, "fen": 1000 } ],
+  "goodsFen": 7190, "shippingFen": 1000, "totalFen": 8190, "merchantQuoteFen": 6410,
+  "…": "其余字段（delivery/address/phone/pickupAddress/note/carrier/trackingNo/时间戳…）同 §4"
+}
+```
+
+- 客户接口的 `works[]` **不带** `colors / payload / patternCode`，只有管理端带（11.6）。
+- 单图订单**不带** `works` 字段（也不要下发空数组），VO 和现在一样。
+- 小程序订单详情用 `works[].name / w / h / beads / colorN / finish / finishName / items`，列表用主表 `name / beads / totalFen`。
+
+### 11.6 管理端接口（`pindou-admin/README.md` 已同步）
+
+- `GET /admin/orders`（列表）：多图订单带 `works[]`，可以不带 `works[].payload`。
+  搜索参数 `q` 除了订单号、主表名称、手机号，还要能搜到 `works[].name`。
+- `GET /admin/orders/:id`（详情）：多图订单的 `works[]` 带全字段（含 `colors / payload / patternCode`）。
+  顶层的 `colors / payload / patternCode` 留空，后台会自己按张画图纸，并把各张备豆清单按色号合计。
+- 其余管理接口（接单、发货、待自取、完成、退款、留言、分账）都**按整单操作**，逻辑不变。退款仍然只能整单、只能在分账前。
+
+### 11.7 派单：每张一个导入码，payload 加 `order` 标记；订单结束后作废
+
+`POST /admin/orders/:id/assign` 首次派单时生成导入码（复用 `POST /api/patterns` 的建档逻辑）：
+
+| 订单 | clientWorkId | 导入码写到哪 |
+|---|---|---|
+| 单图 | `'order:' + 订单id`（和现在一样） | 主表 `pattern_code` |
+| 多图 | 每张一条 `'order:' + 订单id + ':' + idx` | 各张的 `order_works.pattern_code` |
+
+建 pattern 时，pattern 的 payload = 这张图的 payload **再加一个 `order` 字段**。单图、多图都加：
+
+```json
+{ "w": 30, "h": 30, "cells": [ … ], "palette": ["…可选"], "name": "小熊",
+  "order": { "no": "0140", "idx": 1, "n": 3, "finish": "towel" } }
+```
+
+| 字段 | 取值 |
+|---|---|
+| `no` | 订单号后 4 位：`od_20260930_000140` → `"0140"`（字母数字，1~8 位） |
+| `idx` | 第几张，从 1 开始（单图就是 1） |
+| `n` | 共几张（单图就是 1） |
+| `finish` | 这一张的烫法 key |
+
+- `name` 放客户起的**原名**，不要自己加前缀。小程序导入时会把名字改成「0140-1 小熊」，首页标「代拼单」，并预先选好烫法（见 §5.3）。
+- 改派（`assigned → assigned`）：沿用已经生成的导入码。因为按 clientWorkId 幂等，重复调用会拿到同一个码。
+- **作废**：订单变成 `done`、`refunded`、`cancelled` 时，把该订单的所有 pattern 置 `status = disabled`。之后再用这些码导入会返回 410；商家已经导入的作品不受影响。
+  放在状态流转的同一个事务里，或者之后异步处理都可以，作废失败不要影响订单状态变更。
+
+### 11.8 企业微信机器人消息（接了机器人才需要做）
+
+多图订单的派单消息逐张列作品、烫法和导入码，备豆清单按色号合计。内容和后台「派单文案」（`pindou-admin/src/lib/format.js` 的 `buildDispatch`）一致，markdown 里可以把每张压成一行：
+
+```
+**新代拼订单 od_20260930_000140**（共 3 件，合寄一个包裹）
+> 1. 小熊 30×30 · 900 颗 · 12 色 · 毛巾烫 · 无孔 · 导入码 PD-3K7F-9QWW
+> 2. 色块 12×12 · 144 颗 · 3 色 · 闪粉（粗闪） · 无孔 · 导入码 PD-9Z8B-J2JB
+> 3. …
+> 配送：快递 北京市… 李四 137****1111
+> 备注：三张一起寄
+> 导入后作品名是「0140-序号 作品名」，首页标「代拼单」
+> 备豆（合计）：C8×1812 H7×1266 …
+```
+
+备豆合计的规则：有实体色号的按色号 `code` 相加；自带色板作品（`approx=true`）按 `hex` 相加。按用量从多到少排。超过 4096 字节时截断。
+
+### 11.9 请求体大小与限额
+
+- 多图订单的请求体最大约为 `maxItems × 256KB`，默认 10 张约 2.6MB。**网关和框架的 body 上限至少要设到 3MB**，否则大单会被 413 拒绝。
+- 每张 payload 仍然限制 ≤256KB，w/h ≤256。
+- §8 的频率限额按**订单数**算，不按张数。每单的 msgSecCheck 调用次数 = 张数 + 1（备注），额度要留够。
+
+### 11.10 上线开关
+
+1. 11.1～11.9 部署到测试环境，`order.multi` 保持 `false`，跑一遍 §10 的老用例，确认单图没有被改坏。
+2. 测试环境下发 `"multi": true`，跑 11.11 的用例。
+3. 生产部署后下发 `"multi": true`，所有用户下次冷启动生效。
+4. 出问题时下发 `false` 就能关掉，不用发版。已经下好的多图订单照常流转。
+
+小程序代码里 `multi` 的默认值是 `false`（`utils/config.js ORDER_DEF`）。这个默认值只在配置从来没拉到过时才起作用，平时以下发的值为准。
+
+### 11.11 验收用例
+
+| # | 场景 | 预期 |
+|---|---|---|
+| M1 | `multi=false` | 下单页没有作品条，下单请求仍是单图格式，§10 老用例全过 |
+| M2 | `multi=true`，只选 1 张下单 | 请求仍是单图格式（没有 `works`），VO 没有 `works`，和老流程一样 |
+| M3 | 3 张 30×30（900 颗）+ 自取 | 每张代拼费 ¥10.10，合计 ¥30.30。豆数不加总：加总会跳到 0.015 档变成 ¥45.30，这是错的 |
+| M4 | 3 张 30 板 + 快递浙江 | 运费 ¥6.00，只收一次；VO 顶层 `items` 只有运费一行，`works[]` 各带自己的代拼费 |
+| M5 | 10 张 104 满板 + 快递北京（默认 parcel） | 运费 ¥15.00，desc「其他省份 · 计费重 1.2kg」 |
+| M6 | 第 2 张豆子不足 100 颗 | `400`，message「第 2 张「…」：豆子不足 100 颗，暂不支持代拼」 |
+| M7 | 11 张 | `400`「一单最多 10 张图，请分开下单」 |
+| M8 | 客户端发来的 `glitter` 和 `finish` 对不上 | 按 `finish` 算格利特 |
+| M9 | 多图订单支付成功 → 后台 | 列表显示「小熊 等 3 件」「3 件 · 共 N 颗」；详情能按张切换图纸，备豆清单是合计 |
+| M10 | 派单 | 每张生成一个导入码；派单文案逐张列出；商家输码后作品名是「0140-1 小熊」、首页角标「代拼单」、烫法已预选 |
+| M11 | 单图订单派单 | 导入码的 payload 也带 `order`（`idx:1, n:1`），商家导入后叫「0140-1 名字」 |
+| M12 | 改派 | 导入码不变 |
+| M13 | 订单 done / refunded | 该单所有导入码再导入返回 410；商家已导入的作品还在 |
+| M14 | 老版本小程序导入带 `order` 的码 | 正常导入（名字没有前缀），不报错 |
+| M15 | 同一个 clientOrderId 重复提交多图订单 | 返回同一个订单 |
+| M16 | 多图订单整单退款（分账前） | 整单 refunded，全额原路退，导入码作废 |

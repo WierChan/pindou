@@ -331,6 +331,7 @@ Page({
       this.fromChart = true;
       this.fromTpl = false;
       this._importedCode = code;
+      this._importedOrder = p.order; // 代拼派单码：建档时记来源、预选客户的烫法
       this.name = p.name;
       this._renderConfig();
     }).catch(err => {
@@ -738,10 +739,13 @@ Page({
     const p = this.pattern;
     if (!p) return;
     const name = (this.name || '').trim() || '我的拼豆';
-    // 作品自带色板（图纸导入）随建档持久化；口令导入的记来源
+    // 作品自带色板（图纸导入）随建档持久化；口令导入的记来源（代拼派单码另记订单标记）
+    const ord = this._importedCode ? this._importedOrder : null;
     const work = store.create({
       name, w: p.w, h: p.h, cells: p.cells, palette: p.palette,
       fromCode: this._importedCode || undefined,
+      fromOrder: ord ? { no: ord.no, idx: ord.idx, n: ord.n } : undefined,
+      finish: ord ? ord.finish : undefined,
     });
     // 照片/表情作品：把量化源存下来，拼阶段可高质量重调大小/颜色（图纸/模板不存——本就 1:1、不可调）
     const editable = this.srcData && !this.fromChart && !this.fromTpl;

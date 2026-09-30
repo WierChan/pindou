@@ -8,6 +8,27 @@
   <scroll-view scroll-y class="od-scroll" enhanced show-scrollbar="{{false}}">
     <!-- 作品 -->
     <view class="od-sec">
+      <!-- 代拼篮（多图订单）：点一张切换编辑，× 移除，末尾「再加一张」 -->
+      <block wx:if="{{multi}}">
+        <scroll-view scroll-x class="wk-strip" enhanced show-scrollbar="{{false}}" scroll-into-view="wk{{cur}}">
+          <view wx:for="{{works}}" wx:key="id" id="wk{{index}}"
+                class="wk-it {{cur === index ? 'on' : ''}} {{item.bad ? 'bad' : ''}}" hover-class="pressed"
+                data-i="{{index}}" bindtap="selectWork">
+            <view class="wk-pv">
+              <image wx:if="{{item.thumb}}" class="wk-img" src="{{item.thumb}}" mode="aspectFit" />
+              <view wx:if="{{works.length > 1}}" class="wk-x" data-i="{{index}}" catchtap="removeWork">✕</view>
+            </view>
+            <view class="wk-nm">{{item.name}}</view>
+            <view class="wk-fin">{{item.finishText}}</view>
+          </view>
+          <view class="wk-it wk-add {{canAdd ? '' : 'off'}}" hover-class="pressed" bindtap="openPicker">
+            <view class="wk-pv"><text class="wk-plus">＋</text></view>
+            <view class="wk-nm">再加一张</view>
+            <view class="wk-fin">运费只收一次</view>
+          </view>
+        </scroll-view>
+        <view wx:if="{{works.length > 1}}" class="od-hint wk-hint">共 {{works.length}} 张，派给同一位商家、合寄一个包裹。点上面的作品分别选烫法。</view>
+      </block>
       <view class="od-card od-work">
         <view class="od-pv-wrap">
           <image wx:if="{{preview}}" class="od-pv" src="{{preview}}" mode="aspectFit" />
@@ -27,7 +48,7 @@
       <view class="od-sec-t">成品要求</view>
       <view class="od-card">
         <view class="od-row col">
-          <view class="od-lb">烫法<text class="od-sub">点小图看成品实拍；闪粉按板子档加收，款式写在备注</text></view>
+          <view class="od-lb">烫法<text wx:if="{{works.length > 1}}" class="od-cur">「{{title}}」</text><text class="od-sub">点小图看成品实拍；闪粉按板子档加收，款式写在备注</text></view>
           <view class="fin-groups">
             <view wx:for="{{finishGroups}}" wx:key="cat" class="fin-group">
               <view class="fin-cat">{{item.label}}</view>
@@ -121,6 +142,24 @@
 </view>
 
 <canvas type="2d" id="util" class="util-canvas" style="width:{{capW}}px;height:{{capH}}px"></canvas>
+
+<!-- 「再加一张」选作品 -->
+<view wx:if="{{picker}}" class="pk-mask" bindtap="closePicker">
+  <view class="pk-sheet" catchtap="noop">
+    <view class="pk-head"><text class="pk-t">加一张作品到这单</text><text class="pk-x" catchtap="closePicker">✕</text></view>
+    <scroll-view scroll-y class="pk-body" enhanced show-scrollbar="{{false}}">
+      <view wx:for="{{picker}}" wx:key="id" class="pk-row {{item.low ? 'off' : ''}}" hover-class="pressed"
+            data-id="{{item.id}}" data-low="{{item.low}}" bindtap="pickWork">
+        <view class="pk-pv"><image wx:if="{{item.thumb}}" class="wk-img" src="{{item.thumb}}" mode="aspectFit" /></view>
+        <view class="pk-info">
+          <view class="pk-nm">{{item.name}}</view>
+          <view class="pk-dims">{{item.dims}}{{item.low ? ' · 豆子太少不能代拼' : ''}}</view>
+        </view>
+        <view class="pk-go">{{item.low ? '' : '加入'}}</view>
+      </view>
+    </scroll-view>
+  </view>
+</view>
 
 <!-- 烫法示例实拍放大（页面根节点、高层级，盖住一切） -->
 <view wx:if="{{zoom}}" class="fz-mask" bindtap="closeZoom">
