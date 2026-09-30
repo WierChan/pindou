@@ -25,6 +25,26 @@ const STATUS = {
 };
 const HOLE_TEXT = { none: '无孔', small: '小孔', large: '大孔' };
 
+// 物流状态（后端把快递查询服务商的状态归一成这几种，docs/order-api.md §12）
+const LOGI = {
+  pending:    { text: '待揽收', cls: 'wait' },
+  collected:  { text: '已揽收', cls: 'go' },
+  transit:    { text: '运输中', cls: 'go' },
+  delivering: { text: '派送中', cls: 'go' },
+  signed:     { text: '已签收', cls: 'ok' },
+  exception:  { text: '物流异常', cls: 'bad' },
+  returning:  { text: '退回中', cls: 'bad' },
+  returned:   { text: '已退回', cls: 'bad' },
+};
+function logiInfo(l) {
+  if (!l || !l.state) return null;
+  const s = LOGI[l.state] || { text: l.stateText || '物流更新', cls: 'go' };
+  return {
+    state: l.state, text: l.stateText || s.text, cls: s.cls,
+    last: l.lastText || '', lastTime: fmtTime(l.lastTime),
+  };
+}
+
 // 代拼里闪粉只分粗闪 / 细闪两档（市面格利特款式太多，具体款式客户在备注里写）：
 // 下单页只给这两个 chip，作品原来选的彩虹款归并到对应粗/细；订单里的名字也用这套
 const ORDER_FINISH = {
@@ -133,6 +153,16 @@ function get(id) { return api.get('/api/orders/' + id).then(d => { const o = (d 
 function payParams(id) { return api.post('/api/orders/' + id + '/pay', {}).then(d => (d && d.payParams) || d); }
 function cancel(id) { return api.post('/api/orders/' + id + '/cancel', {}).then(d => { if (d && d.order) remember(d.order); return d; }); }
 function confirm(id) { return api.post('/api/orders/' + id + '/confirm', {}).then(d => { if (d && d.order) remember(d.order); return d; }); }
+// 物流轨迹（后端从库里读订阅推送存下的数据，不实时查服务商）。traces 新的在前
+function track(id) {
+  return api.get('/api/orders/' + id + '/track').then(d => {
+    const t = d || {};
+    return {
+      logi: logiInfo(t),
+      traces: (Array.isArray(t.traces) ? t.traces : []).map(x => ({ time: fmtTime(x.time), text: String(x.text || '') })),
+    };
+  });
+}
 
 // 接口错误 → 用户文案（未部署订单接口时 404 提示服务未开通）
 function errText(err) {
@@ -195,6 +225,7 @@ function toVM(o) {
   let desc = st.desc;
   if (o.status === 'cancelled' && o.cancelReason) desc += '：' + o.cancelReason;
   if (o.status === 'shipped' && o.trackingNo) desc = '商家已寄出 · ' + (o.carrier || '快递') + ' ' + o.trackingNo;
+  const logi = o.delivery === 'express' ? logiInfo(o.logistics) : null; // 后端接了快递查询才有
   if (o.merchantNote) desc += '\n商家留言：' + o.merchantNote;
   const dimsOf = x => x.w + '×' + x.h + ' · ' + (x.beads | 0) + ' 颗' + (x.colorN ? ' · ' + x.colorN + ' 色' : '');
   const finishOf = x => (x.finish ? finishLabel(x.finish) : (x.finishName || ''));
@@ -211,7 +242,8 @@ function toVM(o) {
       : (o.worksN > 1 ? o.worksN + ' 件 · 共 ' + (o.beads | 0) + ' 颗' : dimsOf(o)),
     finishText: works ? '' : finishOf(o),
     holeText: HOLE_TEXT[o.hole] || '',
-    deliveryText: o.delivery === 'express' ? '快递到家' : '到店自取',
+    deliveryText: o.delivery === 'express' ? '快递到家' + (logi && o.status === 'shipped' ? ' · ' + logi.text : '') : '到店自取',
+    logi,
     totalYuan: pricing.yuan(o.totalFen),
     timeText: fmtTime(o.createdAt),
     paidText: fmtTime(o.paidAt),
@@ -225,7 +257,7 @@ function toVM(o) {
 
 module.exports = {
   STATUS, ORDER_FINISH, statusInfo, isGlitter, orderFinish, finishLabel, workStats, buildPayload,
-  create, requestPay, list, get, payParams, cancel, confirm, errText,
+  create, requestPay, list, get, payParams, cancel, confirm, track, errText,
   cartRead, cartWrite, cartClear,
   remember, localList, localCount, lastPhone, rememberPhone, fmtTime, toVM,
 };

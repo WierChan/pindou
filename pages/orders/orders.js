@@ -14,6 +14,8 @@ Page({
     detail: null,       // 当前展开的订单视图模型
     pickupArea: '',     // 自取范围文案（派单前详情里没有具体地址时显示）
     cartN: 0,           // 代拼篮里没下单的作品数（多图订单开了才有）
+    traces: [],         // 详情里的物流轨迹（新的在前），后端接了快递查询才有
+    traceAll: false,    // 轨迹默认只显示最近 3 条
   },
 
   onLoad(q) {
@@ -55,7 +57,7 @@ Page({
     if (!id) return;
     this.focusId = '';
     const o = vms.find(x => x.id === id);
-    if (o) this.setData({ detail: o });
+    if (o) this._showDetail(o);
     if (this.justPaid && o && o.status === 'unpaid') this._poll(id, 6);
     this.justPaid = false;
   },
@@ -80,10 +82,31 @@ Page({
   openDetail(e) {
     const id = e.currentTarget.dataset.id;
     const o = this.data.list.find(x => x.id === id);
-    if (o) this.setData({ detail: o });
-    order.get(id).then(x => this._patch(order.toVM(x))).catch(() => { /* 用列表里的 */ });
+    if (o) this._showDetail(o);
+    order.get(id).then(x => {
+      const vm = order.toVM(x);
+      this._patch(vm);
+      if (!o) this._loadTrack(vm); // 列表里没有（离线索引）时，拿到详情再拉轨迹
+    }).catch(() => { /* 用列表里的 */ });
   },
-  closeDetail() { this.setData({ detail: null }); },
+  _showDetail(vm) {
+    this.setData({ detail: vm, traces: [], traceAll: false });
+    this._loadTrack(vm);
+  },
+  // 物流轨迹：只有快递单、且后端返回了 logistics（接了快递查询）才拉；失败就不显示轨迹，单号照常可复制
+  _loadTrack(vm) {
+    if (!vm || !vm.logi) return;
+    const id = vm.id;
+    order.track(id).then(t => {
+      const d = this.data.detail;
+      if (!d || d.id !== id) return;
+      const patch = { traces: t.traces };
+      if (t.logi) patch['detail.logi'] = t.logi;
+      this.setData(patch);
+    }).catch(() => { /* 忽略 */ });
+  },
+  toggleTraces() { this.setData({ traceAll: !this.data.traceAll }); },
+  closeDetail() { this.setData({ detail: null, traces: [] }); },
 
   copyText(e) {
     const t = e.currentTarget.dataset.t;

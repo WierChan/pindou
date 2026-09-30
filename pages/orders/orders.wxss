@@ -20,6 +20,26 @@
 .ol-cart-go { margin-left: auto; color: var(--accent-dark); font-weight: 900; flex-shrink: 0; }
 .ol-kv-sub { font-size: 12px; color: var(--ink2); }
 
+/* 物流：状态徽标 + 时间线（最新一条高亮） */
+.ol-logi { margin: 4px 2px 6px; padding: 10px 12px; background: var(--chipbg); border: 2px solid var(--ink); }
+.ol-logi-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.ol-logi-st { font-size: 12px; font-weight: 900; padding: 2px 8px; border: 2px solid var(--ink); background: #CDE3F2; color: #3D5A78; }
+.ol-logi-st.wait { background: #FFE39A; color: #7A5A2E; }
+.ol-logi-st.ok { background: #B7E6A6; color: #2F6B2A; }
+.ol-logi-st.bad { background: #FFE3E3; color: #A32C2C; }
+.ol-logi-time { font-size: 11px; color: var(--ink2); }
+.ol-tr { position: relative; display: flex; gap: 10px; padding-bottom: 10px; }
+.ol-tr::before { content: ''; position: absolute; left: 4px; top: 12px; bottom: 0; width: 2px; background: #E2DAD3; }
+.ol-tr.end::before { display: none; }
+.ol-tr-dot { flex-shrink: 0; width: 10px; height: 10px; margin-top: 4px; background: #D8CFC8; border: 2px solid var(--card); box-sizing: border-box; }
+.ol-tr.now .ol-tr-dot { background: var(--accent-dark); }
+.ol-tr-body { flex: 1; min-width: 0; }
+.ol-tr-text { font-size: 12px; line-height: 1.55; color: var(--ink2); word-break: break-all; }
+.ol-tr.now .ol-tr-text { color: var(--ink); font-weight: 700; }
+.ol-tr-time { font-size: 11px; color: #B9ADA9; margin-top: 2px; }
+.ol-tr-more { font-size: 12px; font-weight: 800; color: var(--accent-dark); text-align: center; padding-top: 2px; }
+.ol-tr-empty { font-size: 12px; color: var(--ink2); line-height: 1.5; }
+
 .ol-list { max-width: 560px; margin: 0 auto; padding: 4px 16px; display: flex; flex-direction: column; gap: 14px; }
 .ol-card {
   background: var(--card); border: 3px solid var(--ink); box-shadow: 4px 4px 0 #E2DAD3;

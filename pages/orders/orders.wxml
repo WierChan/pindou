@@ -66,6 +66,28 @@
         <block wx:if="{{detail.delivery === 'express'}}">
           <view wx:if="{{detail.address}}" class="ol-kv"><text class="k">收货</text><view class="v"><view>{{detail.address.name}} {{detail.address.tel}}</view><view>{{detail.address.full}}</view></view></view>
           <view wx:if="{{detail.trackingNo}}" class="ol-kv" bindtap="copyText" data-t="{{detail.trackingNo}}"><text class="k">快递</text><text class="v">{{detail.carrier || ''}} {{detail.trackingNo}} <text class="ol-copy">复制</text></text></view>
+          <!-- 物流（后端接了快递查询才有）：当前状态 + 轨迹时间线，默认最近 3 条 -->
+          <view wx:if="{{detail.logi}}" class="ol-logi">
+            <view class="ol-logi-head">
+              <text class="ol-logi-st {{detail.logi.cls}}">{{detail.logi.text}}</text>
+              <text wx:if="{{detail.logi.lastTime}}" class="ol-logi-time">{{detail.logi.lastTime}} 更新</text>
+            </view>
+            <block wx:if="{{traces.length}}">
+              <view wx:for="{{traces}}" wx:key="index" wx:if="{{traceAll || index < 3}}" class="ol-tr {{index === 0 ? 'now' : ''}} {{(index === traces.length - 1 || (!traceAll && index === 2)) ? 'end' : ''}}">
+                <view class="ol-tr-dot"></view>
+                <view class="ol-tr-body">
+                  <view class="ol-tr-text">{{item.text}}</view>
+                  <view class="ol-tr-time">{{item.time}}</view>
+                </view>
+              </view>
+              <view wx:if="{{traces.length > 3}}" class="ol-tr-more" bindtap="toggleTraces">{{traceAll ? '收起' : '查看全部 ' + traces.length + ' 条物流 ›'}}</view>
+            </block>
+            <view wx:elif="{{detail.logi.last}}" class="ol-tr now end">
+              <view class="ol-tr-dot"></view>
+              <view class="ol-tr-body"><view class="ol-tr-text">{{detail.logi.last}}</view></view>
+            </view>
+            <view wx:else class="ol-tr-empty">快递公司还没有返回轨迹，一般揽收后几小时内会更新</view>
+          </view>
         </block>
         <block wx:else>
           <view wx:if="{{detail.pickupAddress}}" class="ol-kv" bindtap="copyText" data-t="{{detail.pickupAddress}}"><text class="k">地址</text><text class="v">{{detail.pickupAddress}} <text class="ol-copy">复制</text></text></view>
