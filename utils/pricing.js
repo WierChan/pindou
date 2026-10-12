@@ -74,7 +74,7 @@ const DEFAULTS = {
   },
 };
 
-const WX_FEE_RATE = 0.006;   // 支付通道手续费默认值（微信渠道 0.6%，按实付总额、交易时由支付机构先扣；合同费率不同时用 pricing.feeRate 覆盖）
+const WX_FEE_RATE = 0.006;   // 微信支付手续费默认值（0.6%，按实付总额、入账时微信先扣；商户号费率不同时用 pricing.feeRate 覆盖）
 const PLATFORM_RATE = 0.10;  // 平台份额（按扣除手续费后的净额）
 const MERCHANT_SHARE = (1 - WX_FEE_RATE) * (1 - PLATFORM_RATE); // 0.8946：默认费率下商家分得的实付比例
 const ROUND_FEN = 10;        // 用户价取整粒度：10 分 = 1 角（代拼费 / 格利特）
