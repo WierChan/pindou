@@ -62,9 +62,14 @@ function makeAppExport(cells, w, h, paletteHex, opts) {
       fill(im, x0, y0, S(gridX + (x + 1) * cellPx) - x0, S(gridY + (y + 1) * cellPx) - y0, rgbOf(t));
     }
   }
-  // 格线画在豆色上层：每格淡灰 + 5 格淡青（#E6E9EB / #C9E4DE），半透明叠在豆色上。
-  // 细线用 A_FINE、5 格参考线用较重的 A_MAJOR（与 share.js 的 GRID_LINE_A / GRID_MAJOR_A 一致）。
-  const A_FINE = 0.5, A_MAJOR = 0.85;
+  // 格线画在豆色上层：每格淡灰（#E6E9EB）+ 参考线酒红（#8C2F43）——10 格实线、
+  // 夹中间的 5 格虚线（边界强制实线），加粗 2 逻辑像素骑缝居中、半透明叠在豆色上。
+  // 细线用 A_FINE、参考线用较重的 A_MAJOR，虚线实/空段 DASH/GAP 逻辑像素
+  // （与 share.js 的 GRID_* 常量一致）。
+  const A_FINE = 0.5, A_MAJOR = 0.9;
+  const DASH = 5, GAP = 4;
+  const MAJ = [140, 47, 67];
+  const lwM = Math.max(1, Math.round(2 * scale)); // 参考线 2 逻辑像素线宽
   const blendLine = (x, y, ww, hh, rgb, a) => {
     const x0 = Math.max(0, Math.round(x)), y0 = Math.max(0, Math.round(y));
     const x1 = Math.min(im.w, Math.round(x + ww)), y1 = Math.min(im.h, Math.round(y + hh));
@@ -77,11 +82,35 @@ function makeAppExport(cells, w, h, paletteHex, opts) {
   };
   for (let k = 0; k <= w; k++) {
     const major = k % 5 === 0;
-    blendLine(S(gridX + k * cellPx), S(gridY), lw, S(gridH), major ? [201, 228, 222] : [230, 233, 235], major ? A_MAJOR : A_FINE);
+    if (!major) {
+      blendLine(S(gridX + k * cellPx), S(gridY), lw, S(gridH), [230, 233, 235], A_FINE);
+      continue;
+    }
+    const x = S(gridX + k * cellPx - 0.5); // 骑缝居中（与 share.js 的 mOff 一致）
+    if (k % 10 !== 0 && k !== w) {
+      for (let s = 0; s < gridH; s += DASH + GAP) {
+        const y0 = S(gridY + s);
+        blendLine(x, y0, lwM, S(gridY + Math.min(s + DASH, gridH)) - y0, MAJ, A_MAJOR);
+      }
+    } else {
+      blendLine(x, S(gridY), lwM, S(gridH), MAJ, A_MAJOR);
+    }
   }
   for (let k = 0; k <= h; k++) {
     const major = k % 5 === 0;
-    blendLine(S(gridX), S(gridY + k * cellPx), S(gridW), lw, major ? [201, 228, 222] : [230, 233, 235], major ? A_MAJOR : A_FINE);
+    if (!major) {
+      blendLine(S(gridX), S(gridY + k * cellPx), S(gridW), lw, [230, 233, 235], A_FINE);
+      continue;
+    }
+    const y = S(gridY + k * cellPx - 0.5);
+    if (k % 10 !== 0 && k !== h) {
+      for (let s = 0; s < gridW; s += DASH + GAP) {
+        const x0 = S(gridX + s);
+        blendLine(x0, y, S(gridX + Math.min(s + DASH, gridW)) - x0, lwM, MAJ, A_MAJOR);
+      }
+    } else {
+      blendLine(S(gridX), y, S(gridW), lwM, MAJ, A_MAJOR);
+    }
   }
 
   // 逐格色号伪笔画：同号固定种子 → 跨格笔画对齐（与 chart-real 的 cellLabels 同思路，

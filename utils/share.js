@@ -1,7 +1,7 @@
 // 分享卡片 / 导出图片：直接绘制到传入的 canvas 上
 const { drawPatternInto, patternSize, workFinish, workHole } = require('./board');
-const { colorStats } = require('./convert');
-const { PALETTE, textColorFor } = require('./palette');
+const { colorStats, nearestPalette } = require('./convert');
+const { PALETTE, hexToRgb, textColorFor } = require('./palette');
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
@@ -226,8 +226,9 @@ function fitText(ctx, s, maxW) {
 }
 
 // 图纸样式导出（分享弹窗「保存图纸」）：仿实体拼豆图纸版式（参照 RED 图纸工坊）——
-// 米黄页面底 + 白底网格卡片；格内直接印 MARD 色号（对着图纸抓豆；自带色板作品没有
-// 实体色号，退回 1..N 编号）、四边坐标数字、每格淡灰线 + 5 格淡青参考线；
+// 米黄页面底 + 白底网格卡片；格内直接印 MARD 色号（对着图纸抓豆；自带色板作品——
+// 图纸导入等——按 OKLab 就近匹配 MARD 色号印出）、四边坐标数字、每格淡灰线 +
+// 10 格酒红实线 / 5 格酒红虚线加粗参考线（仿实体拼豆板）；
 // 底部「名称 · 尺寸 · 色数/总颗数」说明行 + 色号图例（编号 色号 ×数量 ——
 // 编号是 app 拼豆页色卡的编号，图例即两套标识的对照桥）。
 // 网格区仍是平色格（无豆孔/高光），保存的图可再从「导入拼豆图纸」识别回来（往返闭环）；
@@ -243,16 +244,23 @@ function buildChartExportTo(canvas, work, opts) {
   const hexOf = t => (work.palette ? work.palette[t] : PALETTE[t].hex);
 
   const stats = colorStats(cells);
-  const numOf = new Map(stats.map((s, i) => [s.pal, i + 1]));
   const total = stats.reduce((a, s) => a + s.count, 0);
-  // 格内标签：全局色板印 MARD 色号（对着图纸直接抓豆），自带色板作品退回编号
-  const labelOf = t => (work.palette ? String(numOf.get(t)) : PALETTE[t].code);
+  // 格内标签：直接印 MARD 色号（对着图纸抓豆）。自带色板作品（图纸导入等）没有现成
+  // 色号，按 OKLab 就近匹配一颗 MARD 豆印其色号——app 自己导出的图纸色板本就是 MARD
+  // hex，匹配即原色号；第三方图纸给出的是最接近的可买豆色。不同板色匹配到同一色号时
+  // 格内同标（本就该用同一颗豆），图例里仍按编号分行
+  const codeOf = work.palette
+    ? work.palette.map(hx => { const c = hexToRgb(hx); return PALETTE[nearestPalette(c[0], c[1], c[2])].code; })
+    : null;
+  const labelOf = t => (codeOf ? codeOf[t] : PALETTE[t].code);
 
   // 版式（逻辑像素）—— 常量改动要同步 tests/export-synth.js
   const P = 30, HEADER = 56, COORD = 30, CARD_PAD = 14;
   const INFO_H = 46, PILL_H = 42, PILL_GAP = 12, FOOT = 54;
-  const GRID_LINE_A = 0.5;   // 细格线透明度：小=豆色更实、大=分格更清（再导入靠这条占多数的细线认格）
-  const GRID_MAJOR_A = 0.85; // 每 5 格参考线透明度：加重便于数格；只占 1/5 洗色有限
+  const GRID_LINE_A = 0.5;  // 细格线透明度：小=豆色更实、大=分格更清（再导入靠这条占多数的细线认格）
+  const GRID_MAJOR_A = 0.9; // 5/10 格参考线透明度：拼的时候靠它数格，要一眼可辨；只占 1/5 洗色有限
+  const GRID_DASH = 5, GRID_GAP = 4; // 5 格虚线的实/空段长（逻辑像素）
+  const GRID_MAJOR_W = 2;   // 参考线线宽（逻辑像素）：比 1px 细格线粗一档，骑缝居中画
   const gridW = w * cellPx, gridH = h * cellPx;
   const cardW = gridW + CARD_PAD * 2, cardH = gridH + CARD_PAD * 2;
   const lgCols = Math.min(5, stats.length);
@@ -305,20 +313,35 @@ function buildChartExportTo(canvas, work, opts) {
     }
   }
   // 格线画在豆色上层（真图纸同款，同色区域靠它分格）：细格线半透明（GRID_LINE_A）让豆色透出、
-  // 图纸不发白；每 5 格的淡青参考线加重（GRID_MAJOR_A）便于数格定位。参考线虽强但只占 1/5，
-  // 洗色有限；再导入的格距靠占多数的细线周期锁定，配合 analyzeChart 的谐波纠偏不会误锁 5×。
+  // 图纸不发白；参考线仿实体拼豆板——每 10 格酒红实线、夹中间的 5 格酒红虚线（GRID_MAJOR_A，
+  // 加粗到 GRID_MAJOR_W、深到一眼可辨；边界线强制实线收边），数格先按实线大格再虚线对半。
+  // 参考线虽强但只占 1/5，洗色有限；再导入的格距靠占多数的 1px 细线周期锁定，配合
+  // analyzeChart 的谐波纠偏不会误锁 5×。
   ctx.save();
+  const mOff = (GRID_MAJOR_W - 1) / 2; // 参考线骑缝居中的回退量
+  const dashedV = (x, y, len) => { // 手绘虚线（fillRect 分段，便于 tests/export-synth.js 逐像素镜像）
+    for (let s = 0; s < len; s += GRID_DASH + GRID_GAP) ctx.fillRect(x, y + s, GRID_MAJOR_W, Math.min(GRID_DASH, len - s));
+  };
+  const dashedH = (x, y, len) => {
+    for (let s = 0; s < len; s += GRID_DASH + GRID_GAP) ctx.fillRect(x + s, y, Math.min(GRID_DASH, len - s), GRID_MAJOR_W);
+  };
   for (let k = 0; k <= w; k++) {
     const major = k % 5 === 0;
     ctx.globalAlpha = major ? GRID_MAJOR_A : GRID_LINE_A;
-    ctx.fillStyle = major ? '#C9E4DE' : '#E6E9EB';
-    ctx.fillRect(gridX + k * cellPx, gridY, 1, gridH);
+    ctx.fillStyle = major ? '#8C2F43' : '#E6E9EB';
+    const x = gridX + k * cellPx;
+    if (!major) ctx.fillRect(x, gridY, 1, gridH);
+    else if (k % 10 !== 0 && k !== w) dashedV(x - mOff, gridY, gridH);
+    else ctx.fillRect(x - mOff, gridY, GRID_MAJOR_W, gridH);
   }
   for (let k = 0; k <= h; k++) {
     const major = k % 5 === 0;
     ctx.globalAlpha = major ? GRID_MAJOR_A : GRID_LINE_A;
-    ctx.fillStyle = major ? '#C9E4DE' : '#E6E9EB';
-    ctx.fillRect(gridX, gridY + k * cellPx, gridW, 1);
+    ctx.fillStyle = major ? '#8C2F43' : '#E6E9EB';
+    const y = gridY + k * cellPx;
+    if (!major) ctx.fillRect(gridX, y, gridW, 1);
+    else if (k % 10 !== 0 && k !== h) dashedH(gridX, y - mOff, gridW);
+    else ctx.fillRect(gridX, y - mOff, gridW, GRID_MAJOR_W);
   }
   ctx.restore();
   // 逐格标签（深浅字按格色亮度选）。色号 2-3 字符比编号宽：从理想字号起，
@@ -369,23 +392,23 @@ function buildChartExportTo(canvas, work, opts) {
   }
 
   // 说明行：「名字」 MARD · w×h · N 色 / 共 total 颗（与 RED 图纸工坊同位置的品牌标识；
-  // 文字属色号体系的描述性标注。自带色板作品不是 MARD 豆色，不标）
+  // 文字属色号体系的描述性标注。自带色板作品的格内/图例色号也是就近匹配的 MARD 码，照标）
   ctx.textAlign = 'left';
   ctx.fillStyle = '#5F4A4E';
   ctx.font = 'bold 23px sans-serif';
-  const dims = ' ' + (work.palette ? '' : 'MARD · ') + w + '×' + h + ' · ' + stats.length + ' 色 / 共 ' + total + ' 颗';
+  const dims = ' MARD · ' + w + '×' + h + ' · ' + stats.length + ' 色 / 共 ' + total + ' 颗';
   const nm = fitText(ctx, '「' + (work.name || '拼豆作品') + '」', CW - ctx.measureText(dims).width);
   ctx.fillText(nm + dims, P, infoY + INFO_H / 2);
 
   // 图例：色块药丸（编号 MARD色号 ×数量），5 列。
-  // 编号与格内/拼豆页色卡一致；MARD 色号只对全局色板作品展示（自带色板不是实体豆色，
-  // 标了会误导按码买豆）
+  // 编号与拼豆页色卡一致、色号与格内一致（自带色板是就近匹配的 MARD 码）——
+  // 图例即两套标识的对照桥
   if (lgCols) {
     const pillW = (CW - (lgCols - 1) * PILL_GAP) / lgCols;
     ctx.textAlign = 'center';
     stats.forEach((s, i) => {
       const hex = hexOf(s.pal);
-      const code = work.palette ? '' : PALETTE[s.pal].code + ' ';
+      const code = labelOf(s.pal) + ' ';
       const px = P + (i % lgCols) * (pillW + PILL_GAP);
       const py = lgY + Math.floor(i / lgCols) * (PILL_H + PILL_GAP);
       ctx.fillStyle = hex;
