@@ -58,8 +58,8 @@
     <view class="modal-title"><image class="pxi-l" src="/assets/icons/key.png" />图纸导入码</view>
     <view class="code-big">{{codeText}}</view>
     <view class="modal-sub">
-      <view>复制整段文案发给好友，打开小程序自动识别口令</view>
-      <view>也可以手动：新作品 → 输入导入码</view>
+      <view>复制口令发给好友</view>
+      <view>好友在「新作品 → 输入导入码」中输入或长按粘贴</view>
     </view>
     <view class="modal-btns">
       <view class="btn-primary" hover-class="pressed" bindtap="copyCode">复制口令</view>

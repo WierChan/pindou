@@ -10,7 +10,7 @@ const { cfg } = require('../../utils/config');
 const { buildGuide, guideSeen, markGuideSeen } = require('../../utils/guidance');
 const ads = require('../../utils/ads');
 const { buildChartExportTo } = require('../../utils/share');
-const { createCode, format, markCodePrompted, reportFlow } = require('../../utils/importcode');
+const { createCode, format, reportFlow } = require('../../utils/importcode');
 
 const SIZE_CAP = 256; // 画布长边上限（同 create 页），改大小时的最大豆数
 const PAINT_KEY = 'pindou.paintMode.v1'; // 划动模式:1 = 连续上豆 / 其余 = 拖动平移（跨作品记忆）
@@ -293,7 +293,7 @@ Page({
     });
   },
 
-  // 接力分享：把当前图纸 + 进度上传成口令，好友复制口令打开小程序就能从这个进度接着拼
+  // 接力分享：把当前图纸和进度上传成口令，好友在新作品页输入或粘贴口令接着拼。
   relayShare() {
     const work = this.work;
     if (!work) return;
@@ -310,10 +310,8 @@ Page({
         createCode(work, { placed: work.placed }).then(code => {
           wx.hideLoading();
           if (!code) { ui.toast('生成失败，稍后再试'); return; }
-          markCodePrompted(code); // 自家口令：复制后回前台不被剪贴板识别弹窗打扰
           wx.setClipboardData({
-            data: '我在拼豆便利店拼「' + work.name + '」拼到 ' + pct + '% 啦！复制这段话打开「拼豆便利店」小程序，' +
-              '凭口令 ' + format(code) + ' 接着帮我拼～也可以在 新作品 → 输入导入码 里粘贴。',
+            data: '我在拼豆便利店拼「' + work.name + '」拼到 ' + pct + '% 啦！打开「拼豆便利店」小程序，在「新作品 → 输入导入码」中输入或长按粘贴 ' + format(code) + '，接着帮我拼～',
             success: () => ui.toast('接力口令已复制，发给好友吧 ✨'),
           });
         }).catch(err => {

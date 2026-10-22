@@ -51,7 +51,7 @@ Page({
     celebrating: false,
     guideSteps: [],
     adHome: '',       // 流量主 banner 位 ID（空 = 不渲染）
-    orderOn: true,    // 代拼服务入口（后端 order.enabled=false 可收起）
+    orderOn: false,   // 代拼入口默认隐藏
     orderN: 0,        // 本机记录的代拼订单数（入口角标）
   },
 

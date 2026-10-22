@@ -6,6 +6,7 @@ const ENV = 'dev'; // 'dev' | 'prod'
 
 const HOSTS = {
   dev: 'http://192.168.50.62:7000',
+  // dev: 'https://api.pindoubianlidian.com',
   prod: 'https://api.pindoubianlidian.com', // TODO: 部署后替换为真实域名
 };
 

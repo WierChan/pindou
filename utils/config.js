@@ -22,7 +22,7 @@ function pickAd(src) {
 }
 
 // 代拼服务配置(/api/config 的 order 字段,契约见 docs/order-api.md):
-//   enabled        总开关。缺省 = 开;后端下发 false 可整体收起入口,不用发版
+//   enabled        代拼入口暂时在客户端统一隐藏；保留后端字段供日后恢复
 //   pickupArea     自取范围文案(合作商家都在杭州;具体哪家由平台派单后决定,客户端不展示商家)
 //   pickupHint     自取补充说明
 //   notice         下单页展示的说明(可空)
@@ -30,7 +30,7 @@ function pickAd(src) {
 //   pricing        报价表覆盖 {minBeads, maxSide, tiers, shipping, parcel},缺省用 utils/pricing.js 内置表
 //   multi          多图订单(代拼篮)开关。缺省 = 关:后端按 docs/order-api.md §11 支持 works[] 后下发 true 才出现「再加一张」
 const ORDER_DEF = {
-  enabled: true,
+  enabled: false,
   multi: false,
   pickupArea: '杭州市内到店自取',
   pickupHint: '具体取货地址在派单后的订单详情里显示，做好后商家会电话联系你约时间',
@@ -42,7 +42,7 @@ const ORDER_DEF = {
 function pickOrder(src) {
   const o = Object.assign({}, ORDER_DEF);
   if (src && typeof src === 'object') {
-    if (typeof src.enabled === 'boolean') o.enabled = src.enabled;
+    // 暂停代拼入口期间，即使服务端或本地缓存仍下发 true 也不展示。
     if (typeof src.multi === 'boolean') o.multi = src.multi;
     ['pickupArea', 'pickupHint', 'notice'].forEach(k => {
       if (typeof src[k] === 'string' && src[k]) o[k] = src[k];

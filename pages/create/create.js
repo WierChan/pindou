@@ -8,7 +8,7 @@ const { renderPatternTo, patternSize, getBeadShape } = require('../../utils/boar
 const ui = require('../../utils/ui');
 const ads = require('../../utils/ads');
 const { buildGuide, guideSeen, markGuideSeen } = require('../../utils/guidance');
-const { normalize, format, fetchByCode, markCodePrompted, reportFlow } = require('../../utils/importcode');
+const { normalize, extractCode, format, fetchByCode, reportFlow } = require('../../utils/importcode');
 const api = require('../../utils/api');
 
 const PENDING_IMAGE = 'pindou.pendingImageReview';
@@ -100,7 +100,7 @@ Page({
     this.tpls = null; // 图案库数据(来自后端)
     this.setData({ insets: ui.navInsets() });
     this._loadTemplates();
-    // 剪贴板口令弹窗「拼同款」直达：带 code 参数进来就自动取图纸进配置页
+    // 分享链接带 code 参数时，直接取图纸进配置页。
     const auto = q && normalize(q.code);
     if (auto) {
       this._autoCode = true; // 本次直奔配置页，选择页引导这轮不弹（未标记看过，下次正常进入再出）
@@ -167,7 +167,7 @@ Page({
     if (this._autoCode) return;
     const codeStep = {
       sel: '.code-entry',
-      text: '收到好友的拼豆口令？复制整段文案打开小程序会自动识别；也可以点这里手动输入，拼个同款～',
+      text: '收到好友的拼豆口令？点这里输入，或长按输入框粘贴，拼个同款～',
     };
     if (guideSeen('create')) {
       buildGuide(this, 'create-code', [codeStep]);
@@ -339,31 +339,17 @@ Page({
   },
   closeCodeInput() { this.setData({ codeShow: false, codeFocus: false }); },
   onCodeInput(e) { this.setData({ codeInput: e.detail.value }); },
-  // 从剪贴板捞口令（好友发来的整段文案直接粘贴也行）。
-  // 注意：正式版需在小程序后台《用户隐私保护指引》声明「剪贴板」，
-  // 未声明/被拒时降级提示长按输入框粘贴（系统级粘贴不受隐私接口限制）
-  pasteCode() {
-    wx.getClipboardData({
-      success: r => {
-        const c = normalize(r.data);
-        if (c) this.setData({ codeInput: format(c) });
-        else ui.toast('剪贴板里没找到口令');
-      },
-      fail: () => ui.toast('没拿到剪贴板权限，长按输入框粘贴也可以'),
-    });
-  },
   confirmCode() {
-    const code = normalize(this.data.codeInput);
+    const code = extractCode(this.data.codeInput) || normalize(this.data.codeInput);
     if (!code) { ui.toast('口令不对哦，应是 8 位字符'); return; }
     this.setData({ codeShow: false });
     this._importByCode(code);
   },
-  // 凭码取图纸进配置页：手动输入与剪贴板自动识别（onLoad ?code=）共用
+  // 凭码取图纸进配置页：手动输入和分享链接（onLoad ?code=）共用。
   _importByCode(code) {
     wx.showLoading({ title: '取图纸中', mask: true });
     fetchByCode(code).then(p => {
       wx.hideLoading();
-      markCodePrompted(code); // 导入过的码不再被剪贴板识别弹窗打扰
       // 接力口令（带进度）：直接建档、进拼豆页从好友的进度接着拼，跳过配置
       if (p.placed) {
         const work = store.create({

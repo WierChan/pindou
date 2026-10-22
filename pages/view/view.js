@@ -2,7 +2,7 @@
 const { store } = require('../../utils/store');
 const { BoardView, workFinish, workHole, finishList, finishInfo, getBeadShape } = require('../../utils/board');
 const { ensureFinishSwatches } = require('../../utils/finishswatch');
-const { createCode, format, markCodePrompted, reportFlow } = require('../../utils/importcode');
+const { createCode, format, reportFlow } = require('../../utils/importcode');
 const { bgm } = require('../../utils/audio');
 const ui = require('../../utils/ui');
 const { cfg } = require('../../utils/config');
@@ -14,7 +14,7 @@ Page({
     capW: 700,
     capH: 900,
     title: '',
-    orderOn: true,      // 代拼入口（后端 order.enabled=false 可收起）
+    orderOn: false,     // 代拼入口默认隐藏
     // 已定型作品：可在「未烫成品 / 烫后效果」间切看，并横滑换烫法、保存
     fusedOn: true,      // true 烫后效果（融合+烫法） / false 未烫成品（原豆）
     finish: 'smooth',
@@ -212,11 +212,8 @@ Page({
     });
   },
   copyCode() {
-    // 预标记自家口令：复制后回到前台，不被剪贴板自动识别弹窗打扰
-    markCodePrompted(this.work.shareCode);
     wx.setClipboardData({
-      data: '我在拼豆便利店分享了一张图纸！复制这段话打开「拼豆便利店」小程序，' +
-        '自动识别口令 ' + this.data.codeText + '，一键拼同款；也可以在 新作品 → 输入导入码 里粘贴～',
+      data: '我在拼豆便利店分享了一张图纸！打开「拼豆便利店」小程序，在「新作品 → 输入导入码」中输入或长按粘贴 ' + this.data.codeText + '，一起拼同款～',
       success: () => ui.toast('口令已复制，去粘贴给好友吧 ✨'),
     });
   },

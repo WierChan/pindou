@@ -255,16 +255,4 @@
   letter-spacing: 2px;
   text-align: center;
 }
-.code-paste {
-  padding: 11px 16px;
-  background: var(--blue);
-  border: 3px solid var(--ink);
-  box-shadow: 3px 3px 0 var(--blue-dark);
-  font-size: 14px;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  transition: transform .12s;
-}
-
 .uz-chart .pxi-xl { width: 32px; height: 32px; }

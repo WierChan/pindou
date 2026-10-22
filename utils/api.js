@@ -76,8 +76,17 @@ function upload(path, filePath) {
         let body;
         try { body = JSON.parse(res.data); } catch (e) { /* 非 JSON 错误页 */ }
         if (body && body.code === 0) resolve(body.data);
-        else reject({ code: body && body.code || res.statusCode,
-          message: body && body.message || '图片上传失败' });
+        else {
+          // uploadFile 在 HTTP 200 时也可能返回业务错误；开发者工具的 Network
+          // 面板不一定展示上传响应体，记录非敏感字段便于定位服务端失败。
+          console.warn('图片审核上传失败', {
+            path, httpStatus: res.statusCode,
+            code: body && body.code,
+            message: body && body.message,
+          });
+          reject({ code: body && body.code || res.statusCode,
+            message: body && body.message || '图片上传失败' });
+        }
       },
       fail: () => reject({ code: -1, message: '无法连接拼豆服务器' }),
     });
