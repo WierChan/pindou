@@ -67,10 +67,32 @@ function request(method, path, data) {
   });
 }
 
+function upload(path, filePath) {
+  const send = () => new Promise((resolve, reject) => {
+    wx.uploadFile({
+      url: API_BASE + path, filePath, name: 'file',
+      header: { Authorization: 'Bearer ' + token },
+      success: res => {
+        let body;
+        try { body = JSON.parse(res.data); } catch (e) { /* 非 JSON 错误页 */ }
+        if (body && body.code === 0) resolve(body.data);
+        else reject({ code: body && body.code || res.statusCode,
+          message: body && body.message || '图片上传失败' });
+      },
+      fail: () => reject({ code: -1, message: '无法连接拼豆服务器' }),
+    });
+  });
+  return (token ? send() : login().then(send)).catch(err => {
+    if (err && err.code === 401) { token = ''; return login().then(send); }
+    throw err;
+  });
+}
+
 module.exports = {
   ensureLogin: () => (token ? Promise.resolve() : login()),
   get: path => request('GET', path),
   post: (path, data) => request('POST', path, data),
   put: (path, data) => request('PUT', path, data),
   del: path => request('DELETE', path),
+  upload,
 };

@@ -147,19 +147,60 @@ function makeThumb(host, canvas, work, fused) {
 // 调起系统图片分享菜单（发好友 / 朋友圈 / 保存到相册都在里面）；
 // 老基础库不支持 showShareImageMenu 就退回直接保存到相册
 function shareImage(path) {
-  if (!path) return;
-  if (!wx.showShareImageMenu) { saveToAlbum(path); return; }
+  if (!path) return Promise.resolve(false);
+  wx.showLoading({ title: '提交图片审核', mask: true });
+  return moderateImage(path).then(() => {
+    wx.hideLoading();
+    openShareImage(path);
+    return true;
+  }).catch(err => { wx.hideLoading(); toast((err && err.message) || '图片审核失败'); return false; });
+}
+
+const approvedImages = Object.create(null);
+function moderateImage(path) {
+  if (approvedImages[path]) return Promise.resolve(true);
+  const api = require('./api');
+  return api.upload('/api/content/images', path).then(r => {
+    if (r.status === 'pass') { approvedImages[path] = true; return true; }
+    if (!r.reviewId) throw { message: '图片审核提交失败' };
+    wx.hideLoading();
+    wx.showModal({ title: '图片审核中', content: '审核通过后会继续当前操作，请稍候。', showCancel: false });
+    const poll = attempt => {
+      if (attempt >= 210) return Promise.reject({ message: '图片审核超时，请稍后重试' });
+      return new Promise(resolve => setTimeout(resolve, 10000))
+        .then(() => api.get('/api/content/images/' + r.reviewId))
+        .then(result => {
+          if (result.status === 'pass') { approvedImages[path] = true; return true; }
+          if (result.status === 'pending') return poll(attempt + 1);
+          throw { message: '图片未通过审核，无法分享或保存' };
+        });
+    };
+    return poll(0);
+  });
+}
+
+function openShareImage(path) {
+  if (!wx.showShareImageMenu) { saveToAlbumApproved(path); return; }
   wx.showShareImageMenu({
     path,
     fail: err => {
       const msg = (err && err.errMsg) || '';
       if (msg.indexOf('cancel') >= 0) return; // 用户取消不提示
-      saveToAlbum(path);                       // 调起失败就直接存相册
+      saveToAlbumApproved(path);               // 已通过审核，调起失败则保存相册
     },
   });
 }
 
 function saveToAlbum(path) {
+  if (!path) return Promise.resolve(false);
+  wx.showLoading({ title: '提交图片审核', mask: true });
+  return moderateImage(path).then(() => {
+    wx.hideLoading();
+    return saveToAlbumApproved(path);
+  }).catch(err => { wx.hideLoading(); toast((err && err.message) || '图片审核失败'); return false; });
+}
+
+function saveToAlbumApproved(path) {
   return new Promise(resolve => {
     wx.saveImageToPhotosAlbum({
       filePath: path,

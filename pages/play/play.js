@@ -10,7 +10,7 @@ const { cfg } = require('../../utils/config');
 const { buildGuide, guideSeen, markGuideSeen } = require('../../utils/guidance');
 const ads = require('../../utils/ads');
 const { buildChartExportTo } = require('../../utils/share');
-const { createCode, format, markCodePrompted } = require('../../utils/importcode');
+const { createCode, format, markCodePrompted, reportFlow } = require('../../utils/importcode');
 
 const SIZE_CAP = 256; // 画布长边上限（同 create 页），改大小时的最大豆数
 const PAINT_KEY = 'pindou.paintMode.v1'; // 划动模式:1 = 连续上豆 / 其余 = 拖动平移（跨作品记忆）
@@ -138,6 +138,7 @@ Page({
     this.setData({
       insets: ui.navInsets(),
       title: work.name,
+      fromCode: work.fromCode || '',
       chips,
       paintOn: this.paintOn,
       locateOn: this.locateOn,
@@ -793,4 +794,5 @@ Page({
       path: '/pages/home/home',
     };
   },
+  reportImported() { if (this.work) reportFlow(this.work.fromCode); },
 });

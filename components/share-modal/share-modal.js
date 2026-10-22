@@ -43,15 +43,7 @@ Component({
     // 老基础库不支持时退回保存到相册
     sendImage() {
       if (!this.path) return;
-      if (!wx.showShareImageMenu) { ui.saveToAlbum(this.path); return; }
-      wx.showShareImageMenu({
-        path: this.path,
-        fail: err => {
-          const msg = (err && err.errMsg) || '';
-          if (msg.indexOf('cancel') >= 0) return; // 用户取消不提示
-          ui.saveToAlbum(this.path);              // 调起失败就直接保存
-        },
-      });
+      ui.shareImage(this.path);
     },
     // 保存纯网格图纸到相册（无品牌装饰、平色格 —— 往返闭环的载体）。
     // 流量主接入后（rvChart 位下发）先看一段激励视频；未接入/失败直接放行，

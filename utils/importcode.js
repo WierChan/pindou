@@ -52,6 +52,21 @@ function packPlaced(placed, n) {
   }
   return s;
 }
+
+// 两组 32 位散列组成稳定快照键。图案、名称、色板或接力进度任一变化都会换键，
+// 避免静默保存时间戳或“已拼数量相同但位置不同”时误取旧的审核结果。
+function snapshotKey(value) {
+  const s = String(value || '');
+  let a = 2166136261, b = 5381;
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    a ^= c;
+    a = Math.imul(a, 16777619);
+    b = Math.imul(b, 33) ^ c;
+  }
+  return (a >>> 0).toString(16).padStart(8, '0') +
+    (b >>> 0).toString(16).padStart(8, '0');
+}
 function unpackPlaced(s, n) {
   const out = new Array(n).fill(0);
   for (let i = 0; i < n; i++) {
@@ -115,13 +130,11 @@ function createCode(work, opts) {
     w: work.w, h: work.h, cells: work.cells,
     palette: work.palette || undefined, name: work.name,
   };
-  let clientWorkId = work.id;
   if (opts.placed) {
-    // 进度变了要换码：否则服务端按 clientWorkId 幂等会返回旧进度。用已拼数区分快照
-    const done = opts.placed.reduce((a, v) => a + (v ? 1 : 0), 0);
     payload.placed = packPlaced(opts.placed, work.cells.length);
-    clientWorkId = work.id + '@' + done;
   }
+  // 服务端按 clientWorkId 幂等；把实际提交内容纳入键，确保审核结果只对应当前快照。
+  const clientWorkId = (work.id + '@' + snapshotKey(JSON.stringify(payload))).slice(0, 32);
   return api.post('/api/patterns', {
     clientWorkId,
     name: work.name,
@@ -129,7 +142,23 @@ function createCode(work, opts) {
     h: work.h,
     total: work.cells.filter(t => t >= 0).length,
     payload: JSON.stringify(payload),
-  }).then(d => normalize(d && d.code));
+  }).then(d => {
+    const code = normalize(d && d.code);
+    if (!code) throw { message: '生成口令失败' };
+    if (d.reviewStatus === 'pass') return code;
+    if (d.reviewStatus !== 'pending') throw { message: '图纸未通过审核，请修改后重试' };
+    return waitForReview(code, 0);
+  });
+}
+
+function waitForReview(code, attempt) {
+  if (attempt >= 6) throw { message: '图纸还在审核中，稍后再点生成即可查看结果' };
+  return new Promise(resolve => setTimeout(resolve, 5000)).then(() =>
+    api.get('/api/patterns/code/' + code + '/review').then(r => {
+      if (r.status === 'pass') return code;
+      if (r.status === 'pending') return waitForReview(code, attempt + 1);
+      throw { message: '图纸未通过审核，请修改后重试' };
+    }));
 }
 
 // 凭码取图纸（已校验，可直接建作品）
@@ -147,7 +176,16 @@ function reportCode(code, reason) {
   return api.post('/api/patterns/code/' + code + '/report', { reason: reason || 'user' });
 }
 
+function reportFlow(code) {
+  if (!code) return;
+  const reasons = ['违法违规', '色情低俗', '暴力血腥', '侵权盗用', '其他不适宜内容'];
+  wx.showActionSheet({ itemList: reasons, success: r => {
+    reportCode(code, reasons[r.tapIndex]).then(() => wx.showToast({ title: '举报已提交', icon: 'none' }))
+      .catch(() => wx.showToast({ title: '举报提交失败', icon: 'none' }));
+  } });
+}
+
 module.exports = {
   normalize, format, extractCode, markCodePrompted, wasCodePrompted,
-  validatePattern, createCode, fetchByCode, reportCode,
+  validatePattern, createCode, fetchByCode, reportCode, reportFlow,
 };

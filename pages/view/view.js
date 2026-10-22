@@ -2,7 +2,7 @@
 const { store } = require('../../utils/store');
 const { BoardView, workFinish, workHole, finishList, finishInfo, getBeadShape } = require('../../utils/board');
 const { ensureFinishSwatches } = require('../../utils/finishswatch');
-const { createCode, format, markCodePrompted } = require('../../utils/importcode');
+const { createCode, format, markCodePrompted, reportFlow } = require('../../utils/importcode');
 const { bgm } = require('../../utils/audio');
 const ui = require('../../utils/ui');
 const { cfg } = require('../../utils/config');
@@ -44,6 +44,7 @@ Page({
       insets: ui.navInsets(),
       title: work.name,
       workId: work.id,
+      fromCode: work.fromCode || '',
       orderOn: cfg.ORDER.enabled,
       finish,
       finishName: finishInfo(finish).name,
@@ -178,7 +179,15 @@ Page({
     const work = this.work;
     if (!work) return;
     if (work.shareCode) {
-      this.setData({ codeShow: true, codeText: format(work.shareCode) });
+      wx.showLoading({ title: '核对审核中', mask: true });
+      createCode(work).then(code => {
+        wx.hideLoading();
+        if (work.shareCode !== code) {
+          work.shareCode = code;
+          store.update(work.id, { shareCode: code }, true);
+        }
+        this.setData({ codeShow: true, codeText: format(code) });
+      }).catch(err => { wx.hideLoading(); ui.toast((err && err.message) || '审核未完成'); });
       return;
     }
     wx.showModal({
@@ -206,7 +215,7 @@ Page({
     // 预标记自家口令：复制后回到前台，不被剪贴板自动识别弹窗打扰
     markCodePrompted(this.work.shareCode);
     wx.setClipboardData({
-      data: '我在拼豆便利店拼了「' + this.work.name + '」！复制这段话打开「拼豆便利店」小程序，' +
+      data: '我在拼豆便利店分享了一张图纸！复制这段话打开「拼豆便利店」小程序，' +
         '自动识别口令 ' + this.data.codeText + '，一键拼同款；也可以在 新作品 → 输入导入码 里粘贴～',
       success: () => ui.toast('口令已复制，去粘贴给好友吧 ✨'),
     });
@@ -231,11 +240,7 @@ Page({
   },
 
   onShareAppMessage() {
-    const msg = {
-      title: '我拼好了「' + (this.work ? this.work.name : '拼豆作品') + '」，来拼豆便利店逛逛！',
-      path: '/pages/home/home',
-    };
-    if (this.shareImg) msg.imageUrl = this.shareImg;
-    return msg;
+    return { title: '拼豆便利店 · 把喜欢的图片，一颗一颗拼出来', path: '/pages/home/home' };
   },
+  reportImported() { reportFlow(this.data.fromCode); },
 });

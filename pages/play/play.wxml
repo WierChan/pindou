@@ -49,6 +49,7 @@
         </view>
       </view>
       <view class="tools-hint row2">{{fillArmed ? '点画板上想拼的位置 → 周围一块向外扩散铺上～' : (paintOn ? '划过格子连续上豆！' : '选颜色点格子上豆 ·「一键拼豆」点哪、哪周围一块都铺上')}}</view>
+      <view wx:if="{{fromCode}}" class="btn-link" bindtap="reportImported">举报导入图纸</view>
       <scroll-view class="palette-bar" scroll-x scroll-into-view="{{scrollInto}}"
                    scroll-with-animation enhanced show-scrollbar="{{false}}">
         <view class="pchip {{item.active ? 'active' : ''}} {{item.done ? 'done' : ''}}"

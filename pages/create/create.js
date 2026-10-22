@@ -8,7 +8,10 @@ const { renderPatternTo, patternSize, getBeadShape } = require('../../utils/boar
 const ui = require('../../utils/ui');
 const ads = require('../../utils/ads');
 const { buildGuide, guideSeen, markGuideSeen } = require('../../utils/guidance');
-const { normalize, format, fetchByCode, markCodePrompted, reportCode: reportImportCode } = require('../../utils/importcode');
+const { normalize, format, fetchByCode, markCodePrompted, reportFlow } = require('../../utils/importcode');
+const api = require('../../utils/api');
+
+const PENDING_IMAGE = 'pindou.pendingImageReview';
 
 // 表情库：每个 emoji 都是现成的拼豆图案（预先按字素拆好，❤️ 这类组合字符不被拆散）
 const EMOJIS = [
@@ -129,10 +132,22 @@ Page({
   // banner 位 ID 可能在启动配置拉到后才有值（口令直达冷启动时尤其），回到页面补一次。
   // 零作品的新用户不展示：第一次「开始新作品」不该见到广告（与首页空状态同一原则）
   onShow() {
+    this._visible = true;
     // 位 key 仍叫 bannerTpl（沿用最初挂图案库 tab 时的接口字段名，不动后端契约）
     const id = store.list().length ? ads.unit('bannerTpl') : '';
     if (id !== this.data.adCreate) this.setData({ adCreate: id });
+    if (!this._pendingImage) {
+      let saved;
+      try { saved = wx.getStorageSync(PENDING_IMAGE); } catch (e) { /* 忽略 */ }
+      if (saved && saved.path && saved.reviewId) {
+        this._pendingImage = { path: saved.path, reviewId: saved.reviewId,
+          onPath: saved.mode === 'chart' ? path => this._openReviewedChart(path) : path => this._openCrop(path, 'image', {}) };
+      }
+    }
+    if (this._pendingImage) setTimeout(() => this._pollImageReview(), 500);
   },
+  onHide() { this._visible = false; clearTimeout(this._reviewTimer); },
+  onUnload() { this._visible = false; clearTimeout(this._reviewTimer); },
   onAdCreateError(e) {
     console.warn('创建页 banner 加载失败', e && e.detail);
     this.setData({ adCreate: '' });
@@ -226,27 +241,65 @@ Page({
     chain.then(() => { TPL_THUMBS = paths; }).catch(() => { /* 缩略图失败不影响功能 */ });
   },
 
-  _pickImage(onPath) {
+  _pickImage(onPath, mode) {
     const pick = wx.chooseMedia || wx.chooseImage;
     const opts = {
       count: 1,
       success: res => {
-        onPath(res.tempFiles ? res.tempFiles[0].tempFilePath : res.tempFilePaths[0]);
+        const path = res.tempFiles ? res.tempFiles[0].tempFilePath : res.tempFilePaths[0];
+        this._reviewPickedImage(path, onPath, mode);
       },
     };
     if (wx.chooseMedia) opts.mediaType = ['image'];
     pick(opts);
   },
 
+  _reviewPickedImage(path, onPath, mode) {
+    wx.showLoading({ title: '提交图片审核', mask: true });
+    api.upload('/api/content/images', path).then(result => {
+      wx.hideLoading();
+      if (result.status === 'pass') { onPath(path); return; }
+      if (!result.reviewId) throw { message: '图片审核未能提交' };
+      this._pendingImage = { path, reviewId: result.reviewId, onPath };
+      // 临时图片持久化，用户离开页面后也能在下次进入时继续。
+      wx.saveFile({ tempFilePath: path, success: saved => {
+        if (!this._pendingImage || this._pendingImage.reviewId !== result.reviewId) return;
+        this._pendingImage.path = saved.savedFilePath;
+        try { wx.setStorageSync(PENDING_IMAGE, { path: saved.savedFilePath, reviewId: result.reviewId, mode }); }
+        catch (e) { /* 本次仍可轮询 */ }
+      } });
+      wx.showModal({ title: '图片审核中', content: '图片已提交安全审核。通过后返回“新作品”页继续裁剪；审核期间不能使用这张图片。',
+        showCancel: false });
+      this._pollImageReview();
+    }).catch(err => { wx.hideLoading(); ui.toast((err && err.message) || '图片审核失败，请重试'); });
+  },
+
+  _pollImageReview() {
+    const pending = this._pendingImage;
+    if (!pending || !this._visible) return;
+    api.get('/api/content/images/' + pending.reviewId).then(r => {
+      if (!this._pendingImage || this._pendingImage.reviewId !== pending.reviewId) return;
+      if (r.status === 'pending') { this._reviewTimer = setTimeout(() => this._pollImageReview(), 10000); return; }
+      this._pendingImage = null;
+      try { wx.removeStorageSync(PENDING_IMAGE); } catch (e) { /* 忽略 */ }
+      if (r.status === 'pass') pending.onPath(pending.path);
+      else ui.toast('图片未通过审核，请更换图片');
+    }).catch(() => { this._reviewTimer = setTimeout(() => this._pollImageReview(), 15000); });
+  },
+
   // 两个入口都先进裁剪弹窗：框哪里拼哪里（不裁直接「使用图片」= 整张）
   chooseImage() {
-    this._pickImage(path => this._openCrop(path, 'image', {}));
+    if (this._pendingImage) { ui.toast('上一张图片仍在审核中'); return; }
+    this._pickImage(path => this._openCrop(path, 'image', {}), 'image');
   },
 
   // 图纸先预识别一遍网格：裁剪框自动吸附到图纸格线、开门就框在图案上；
   // 识别不出（拍照太歪等）就退化成普通裁剪，框完再由正式识别兜底
   chooseChart() {
-    this._pickImage(path => {
+    if (this._pendingImage) { ui.toast('上一张图片仍在审核中'); return; }
+    this._pickImage(path => this._openReviewedChart(path), 'chart');
+  },
+  _openReviewedChart(path) {
       wx.showLoading({ title: '识别网格中', mask: true });
       // 预识别只为「裁剪框吸附格线」：gridOnly 跳过最贵的逐格取色/聚色，
       // 把开弹窗前的等待压到 1/4。不降分辨率 —— 实测降采样的重采样模糊会让
@@ -269,7 +322,6 @@ Page({
           this._openCrop(path, 'chart', extra);
         }))
         .catch(() => { wx.hideLoading(); this._openCrop(path, 'chart', {}); });
-    });
   },
 
   // 让出一帧：showLoading 之后必须先渲染，才能开始跑同步的重活，
@@ -344,19 +396,7 @@ Page({
   },
   // 举报口令图纸（侵权/违规 → 服务端核实后作废）
   reportCode() {
-    const code = this.data.importedCode;
-    if (!code) return;
-    wx.showModal({
-      title: '举报图纸',
-      content: '如果这幅图纸涉及侵权或违规内容，我们会尽快核实并作废其导入码。确定举报吗？',
-      confirmText: '举报',
-      confirmColor: '#C9838F',
-      success: r => {
-        if (!r.confirm) return;
-        reportImportCode(code, 'user').then(() => ui.toast('已收到，我们会尽快核实'))
-          .catch(() => ui.toast('已记录'));
-      },
-    });
+    reportFlow(this.data.importedCode);
   },
 
   _openCrop(path, mode, extra) {
