@@ -146,24 +146,56 @@ function makeThumb(host, canvas, work, fused) {
 // 保存图片到相册，处理授权被拒的情况
 // 调起系统图片分享菜单（发好友 / 朋友圈 / 保存到相册都在里面）；
 // 老基础库不支持 showShareImageMenu 就退回直接保存到相册
-function shareImage(path) {
+function shareImage(path, opts) {
   if (!path) return Promise.resolve(false);
   wx.showLoading({ title: '提交图片审核', mask: true });
-  return moderateImage(path).then(() => {
+  return moderateImage(path, opts).then(() => {
     wx.hideLoading();
+    if (opts && opts.onFinish) opts.onFinish();
     openShareImage(path);
     return true;
-  }).catch(err => { wx.hideLoading(); toast((err && err.message) || '图片审核失败'); return false; });
+  }).catch(err => {
+    wx.hideLoading();
+    if (opts && opts.onFinish) opts.onFinish();
+    if (!err || !err.cancelled) toast((err && err.message) || '图片审核失败');
+    return false;
+  });
 }
 
 const approvedImages = Object.create(null);
-function moderateImage(path) {
+function moderateImage(path, opts) {
   if (approvedImages[path]) return Promise.resolve(true);
   const api = require('./api');
   return api.upload('/api/content/images', path).then(r => {
     if (r.status === 'pass') { approvedImages[path] = true; return true; }
     if (!r.reviewId) throw { message: '图片审核提交失败' };
     wx.hideLoading();
+    if (opts && opts.onPending) {
+      return new Promise((resolve, reject) => {
+        let active = true, timer;
+        opts.cancel = () => {
+          if (!active) return;
+          active = false;
+          clearTimeout(timer);
+          reject({ cancelled: true });
+        };
+        opts.onPending();
+        const poll = attempt => {
+          if (!active) return;
+          if (attempt >= 210) { active = false; reject({ message: '图片审核超时，请稍后重试' }); return; }
+          timer = setTimeout(() => {
+            api.get('/api/content/images/' + r.reviewId).then(result => {
+              if (!active) return;
+              if (result.status === 'pending') { poll(attempt + 1); return; }
+              active = false;
+              if (result.status === 'pass') { approvedImages[path] = true; resolve(true); }
+              else reject({ message: '图片未通过审核，无法分享或保存' });
+            }).catch(err => { if (active) { active = false; reject(err); } });
+          }, 10000);
+        };
+        poll(0);
+      });
+    }
     wx.showModal({ title: '图片审核中', content: '审核通过后会继续当前操作，请稍候。', showCancel: false });
     const poll = attempt => {
       if (attempt >= 210) return Promise.reject({ message: '图片审核超时，请稍后重试' });

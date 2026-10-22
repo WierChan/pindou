@@ -13,6 +13,13 @@
     </view>
 
     <block wx:if="{{tab === 'image'}}">
+      <view wx:if="{{reviewWaiting}}" class="review-status">
+        <view class="review-status-text">{{reviewError ? '网络连接失败，审核状态暂时无法获取' : '图片审核中，通过后将自动打开裁剪'}}</view>
+        <view class="review-status-actions">
+          <view wx:if="{{reviewError}}" class="review-status-btn" bindtap="retryImageReview">重试</view>
+          <view class="review-status-btn" bindtap="cancelImageReview">取消等待</view>
+        </view>
+      </view>
       <view class="upload-zone" hover-class="uz-hover" bindtap="chooseImage">
         <view class="uz-icon"><image class="pxi-xl" src="/assets/icons/picture.png" /></view>
         <view class="uz-title">选择一张图片</view>

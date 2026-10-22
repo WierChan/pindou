@@ -130,3 +130,11 @@
 </view>
 
 <guide gid="{{guideId}}" steps="{{guideSteps}}" bind:done="onGuideDone" />
+
+<view wx:if="{{exportReviewWaiting}}" class="export-review-mask">
+  <view class="export-review-card">
+    <view class="export-review-title">图片审核中</view>
+    <view class="export-review-desc">审核通过后会自动打开保存或分享菜单</view>
+    <view class="export-review-cancel" bindtap="cancelExportReview">取消等待</view>
+  </view>
+</view>

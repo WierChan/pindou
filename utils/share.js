@@ -257,7 +257,7 @@ function buildChartExportTo(canvas, work, opts) {
   // 版式（逻辑像素）—— 常量改动要同步 tests/export-synth.js
   const P = 30, HEADER = 56, COORD = 30, CARD_PAD = 14;
   const INFO_H = 46, PILL_H = 42, PILL_GAP = 12, FOOT = 54;
-  const GRID_LINE_A = 0.5;  // 细格线透明度：小=豆色更实、大=分格更清（再导入靠这条占多数的细线认格）
+  const GRID_LINE_A = 0.32; // 小格线用浅酒红；白底上清晰可见，仍弱于大格参考线
   const GRID_MAJOR_A = 0.9; // 5/10 格参考线透明度：拼的时候靠它数格，要一眼可辨；只占 1/5 洗色有限
   const GRID_DASH = 5, GRID_GAP = 4; // 5 格虚线的实/空段长（逻辑像素）
   const GRID_MAJOR_W = 2;   // 参考线线宽（逻辑像素）：比 1px 细格线粗一档，骑缝居中画
@@ -328,7 +328,7 @@ function buildChartExportTo(canvas, work, opts) {
   for (let k = 0; k <= w; k++) {
     const major = k % 5 === 0;
     ctx.globalAlpha = major ? GRID_MAJOR_A : GRID_LINE_A;
-    ctx.fillStyle = major ? '#8C2F43' : '#E6E9EB';
+    ctx.fillStyle = '#8C2F43';
     const x = gridX + k * cellPx;
     if (!major) ctx.fillRect(x, gridY, 1, gridH);
     else if (k % 10 !== 0 && k !== w) dashedV(x - mOff, gridY, gridH);
@@ -337,7 +337,7 @@ function buildChartExportTo(canvas, work, opts) {
   for (let k = 0; k <= h; k++) {
     const major = k % 5 === 0;
     ctx.globalAlpha = major ? GRID_MAJOR_A : GRID_LINE_A;
-    ctx.fillStyle = major ? '#8C2F43' : '#E6E9EB';
+    ctx.fillStyle = '#8C2F43';
     const y = gridY + k * cellPx;
     if (!major) ctx.fillRect(gridX, y, gridW, 1);
     else if (k % 10 !== 0 && k !== h) dashedH(gridX, y - mOff, gridW);

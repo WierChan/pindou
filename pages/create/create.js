@@ -60,6 +60,8 @@ Page({
     cropInit: null,
     cropTitle: '裁剪图片',
     cropHint: '',
+    reviewWaiting: false,
+    reviewError: false,
     codeShow: false,
     codeInput: '',
     importedCode: '',
@@ -144,7 +146,10 @@ Page({
           onPath: saved.mode === 'chart' ? path => this._openReviewedChart(path) : path => this._openCrop(path, 'image', {}) };
       }
     }
-    if (this._pendingImage) setTimeout(() => this._pollImageReview(), 500);
+    if (this._pendingImage && !this._reviewDialogOpen) {
+      this._showReviewLoading();
+      setTimeout(() => this._pollImageReview(), 500);
+    }
   },
   onHide() { this._visible = false; clearTimeout(this._reviewTimer); },
   onUnload() { this._visible = false; clearTimeout(this._reviewTimer); },
@@ -268,23 +273,59 @@ Page({
         try { wx.setStorageSync(PENDING_IMAGE, { path: saved.savedFilePath, reviewId: result.reviewId, mode }); }
         catch (e) { /* 本次仍可轮询 */ }
       } });
-      wx.showModal({ title: '图片审核中', content: '图片已提交安全审核。通过后返回“新作品”页继续裁剪；审核期间不能使用这张图片。',
-        showCancel: false });
-      this._pollImageReview();
+      this._reviewDialogOpen = true;
+      wx.showModal({ title: '图片审核中', content: '图片已提交安全审核，审核通过后会自动打开裁剪，请稍候。',
+        showCancel: false,
+        complete: () => {
+          this._reviewDialogOpen = false;
+          if (!this._pendingImage || !this._visible) return;
+          this._showReviewLoading();
+          this._pollImageReview();
+        },
+      });
     }).catch(err => { wx.hideLoading(); ui.toast((err && err.message) || '图片审核失败，请重试'); });
+  },
+
+  _showReviewLoading() {
+    this.setData({ reviewWaiting: true, reviewError: false });
+  },
+  _hideReviewLoading() {
+    this.setData({ reviewWaiting: false, reviewError: false });
+  },
+  cancelImageReview() {
+    clearTimeout(this._reviewTimer);
+    this._pendingImage = null;
+    this._reviewPolling = null;
+    try { wx.removeStorageSync(PENDING_IMAGE); } catch (e) { /* 忽略 */ }
+    this._hideReviewLoading();
+  },
+  retryImageReview() {
+    if (!this._pendingImage) return;
+    clearTimeout(this._reviewTimer);
+    this._showReviewLoading();
+    this._pollImageReview();
   },
 
   _pollImageReview() {
     const pending = this._pendingImage;
-    if (!pending || !this._visible) return;
+    if (!pending || !this._visible || this._reviewPolling === pending.reviewId) return;
+    this._reviewPolling = pending.reviewId;
     api.get('/api/content/images/' + pending.reviewId).then(r => {
+      if (this._reviewPolling === pending.reviewId) this._reviewPolling = null;
       if (!this._pendingImage || this._pendingImage.reviewId !== pending.reviewId) return;
+      if (!this._visible) return; // 返回新作品页时再接续，避免在后台打开裁剪弹窗
       if (r.status === 'pending') { this._reviewTimer = setTimeout(() => this._pollImageReview(), 10000); return; }
       this._pendingImage = null;
       try { wx.removeStorageSync(PENDING_IMAGE); } catch (e) { /* 忽略 */ }
+      this._hideReviewLoading();
       if (r.status === 'pass') pending.onPath(pending.path);
       else ui.toast('图片未通过审核，请更换图片');
-    }).catch(() => { this._reviewTimer = setTimeout(() => this._pollImageReview(), 15000); });
+    }).catch(() => {
+      if (this._reviewPolling === pending.reviewId) this._reviewPolling = null;
+      if (this._pendingImage && this._pendingImage.reviewId === pending.reviewId && this._visible) {
+        this.setData({ reviewError: true });
+      }
+    });
   },
 
   // 两个入口都先进裁剪弹窗：框哪里拼哪里（不裁直接「使用图片」= 整张）

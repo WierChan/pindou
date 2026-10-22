@@ -62,11 +62,11 @@ function makeAppExport(cells, w, h, paletteHex, opts) {
       fill(im, x0, y0, S(gridX + (x + 1) * cellPx) - x0, S(gridY + (y + 1) * cellPx) - y0, rgbOf(t));
     }
   }
-  // 格线画在豆色上层：每格淡灰（#E6E9EB）+ 参考线酒红（#8C2F43）——10 格实线、
+  // 格线画在豆色上层：每格浅酒红 + 参考线深酒红（#8C2F43）——10 格实线、
   // 夹中间的 5 格虚线（边界强制实线），加粗 2 逻辑像素骑缝居中、半透明叠在豆色上。
   // 细线用 A_FINE、参考线用较重的 A_MAJOR，虚线实/空段 DASH/GAP 逻辑像素
   // （与 share.js 的 GRID_* 常量一致）。
-  const A_FINE = 0.5, A_MAJOR = 0.9;
+  const A_FINE = 0.32, A_MAJOR = 0.9;
   const DASH = 5, GAP = 4;
   const MAJ = [140, 47, 67];
   const lwM = Math.max(1, Math.round(2 * scale)); // 参考线 2 逻辑像素线宽
@@ -83,7 +83,7 @@ function makeAppExport(cells, w, h, paletteHex, opts) {
   for (let k = 0; k <= w; k++) {
     const major = k % 5 === 0;
     if (!major) {
-      blendLine(S(gridX + k * cellPx), S(gridY), lw, S(gridH), [230, 233, 235], A_FINE);
+      blendLine(S(gridX + k * cellPx), S(gridY), lw, S(gridH), MAJ, A_FINE);
       continue;
     }
     const x = S(gridX + k * cellPx - 0.5); // 骑缝居中（与 share.js 的 mOff 一致）
@@ -99,7 +99,7 @@ function makeAppExport(cells, w, h, paletteHex, opts) {
   for (let k = 0; k <= h; k++) {
     const major = k % 5 === 0;
     if (!major) {
-      blendLine(S(gridX), S(gridY + k * cellPx), S(gridW), lw, [230, 233, 235], A_FINE);
+      blendLine(S(gridX), S(gridY + k * cellPx), S(gridW), lw, MAJ, A_FINE);
       continue;
     }
     const y = S(gridY + k * cellPx - 0.5);

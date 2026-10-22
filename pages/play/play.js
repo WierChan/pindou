@@ -61,6 +61,7 @@ Page({
     celebrating: false,
     modal: { show: false, img: '', imgW: 0, imgH: 0 },
     guideSteps: [],
+    exportReviewWaiting: false,
     // 换色：把选中的颜色整幅换成另一个（已拼的豆也跟着变，不丢进度）
     swapShow: false,
     swapChips: [],
@@ -213,6 +214,7 @@ Page({
 
   onUnload() {
     this._gone = true;
+    if (this._exportReview && this._exportReview.cancel) this._exportReview.cancel();
     clearTimeout(this.flushTimer);
     clearTimeout(this._rzTimer);
     clearTimeout(this._thumbTimer);
@@ -276,9 +278,21 @@ Page({
       if (!ok) return;
       wx.showLoading({ title: '生成中', mask: true });
       this.uq(() => ui.captureCanvas(this, this.utilCanvas, () => buildChartExportTo(this.utilCanvas, work)))
-        .then(path => { wx.hideLoading(); ui.shareImage(path); })
+        .then(path => {
+          wx.hideLoading();
+          const review = {
+            onPending: () => this.setData({ exportReviewWaiting: true }),
+            onFinish: () => { this.setData({ exportReviewWaiting: false }); this._exportReview = null; },
+          };
+          this._exportReview = review;
+          ui.shareImage(path, review);
+        })
         .catch(() => { wx.hideLoading(); ui.toast('导出失败，再试一次'); });
     });
+  },
+
+  cancelExportReview() {
+    if (this._exportReview && this._exportReview.cancel) this._exportReview.cancel();
   },
 
   // 右下「分享」：导出图纸让好友拼同款，或邀请好友从当前进度接着拼
