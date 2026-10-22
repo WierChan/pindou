@@ -803,9 +803,24 @@ Page({
   },
 
   start() {
+    if (this._starting) return;
     const p = this.pattern;
     if (!p) return;
     const name = (this.name || '').trim() || '我的拼豆';
+    this._starting = true;
+    wx.showLoading({ title: '检查作品名称', mask: true });
+    api.post('/api/content/text', { value: name }).then(() => {
+      wx.hideLoading();
+      this._starting = false;
+      this._createWork(name, p);
+    }).catch(err => {
+      wx.hideLoading();
+      this._starting = false;
+      ui.toast((err && err.message) || '名称检查失败，请重试');
+    });
+  },
+
+  _createWork(name, p) {
     // 作品自带色板（图纸导入）随建档持久化；口令导入的记来源（代拼派单码另记订单标记）
     const ord = this._importedCode ? this._importedOrder : null;
     const work = store.create({
