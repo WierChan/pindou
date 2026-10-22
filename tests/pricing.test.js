@@ -1,6 +1,6 @@
 // 代拼报价回归：node tests/pricing.test.js
-// 两层价格：商家报价（baseFen，豆数 × 单价精确到分 + 格利特）→ 用户价（fen = ÷0.8946 向上取整到角）。
-// 结算铁律（原「分账铁律」，数字不变、2026-10-12 起是对账口径）：微信先扣手续费（0.6%，可由 pricing.feeRate 覆盖），剩下商家 90%、平台 10%（商家 ≈ 实付 89.46%），含运费没有例外。
+// 两层价格：商家报价（baseFen，豆数 × 单价精确到分 + 格利特）→ 用户价（fen = ÷0.8676 向上取整到角）。
+// 结算铁律（原「分账铁律」，数字不变、2026-10-12 起是对账口径）：微信先扣手续费（0.6%，可由 pricing.feeRate 覆盖），剩下商家 90%、平台 10%（商家 ≈ 实付 86.76%），含运费没有例外。
 // 运费表值就是客户付的运费（整数、不加价）。代拼价已含豆子与熨烫，不收材料包/代烫。
 const assert = require('assert');
 const P = require('../utils/pricing');
@@ -10,19 +10,28 @@ function t(name, fn) { fn(); n++; console.log('ok -', name); }
 const base = (q, k) => q.items.filter(i => i.key === k).reduce((a, i) => a + i.baseFen, 0); // 商家报价
 const cust = (q, k) => q.items.filter(i => i.key === k).reduce((a, i) => a + i.fen, 0);     // 用户价
 const keys = q => q.items.map(i => i.key).join(',');
-const gross = fen => Math.ceil(fen / 0.8946 / 10 - 1e-7) * 10;
-// 期望分账：先扣 0.6%，净额 10/90
+const gross = fen => Math.ceil(fen / 0.8676 / 10 - 1e-7) * 10;
+const oldGross = fen => Math.ceil(fen / 0.8946 / 10 - 1e-7) * 10;
+// 期望分账：先扣 0.6% 手续费和 3% 税费，余额 10/90
 function expectSettle(T) {
-  const wx = Math.round(T * 0.006), net = T - wx, plat = Math.round(net * 0.1);
-  return { wx, plat, merchant: net - plat };
+  const wx = Math.round(T * 0.006), tax = Math.round(T * 0.03), net = T - wx - tax, plat = Math.round(net * 0.1);
+  return { wx, tax, plat, merchant: net - plat };
 }
+
+t('加计税费后，各商品用户价不低于原报价，商家结算仍覆盖报价', () => {
+  for (let fen = 1; fen <= 30000; fen++) {
+    const price = P.grossUp(fen);
+    assert.ok(price >= oldGross(fen), '报价 ' + fen + ' 分变低');
+    assert.ok(P.settle(price).merchantFen >= fen, '商家报价 ' + fen + ' 分未覆盖');
+  }
+});
 
 t('feeRate 覆盖：通道费率变了，分账和用户价跟着变；超范围忽略；configure(null) 恢复 0.6%', () => {
   P.configure({ feeRate: 0.0038 });
   assert.strictEqual(P.rates().feeRate, 0.0038);
   const s = P.settle(10000);
-  assert.deepStrictEqual([s.wxFeeFen, s.netFen, s.platformFen, s.merchantFen], [38, 9962, 996, 8966]);
-  assert.strictEqual(P.grossUp(1000), 1120); // 1000 ÷ ((1−0.0038)×0.9) = 1115.3 → 向上到角
+  assert.deepStrictEqual([s.wxFeeFen, s.netFen, s.platformFen, s.merchantFen], [38, 9662, 966, 8696]);
+  assert.strictEqual(P.grossUp(1000), 1150); // 1000 ÷ ((1−0.0038)×0.9) = 1115.3 → 向上到角
   P.configure({ feeRate: 0.2 });
   assert.strictEqual(P.rates().feeRate, 0.006);
   P.configure(null);
@@ -41,7 +50,7 @@ const TABLE = [
   [78, 1.5, 6084, 121.68],
   [104, 2, 10816, 216.32],
 ];
-t('七档满板：商家报价 = 豆数 × 单价精确到分，用户价 = 报价 ÷ 0.8946 向上取整到角', () => {
+t('七档满板：商家报价 = 豆数 × 单价精确到分，用户价 = 报价 ÷ 0.8676 向上取整到角', () => {
   for (const [size, glitter, beads, labor] of TABLE) {
     const q = P.quote({ w: size, h: size, beads, colorN: 10, delivery: 'pickup' });
     assert.ok(q.ok, size + ' ok');
@@ -57,25 +66,25 @@ t('七档满板：商家报价 = 豆数 × 单价精确到分，用户价 = 报�
   }
 });
 
-t('用户给的例子：1242 颗商家 12.42，用户付 13.90；微信 0.08，剩 13.82 → 平台 1.38、商家 12.44', () => {
+t('用户给的例子：1242 颗商家 12.42，用户付 14.40；手续费 0.09、税费 0.43，余额 13.88 → 平台 1.39、商家 12.49', () => {
   const q = P.quote({ w: 76, h: 78, beads: 1242, delivery: 'pickup' });
   assert.strictEqual(q.rateTier.rate, 10);
   assert.strictEqual(base(q, 'labor'), 1242);
-  assert.strictEqual(q.totalFen, 1390);      // 12.42 ÷ 0.8946 = 13.88 → 13.90
+  assert.strictEqual(q.totalFen, 1440);      // 12.42 ÷ 0.8676 = 14.32 → 14.40
   const s = P.settle(q.totalFen);
-  assert.deepStrictEqual([s.wxFeeFen, s.netFen, s.platformFen, s.merchantFen], [8, 1382, 138, 1244]);
+  assert.deepStrictEqual([s.wxFeeFen, s.netFen, s.platformFen, s.merchantFen], [9, 1388, 139, 1249]);
   assert.ok(s.merchantFen >= 1242);
 });
 
-t('商家给的例子：4592 颗报 68.88 元，用户付 77.00，商家到手 ≥ 68.88', () => {
+t('商家给的例子：4592 颗报 68.88 元，用户付 79.40，商家到手 ≥ 68.88', () => {
   const q = P.quote({ w: 68, h: 68, beads: 4592, delivery: 'pickup' });
   assert.strictEqual(q.rateTier.size, 52);
   assert.strictEqual(base(q, 'labor'), 6888);
-  assert.strictEqual(q.totalFen, 7700);      // 68.88 ÷ 0.8946 = 76.995 → 77.00
-  const s = P.settle(q.totalFen), e = expectSettle(7700);
+  assert.strictEqual(q.totalFen, 7940);      // 68.88 ÷ 0.8676 = 79.39 → 79.40
+  const s = P.settle(q.totalFen), e = expectSettle(7940);
   assert.deepStrictEqual([s.wxFeeFen, s.platformFen, s.merchantFen], [e.wx, e.plat, e.merchant]);
   assert.ok(s.merchantFen >= 6888);
-  assert.strictEqual(s.wxFeeFen + s.platformFen + s.merchantFen, 7700);
+  assert.strictEqual(s.wxFeeFen + s.taxFen + s.platformFen + s.merchantFen, 7940);
 });
 
 t('运费：表值就是客户付的整数运费，不加价；代拼费不随配送方式变；分账连运费一起切', () => {
@@ -88,18 +97,18 @@ t('运费：表值就是客户付的整数运费，不加价；代拼费不随�
   assert.strictEqual(zj.totalFen, pickup.totalFen + 600);
   const sz = P.settle(zj.totalFen), e = expectSettle(zj.totalFen);
   assert.deepStrictEqual([sz.wxFeeFen, sz.platformFen, sz.merchantFen], [e.wx, e.plat, e.merchant]);
-  // 商家到手 ≥ 商品报价 + 运费 × 89.46%
-  assert.ok(sz.merchantFen >= zj.merchantQuoteFen + Math.floor(600 * 0.8946) - 1);
+  // 商家到手 ≥ 商品报价 + 运费 × 86.76%
+  assert.ok(sz.merchantFen >= zj.merchantQuoteFen + Math.floor(600 * 0.8676) - 1);
 });
 
-t('分账保证：任意订单 微信=0.6% 实付、平台=10% 净额、商家=其余且 ≥ 商品报价（+ 运费 89.46%），三方相加 = 实付', () => {
+t('分账保证：任意订单 微信=0.6% 实付、平台=10% 净额、商家=其余且 ≥ 商品报价（+ 运费 86.76%），三方相加 = 实付', () => {
   const cases = [
     { w: 10, h: 10, beads: 100, delivery: 'pickup' },
     { w: 10, h: 10, beads: 100, glitter: true, delivery: 'express', province: '浙江省' },
     { w: 40, h: 40, beads: 1599, delivery: 'express', province: '北京市' },
     { w: 52, h: 52, beads: 2704, glitter: true, delivery: 'express', province: '新疆维吾尔自治区' },
     { w: 104, h: 104, beads: 10816, glitter: true, delivery: 'express', province: '上海市' },
-    { w: 30, h: 30, beads: 8946, delivery: 'pickup' },                      // 89.46 ÷ 0.8946 = 100.000…，浮点边界
+    { w: 30, h: 30, beads: 8946, delivery: 'pickup' },                      // 边界金额，浮点边界
     { w: 30, h: 30, beads: 8946, delivery: 'express', province: '浙江省' },
   ];
   for (const c of cases) {
@@ -107,13 +116,13 @@ t('分账保证：任意订单 微信=0.6% 实付、平台=10% 净额、商家=�
     assert.ok(q.ok, JSON.stringify(c));
     const s = P.settle(q.totalFen), e = expectSettle(q.totalFen);
     assert.deepStrictEqual([s.wxFeeFen, s.platformFen, s.merchantFen], [e.wx, e.plat, e.merchant], JSON.stringify(c));
-    const floor = q.merchantQuoteFen + Math.floor(q.shippingFen * 0.8946) - 1;
+    const floor = q.merchantQuoteFen + Math.floor(q.shippingFen * 0.8676) - 1;
     assert.ok(s.merchantFen >= floor, JSON.stringify(c) + ' 商家到手 ' + s.merchantFen + ' < ' + floor);
     assert.ok(s.merchantFen - floor < 100, JSON.stringify(c) + ' 多给商家超过 1 元');
-    assert.strictEqual(s.wxFeeFen + s.platformFen + s.merchantFen, q.totalFen);
+    assert.strictEqual(s.wxFeeFen + s.taxFen + s.platformFen + s.merchantFen, q.totalFen);
     assert.strictEqual(q.totalFen % 10, 0, '用户价取整到角');
   }
-  assert.strictEqual(P.grossUp(8946), 10000); // 浮点边界：不能进位成 10010
+  assert.strictEqual(P.grossUp(8676), 10000); // 浮点边界：不能进位成 10010
   assert.strictEqual(P.grossUp(0), 0);
 });
 
@@ -122,7 +131,7 @@ t('不再收材料费、代烫费', () => {
   assert.strictEqual(base(q, 'material'), 0);
   assert.strictEqual(base(q, 'iron'), 0);
   assert.strictEqual(q.merchantQuoteFen, 900);
-  assert.strictEqual(q.totalFen, 1010); // 9 ÷ 0.8946 = 10.06 → 10.10
+  assert.strictEqual(q.totalFen, 1040); // 9 ÷ 0.8676 = 10.37 → 10.40
 });
 
 t('门槛：不足 100 颗 / 长边超 104 拒绝，边界值放行', () => {
@@ -178,19 +187,19 @@ t('快递分区：省内 / 江浙沪皖 / 其他 / 偏远 / 港澳台 / 未选�
   assert.strictEqual(none.needAddress, true);
   assert.strictEqual(none.shippingFen, 0);
   assert.strictEqual(none.totalFen, none.goodsFen);
-  assert.strictEqual(ship('浙江省').totalFen, 1050); // 代拼用户价 4.50（4 ÷ 0.8946 = 4.47 → 4.50）+ 运费 6.00
+  assert.strictEqual(ship('浙江省').totalFen, 1070); // 代拼用户价 4.70（4 ÷ 0.8676 = 4.61 → 4.70）+ 运费 6.00
   assert.strictEqual(P.quote({ w: 20, h: 20, beads: 400, delivery: 'pickup' }).shippingFen, 0);
 });
 
-t('分账公式：先扣通道手续费 0.6%，净额平台 10% / 商家 90%', () => {
+t('分账公式：先扣手续费和税费，余额平台 10% / 商家 90%', () => {
   const s = P.settle(10000);
-  assert.deepStrictEqual([s.wxFeeFen, s.netFen, s.platformFen, s.merchantFen], [60, 9940, 994, 8946]);
+  assert.deepStrictEqual([s.wxFeeFen, s.taxFen, s.netFen, s.platformFen, s.merchantFen], [60, 300, 9640, 964, 8676]);
   const z = P.settle(0);
   assert.deepStrictEqual([z.wxFeeFen, z.platformFen, z.merchantFen], [0, 0, 0]);
 });
 
 t('格式：分 → 元字符串，厘 → 单价', () => {
-  assert.strictEqual(P.yuan(1390), '13.90');
+  assert.strictEqual(P.yuan(1440), '14.40');
   assert.strictEqual(P.yuan(100), '1.00');
   assert.strictEqual(P.yuan(0), '0.00');
   assert.strictEqual(P.rateText(10), '0.01');
@@ -243,11 +252,11 @@ t('quoteCart 单张图 = quote()：各分区、自取、闪粉结果完全一致
 t('quoteCart 豆数不加总：3 张 900 颗各按 0.01 档（加总 2700 颗会跳到 0.015 档）', () => {
   const c = P.quoteCart(rep(B30, 3), { delivery: 'pickup' });
   assert.ok(c.ok);
-  assert.strictEqual(c.goodsFen, 3 * 1010);
+  assert.strictEqual(c.goodsFen, 3 * 1040);
   assert.strictEqual(c.merchantQuoteFen, 3 * 900);
   assert.ok(c.lines.every(l => l.rateTier.rate === 10));
   assert.strictEqual(c.shippingFen, 0);
-  assert.strictEqual(c.totalFen, 3030);
+  assert.strictEqual(c.totalFen, 3120);
 });
 
 t('quoteCart 小图合寄：首重内，运费和单张一样只收一次', () => {
@@ -256,7 +265,7 @@ t('quoteCart 小图合寄：首重内，运费和单张一样只收一次', () =
   assert.strictEqual(c.parcel.steps, 0);
   assert.strictEqual(c.shippingFen, 600);
   assert.strictEqual(c.shipping.desc, '浙江省内');
-  assert.strictEqual(c.totalFen, 3030 + 600);
+  assert.strictEqual(c.totalFen, 3120 + 600);
 });
 
 t('quoteCart 实重超首重：10 张 104 满板 → 大箱，实重 1232g > 体积重 768g，续 1 份', () => {
@@ -310,7 +319,7 @@ t('quoteCart 拦截：空单 / 超张数 / 某张不合格 / 港澳台 / 包裹�
   assert.strictEqual(c.totalFen, c.goodsFen);
 });
 
-t('quoteCart 分账保证：商家到手 ≥ 各张商品报价之和 + 运费 × 89.46%', () => {
+t('quoteCart 分账保证：商家到手 ≥ 各张商品报价之和 + 运费 × 86.76%', () => {
   const carts = [
     [[B30, B52, { ...B104, glitter: true }], { delivery: 'express', province: '新疆维吾尔自治区' }],
     [rep(B104, 10), { delivery: 'express', province: '北京市' }],
@@ -320,8 +329,8 @@ t('quoteCart 分账保证：商家到手 ≥ 各张商品报价之和 + 运费 �
     const c = P.quoteCart(list, o);
     assert.ok(c.ok, c.reason);
     const s = P.settle(c.totalFen);
-    assert.ok(s.merchantFen >= c.merchantQuoteFen + Math.floor(c.shippingFen * 0.8946) - 1);
-    assert.strictEqual(s.wxFeeFen + s.platformFen + s.merchantFen, c.totalFen);
+    assert.ok(s.merchantFen >= c.merchantQuoteFen + Math.floor(c.shippingFen * 0.8676) - 1);
+    assert.strictEqual(s.wxFeeFen + s.taxFen + s.platformFen + s.merchantFen, c.totalFen);
     assert.strictEqual(c.totalFen % 10, 0);
   }
 });
@@ -345,3 +354,7 @@ t('包裹参数覆盖：合法项生效（箱型按体积排序、长短边归�
 });
 
 console.log('\n全部通过：' + n + ' 组');
+
+
+
+

@@ -6,9 +6,9 @@
 //   · 商家报价（DEFAULTS 里的数字）= 商家到手的钱，来自商家价目（docs/order-api.md 收录原表）。原表是三种
 //     独立服务：材料包（只买豆子）、代烫（自己拼好寄去烫）、代拼（备豆+拼+烫寄成品）；小程序只卖代拼，
 //     代拼价已含豆子和熨烫，不另收材料包与代烫费。
-//   · 分账铁律（用户 2026-09-17 最终拍板）：**微信先从实付里扣 0.6% 手续费，剩下的商家 90%、平台 10%**，
-//     含运费、没有例外。即商家得实付的 0.994 × 90% = 89.46%，平台得 9.94%。
-//   · 用户价 = 商家报价 ÷ 0.8946，向上取整到角（0.1 元）——这样分账后商家到手 ≥ 报价（取整零头归商家）。
+//   · 分账铁律（用户 2026-09-17 最终拍板）：**先从实付里扣 0.6% 手续费和 3% 税费，剩下的商家 90%、平台 10%**，
+//     含运费、没有例外。即商家得实付的 0.964 × 90% = 86.76%，平台得 9.64%。
+//   · 用户价 = 商家报价 ÷ 0.8676，向上取整到角（0.1 元）——这样分账后商家到手 ≥ 报价（取整零头归商家）。
 //     代拼费 / 格利特 各自加价，不单列「平台服务费」。
 //   · 运费：shipping 表里的数字**就是客户付的运费**（整数，不再另外加价，用户要求运费显示不能贵），
 //     分账时和商品一起按上面比例切——商家报运费价时自己把这 10% 算进去（想净收 6 报 7）。代拼费不随配送方式变。
@@ -75,8 +75,9 @@ const DEFAULTS = {
 };
 
 const WX_FEE_RATE = 0.006;   // 微信支付手续费默认值（0.6%，按实付总额、入账时微信先扣；商户号费率不同时用 pricing.feeRate 覆盖）
-const PLATFORM_RATE = 0.10;  // 平台份额（按扣除手续费后的净额）
-const MERCHANT_SHARE = (1 - WX_FEE_RATE) * (1 - PLATFORM_RATE); // 0.8946：默认费率下商家分得的实付比例
+const TAX_RATE = 0.03;       // 税费按用户实付总额计提，先于双方分配扣除
+const PLATFORM_RATE = 0.10;  // 平台份额（按扣除手续费、税费后的余额）
+const MERCHANT_SHARE = (1 - WX_FEE_RATE - TAX_RATE) * (1 - PLATFORM_RATE); // 0.8676
 const ROUND_FEN = 10;        // 用户价取整粒度：10 分 = 1 角（代拼费 / 格利特）
 
 let CFG = clone(DEFAULTS);
@@ -84,7 +85,7 @@ let FEE_RATE = WX_FEE_RATE;  // 当前生效的通道费率
 
 // 当前生效的比例 { feeRate, platformRate, merchantShare }
 function rates() {
-  return { feeRate: FEE_RATE, platformRate: PLATFORM_RATE, merchantShare: (1 - FEE_RATE) * (1 - PLATFORM_RATE) };
+  return { feeRate: FEE_RATE, taxRate: TAX_RATE, platformRate: PLATFORM_RATE, merchantShare: (1 - FEE_RATE - TAX_RATE) * (1 - PLATFORM_RATE) };
 }
 
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
@@ -151,10 +152,13 @@ function yuan(fen) { return ((fen | 0) / 100).toFixed(2); }
 // 每颗单价格式：厘 → '0.01' / '0.015'
 function rateText(rate) { return String(rate / 1000); }
 
-// 商家报价（分）→ 用户价（分）：÷ 0.8946 后向上取整到角。减 1e-7 抵消浮点误差（0.8946 的整倍数除回去可能多出 1e-13）
+// 商家报价（分）→ 用户价（分）：÷ 0.8676 后向上取整到角。减 1e-7 抵消浮点误差（0.8676 的整倍数除回去可能多出 1e-13）
 function grossUp(fen) {
   if (!(fen > 0)) return 0;
-  return Math.ceil(fen / rates().merchantShare / ROUND_FEN - 1e-7) * ROUND_FEN;
+  let price = Math.ceil(fen / rates().merchantShare / ROUND_FEN - 1e-7) * ROUND_FEN;
+  // 手续费、税费和平台份额各自按分取整，比例倒推可能少给商家 1 分。
+  while (settle(price).merchantFen < fen) price += ROUND_FEN;
+  return price;
 }
 
 // 工费档（按豆数）：「满板豆数 ≤ 实际豆数」的最大档——达到哪档按哪档的单价
@@ -280,7 +284,7 @@ function quote(o) {
   }
   res.colorOver = g.colorOver;
   res.totalFen = res.goodsFen + res.shippingFen;
-  // 商品部分（代拼费 + 格利特）的商家报价合计：分账后商家到手保证 ≥ 它 + 运费 × 89.46%
+  // 商品部分（代拼费 + 格利特）的商家报价合计：分账后商家到手保证 ≥ 它 + 运费 × 86.76%
   res.merchantQuoteFen = g.merchantQuoteFen;
   return res;
 }
@@ -346,16 +350,18 @@ function quoteCart(list, o) {
 }
 
 // 分账：实付总额 → 通道手续费（字段名沿用 wxFeeFen）/ 平台 / 商家（分）。含运费、没有例外：
-//   手续费 = round(实付 × feeRate)；净额 = 实付 − 手续费；平台 = round(净额 × 10%)；商家 = 净额 − 平台（默认费率下 ≈ 实付的 89.46%，取整零头归商家）
+//   手续费 = round(实付 × feeRate)；税费 = round(实付 × 3%)；余额 = 实付 − 手续费 − 税费；平台 = round(净额 × 10%)；商家 = 净额 − 平台（默认费率下 ≈ 实付的 86.76%，取整零头归商家）
 function settle(totalFen) {
   const total = totalFen | 0;
   const wxFeeFen = Math.round(total * FEE_RATE);
-  const netFen = total - wxFeeFen;
+  const taxFen = Math.round(total * TAX_RATE);
+  const netFen = total - wxFeeFen - taxFen;
   const platformFen = Math.round(netFen * PLATFORM_RATE);
-  return { totalFen: total, wxFeeFen, netFen, platformFen, merchantFen: netFen - platformFen };
+  return { totalFen: total, wxFeeFen, taxFen, netFen, platformFen, merchantFen: netFen - platformFen };
 }
 
 module.exports = {
-  DEFAULTS, WX_FEE_RATE, PLATFORM_RATE, MERCHANT_SHARE,
+  DEFAULTS, WX_FEE_RATE, TAX_RATE, PLATFORM_RATE, MERCHANT_SHARE,
   configure, current, rates, quote, quoteCart, parcelOf, settle, grossUp, zoneOf, rateTier, boardTier, yuan, rateText,
 };
+
