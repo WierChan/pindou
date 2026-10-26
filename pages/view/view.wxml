@@ -56,13 +56,10 @@
 <view wx:if="{{codeShow}}" class="overlay hi" bindtap="closeCode">
   <view class="modal" catchtap="noop">
     <view class="modal-title"><image class="pxi-l" src="/assets/icons/key.png" />图纸导入码</view>
-    <view class="code-big">{{codeText}}</view>
+    <text class="code-big" selectable="true">{{codeText}}</text>
     <view class="modal-sub">
-      <view>复制口令发给好友</view>
-      <view>好友在「新作品 → 输入导入码」中输入或长按粘贴</view>
-    </view>
-    <view class="modal-btns">
-      <view class="btn-primary" hover-class="pressed" bindtap="copyCode">复制口令</view>
+      <view>长按上方口令选中复制，发给好友</view>
+      <view>好友在「新作品 → 输入导入码」中输入口令</view>
     </view>
     <view class="btn-link" hover-class="pressed" bindtap="closeCode">关闭</view>
   </view>

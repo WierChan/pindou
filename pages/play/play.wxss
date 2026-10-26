@@ -2,11 +2,6 @@
 /* 工具提示挪到单独一行（给「一键拼豆」腾位）：全宽显示，不再被挤成省略号 */
 .tools-hint.row2 { padding: 0 6px 8px; }
 
-.export-review-mask { position: fixed; inset: 0; z-index: 300; background: rgba(30,20,15,.42); display: flex; align-items: center; justify-content: center; }
-.export-review-card { width: 76%; box-sizing: border-box; padding: 20px; background: var(--card); border: 3px solid var(--ink); text-align: center; box-shadow: 4px 4px 0 var(--ink); }
-.export-review-title { font-size: 17px; font-weight: 800; color: var(--ink); }
-.export-review-desc { margin: 12px 0 18px; font-size: 13px; color: var(--ink2); }
-.export-review-cancel { padding: 10px; border: 2px solid var(--ink); background: #fff; font-size: 14px; font-weight: 700; color: var(--ink); }
 
 /* 换色取色器（底部弹层 + 全色板网格） */
 .swap-mask { position: fixed; left: 0; right: 0; top: 0; bottom: 0; background: rgba(30,20,15,.42); z-index: 200; display: flex; align-items: flex-end; }
@@ -30,6 +25,7 @@
 .rz-slider { flex: 1; margin: 0; }
 .rz-input { flex-shrink: 0; width: 50px; min-height: 30px; text-align: center; font-size: 14px; font-weight: 800; color: var(--accent-dark); border: 2px solid var(--ink); border-radius: 7px; padding: 3px 0; background: #fff; box-sizing: border-box; }
 .rz-warn { text-align: center; font-size: 12px; color: #C9838F; margin: 8px 0 12px; }
+.relay-code { display: block; margin: 12px 0; padding: 14px 10px; background: #FFF7F0; border: 3px dashed var(--accent-dark); color: var(--ink); font-size: 26px; font-weight: 900; letter-spacing: 3px; text-align: center; }
 .rz-btns { display: flex; gap: 12px; }
 .rz-cancel, .rz-apply { flex: 1; text-align: center; padding: 12px; font-size: 15px; font-weight: 800; border: 2px solid var(--ink); box-sizing: border-box; }
 .rz-cancel { background: var(--card); color: var(--ink); }

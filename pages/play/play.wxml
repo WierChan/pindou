@@ -131,10 +131,11 @@
 
 <guide gid="{{guideId}}" steps="{{guideSteps}}" bind:done="onGuideDone" />
 
-<view wx:if="{{exportReviewWaiting}}" class="export-review-mask">
-  <view class="export-review-card">
-    <view class="export-review-title">图片审核中</view>
-    <view class="export-review-desc">审核通过后会自动打开保存或分享菜单</view>
-    <view class="export-review-cancel" bindtap="cancelExportReview">取消等待</view>
+<view wx:if="{{relayCodeShow}}" class="overlay hi" bindtap="closeRelayCode">
+  <view class="modal" catchtap="noop">
+    <view class="modal-title">接力导入码</view>
+    <text class="relay-code" selectable="true">{{relayCodeText}}</text>
+    <view class="modal-sub">长按口令选中复制并发给好友；好友在「新作品 → 输入导入码」中输入，即可接着拼。</view>
+    <view class="btn-link" bindtap="closeRelayCode">关闭</view>
   </view>
 </view>

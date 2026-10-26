@@ -93,7 +93,7 @@ Page({
     this.setData({ detail: vm, traces: [], traceAll: false });
     this._loadTrack(vm);
   },
-  // 物流轨迹：只有快递单、且后端返回了 logistics（接了快递查询）才拉；失败就不显示轨迹，单号照常可复制
+  // 物流轨迹：只有快递单、且后端返回了 logistics（接了快递查询）才拉；失败就不显示轨迹，单号仍可查看
   _loadTrack(vm) {
     if (!vm || !vm.logi) return;
     const id = vm.id;
@@ -107,11 +107,6 @@ Page({
   },
   toggleTraces() { this.setData({ traceAll: !this.data.traceAll }); },
   closeDetail() { this.setData({ detail: null, traces: [] }); },
-
-  copyText(e) {
-    const t = e.currentTarget.dataset.t;
-    if (t) wx.setClipboardData({ data: String(t), success: () => ui.toast('已复制') });
-  },
 
   /* ---------- 操作 ---------- */
   payAgain(e) {

@@ -61,7 +61,8 @@ Page({
     celebrating: false,
     modal: { show: false, img: '', imgW: 0, imgH: 0 },
     guideSteps: [],
-    exportReviewWaiting: false,
+    relayCodeShow: false,
+    relayCodeText: '',
     // 换色：把选中的颜色整幅换成另一个（已拼的豆也跟着变，不丢进度）
     swapShow: false,
     swapChips: [],
@@ -214,7 +215,6 @@ Page({
 
   onUnload() {
     this._gone = true;
-    if (this._exportReview && this._exportReview.cancel) this._exportReview.cancel();
     clearTimeout(this.flushTimer);
     clearTimeout(this._rzTimer);
     clearTimeout(this._thumbTimer);
@@ -280,19 +280,10 @@ Page({
       this.uq(() => ui.captureCanvas(this, this.utilCanvas, () => buildChartExportTo(this.utilCanvas, work)))
         .then(path => {
           wx.hideLoading();
-          const review = {
-            onPending: () => this.setData({ exportReviewWaiting: true }),
-            onFinish: () => { this.setData({ exportReviewWaiting: false }); this._exportReview = null; },
-          };
-          this._exportReview = review;
-          ui.shareImage(path, review);
+          ui.shareGeneratedImage(path);
         })
         .catch(() => { wx.hideLoading(); ui.toast('导出失败，再试一次'); });
     });
-  },
-
-  cancelExportReview() {
-    if (this._exportReview && this._exportReview.cancel) this._exportReview.cancel();
   },
 
   // 右下「分享」：导出图纸让好友拼同款，或邀请好友从当前进度接着拼
@@ -307,7 +298,7 @@ Page({
     });
   },
 
-  // 接力分享：把当前图纸和进度上传成口令，好友在新作品页输入或粘贴口令接着拼。
+  // 接力分享：把当前图纸和进度上传成口令，好友在新作品页输入口令接着拼。
   relayShare() {
     const work = this.work;
     if (!work) return;
@@ -324,10 +315,7 @@ Page({
         createCode(work, { placed: work.placed }).then(code => {
           wx.hideLoading();
           if (!code) { ui.toast('生成失败，稍后再试'); return; }
-          wx.setClipboardData({
-            data: '我在拼豆便利店拼「' + work.name + '」拼到 ' + pct + '% 啦！打开「拼豆便利店」小程序，在「新作品 → 输入导入码」中输入或长按粘贴 ' + format(code) + '，接着帮我拼～',
-            success: () => ui.toast('接力口令已复制，发给好友吧 ✨'),
-          });
+          this.setData({ relayCodeShow: true, relayCodeText: format(code) });
         }).catch(err => {
           wx.hideLoading();
           ui.toast((err && err.message) || '生成失败，稍后再试');
@@ -335,6 +323,7 @@ Page({
       },
     });
   },
+  closeRelayCode() { this.setData({ relayCodeShow: false }); },
 
   /* ---------- 顶栏 ---------- */
   goBack() {

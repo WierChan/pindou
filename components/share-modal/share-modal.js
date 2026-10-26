@@ -43,7 +43,7 @@ Component({
     // 老基础库不支持时退回保存到相册
     sendImage() {
       if (!this.path) return;
-      ui.shareImage(this.path);
+      ui.shareGeneratedImage(this.path);
     },
     // 保存纯网格图纸到相册（无品牌装饰、平色格 —— 往返闭环的载体）。
     // 流量主接入后（rvChart 位下发）先看一段激励视频；未接入/失败直接放行，
@@ -57,7 +57,7 @@ Component({
       }).then(ok => { if (ok) this._doSaveChart(id); });
     },
     _doSaveChart(id) {
-      if (this._chartFor === id && this._chartPath) { ui.saveToAlbum(this._chartPath); return; }
+      if (this._chartFor === id && this._chartPath) { ui.saveChart(this._chartPath); return; }
       const work = store.get(id);
       if (!work) return;
       ui.queryNode(this, '#card').then(r => {
@@ -66,7 +66,7 @@ Component({
         this.uq(() => ui.captureCanvas(this, r.node, draw, '#card')).then(path => {
           this._chartFor = id;
           this._chartPath = path;
-          ui.saveToAlbum(path);
+          ui.saveChart(path);
         }).catch(() => ui.toast('图纸生成失败'));
       });
     },

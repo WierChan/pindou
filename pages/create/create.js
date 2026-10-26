@@ -146,7 +146,7 @@ Page({
           onPath: saved.mode === 'chart' ? path => this._openReviewedChart(path) : path => this._openCrop(path, 'image', {}) };
       }
     }
-    if (this._pendingImage && !this._reviewDialogOpen) {
+    if (this._pendingImage) {
       this._showReviewLoading();
       setTimeout(() => this._pollImageReview(), 500);
     }
@@ -266,6 +266,7 @@ Page({
       if (result.status === 'pass') { onPath(path); return; }
       if (!result.reviewId) throw { message: '图片审核未能提交' };
       this._pendingImage = { path, reviewId: result.reviewId, onPath };
+      this._reviewPollCount = 0;
       // 临时图片持久化，用户离开页面后也能在下次进入时继续。
       wx.saveFile({ tempFilePath: path, success: saved => {
         if (!this._pendingImage || this._pendingImage.reviewId !== result.reviewId) return;
@@ -273,16 +274,8 @@ Page({
         try { wx.setStorageSync(PENDING_IMAGE, { path: saved.savedFilePath, reviewId: result.reviewId, mode }); }
         catch (e) { /* 本次仍可轮询 */ }
       } });
-      this._reviewDialogOpen = true;
-      wx.showModal({ title: '图片审核中', content: '图片已提交安全审核，审核通过后会自动打开裁剪，请稍候。',
-        showCancel: false,
-        complete: () => {
-          this._reviewDialogOpen = false;
-          if (!this._pendingImage || !this._visible) return;
-          this._showReviewLoading();
-          this._pollImageReview();
-        },
-      });
+      this._showReviewLoading();
+      this._pollImageReview();
     }).catch(err => { wx.hideLoading(); ui.toast((err && err.message) || '图片审核失败，请重试'); });
   },
 
@@ -296,6 +289,7 @@ Page({
     clearTimeout(this._reviewTimer);
     this._pendingImage = null;
     this._reviewPolling = null;
+    this._reviewPollCount = 0;
     try { wx.removeStorageSync(PENDING_IMAGE); } catch (e) { /* 忽略 */ }
     this._hideReviewLoading();
   },
@@ -314,7 +308,13 @@ Page({
       if (this._reviewPolling === pending.reviewId) this._reviewPolling = null;
       if (!this._pendingImage || this._pendingImage.reviewId !== pending.reviewId) return;
       if (!this._visible) return; // 返回新作品页时再接续，避免在后台打开裁剪弹窗
-      if (r.status === 'pending') { this._reviewTimer = setTimeout(() => this._pollImageReview(), 10000); return; }
+      if (r.status === 'pending') {
+        // 前 30 秒每 2 秒查询，之后每 5 秒查询，减少通过后的空等。
+        this._reviewPollCount = (this._reviewPollCount || 0) + 1;
+        const delay = this._reviewPollCount <= 15 ? 2000 : 5000;
+        this._reviewTimer = setTimeout(() => this._pollImageReview(), delay);
+        return;
+      }
       this._pendingImage = null;
       try { wx.removeStorageSync(PENDING_IMAGE); } catch (e) { /* 忽略 */ }
       this._hideReviewLoading();

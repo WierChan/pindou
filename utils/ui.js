@@ -162,6 +162,13 @@ function shareImage(path, opts) {
   });
 }
 
+// 本地画布生成的图纸和分享卡片直接交给系统分享菜单。
+function shareGeneratedImage(path) {
+  if (!path) return false;
+  openShareImage(path);
+  return true;
+}
+
 const approvedImages = Object.create(null);
 function moderateImage(path, opts) {
   if (approvedImages[path]) return Promise.resolve(true);
@@ -218,7 +225,7 @@ function openShareImage(path) {
     fail: err => {
       const msg = (err && err.errMsg) || '';
       if (msg.indexOf('cancel') >= 0) return; // 用户取消不提示
-      saveToAlbumApproved(path);               // 已通过审核，调起失败则保存相册
+      saveToAlbumApproved(path);               // 调起失败则保存相册
     },
   });
 }
@@ -230,6 +237,10 @@ function saveToAlbum(path) {
     wx.hideLoading();
     return saveToAlbumApproved(path);
   }).catch(err => { wx.hideLoading(); toast((err && err.message) || '图片审核失败'); return false; });
+}
+
+function saveChart(path) {
+  return path ? saveToAlbumApproved(path) : Promise.resolve(false);
 }
 
 function saveToAlbumApproved(path) {
@@ -282,6 +293,6 @@ function serialQueue() {
 
 module.exports = {
   clamp, winInfo, navInsets, toast, backHome,
-  queryNode, canvasToTemp, captureCanvas, persistFile, makeThumb, THUMB_V, saveToAlbum, shareImage,
+  queryNode, canvasToTemp, captureCanvas, persistFile, makeThumb, THUMB_V, saveToAlbum, shareImage, saveChart, shareGeneratedImage,
   serialQueue, syncBoardRect,
 };

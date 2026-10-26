@@ -211,12 +211,6 @@ Page({
       },
     });
   },
-  copyCode() {
-    wx.setClipboardData({
-      data: '我在拼豆便利店分享了一张图纸！打开「拼豆便利店」小程序，在「新作品 → 输入导入码」中输入或长按粘贴 ' + this.data.codeText + '，一起拼同款～',
-      success: () => ui.toast('口令已复制，去粘贴给好友吧 ✨'),
-    });
-  },
   closeCode() { this.setData({ codeShow: false }); },
   noop() {},
 

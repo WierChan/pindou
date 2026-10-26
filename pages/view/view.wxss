@@ -12,6 +12,7 @@
 
 /* 导入码弹窗 */
 .code-big {
+  display: block;
   margin: 6px 0 2px;
   padding: 14px 10px;
   background: #FFF7F0;
