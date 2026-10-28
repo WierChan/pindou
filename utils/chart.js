@@ -16,7 +16,7 @@
 // 外的才判空）；紧贴网格的裁剪图四边落在不同色豆子上，pageBg 判定
 // 无统一页面底色返回 null，整图按内容处理
 //
-// 已知边界：拍照/透视图纸不支持（需要规整截图）；白底图纸上纯白豆与空格无法区分
+// 已知边界：拍照/透视图纸不支持（需要规整截图）；白底图纸上没有色号的纯白豆与空格无法区分
 const { rgb2oklab } = require('./convert');
 
 const MIN_PITCH = 5.5;   // 每格最少像素：再小取色就不可靠了，让用户换清晰截图
@@ -44,6 +44,7 @@ function scanImage(data, iw, ih, bg) {
   const n = iw * ih;
   const mask = new Uint8Array(n);
   const whiteRows = new Float64Array(ih);
+  let checkerPixels = 0;
   const T = 20;      // 非背景判定容差
   const TW = 14;     // 近白判定容差（白底区定位用）
   const hasBg = !!bg;
@@ -52,6 +53,8 @@ function scanImage(data, iw, ih, bg) {
     let wc = 0, i = y * iw, o = i * 4;
     for (let x = 0; x < iw; x++, i++, o += 4) {
       const r = data[o], g = data[o + 1], b = data[o + 2];
+      const lo = Math.min(r, g, b), hi = Math.max(r, g, b);
+      if (lo >= 225 && hi <= 245 && hi - lo <= 8) checkerPixels++;
       const wr = 255 - r, wg = 255 - g, wb = 255 - b;
       if (wr <= TW && wg <= TW && wb <= TW) wc++;
       let dw = wr;                    // 与白的最大通道差
@@ -68,7 +71,7 @@ function scanImage(data, iw, ih, bg) {
     }
     whiteRows[y] = wc;
   }
-  return { mask, whiteRows };
+  return { mask, whiteRows, checkerBg: checkerPixels > n * 0.1 };
 }
 
 // 直方图里最佳的一段连续高值带；小缺口（bridge 像素内）当作连续。
@@ -446,6 +449,65 @@ function pageBg(data, iw, ih) {
   return all;
 }
 
+// 浅灰棋盘底图：橙色 5 格参考线横贯整张网格，可据此排除四边坐标栏和底部图例。
+function warmGridBounds(data, iw, ih, pitch) {
+  const warm = (x, y) => {
+    const o = (y * iw + x) * 4;
+    return data[o] > 180 && data[o] - data[o + 1] > 30 && data[o + 1] - data[o + 2] > 20;
+  };
+  let x0 = iw, x1 = -1, y0 = ih, y1 = -1;
+  const nx = Math.ceil(iw / 5), ny = Math.ceil(ih / 5);
+  for (let y = 0; y < ih; y++) {
+    let n = 0;
+    for (let x = 0; x < iw; x += 5) if (warm(x, y)) n++;
+    if (n > nx * 0.55) { if (y < y0) y0 = y; y1 = y; }
+  }
+  for (let x = 0; x < iw; x++) {
+    let n = 0;
+    for (let y = 0; y < ih; y += 5) if (warm(x, y)) n++;
+    if (n > ny * 0.5) { if (x < x0) x0 = x; x1 = x; }
+  }
+  if (x1 - x0 < pitch * 8 || y1 - y0 < pitch * 8) return null;
+  return { x0, y0, x1: x1 + pitch, y1: y1 + pitch };
+}
+
+// 灰色坐标栏包住的图纸：四边浅灰栏不是豆色，水印跨过它们时容易带出杂色。
+function grayAxisBounds(data, iw, ih) {
+  const gray = (x, y) => {
+    const o = (y * iw + x) * 4;
+    const lo = Math.min(data[o], data[o + 1], data[o + 2]);
+    const hi = Math.max(data[o], data[o + 1], data[o + 2]);
+    return lo >= 195 && hi <= 230 && hi - lo < 12;
+  };
+  const topRows = [], bottomRows = [], leftCols = [], rightCols = [];
+  const rowN = Math.ceil(iw / 8), colN = Math.ceil(ih / 8);
+  for (let y = 0; y < ih; y++) {
+    if (y > ih * 0.16 && y < ih * 0.8) continue;
+    let n = 0;
+    for (let x = 0; x < iw; x += 8) if (gray(x, y)) n++;
+    if (n > rowN * 0.5) (y < ih * 0.16 ? topRows : bottomRows).push(y);
+  }
+  for (let x = 0; x < iw; x++) {
+    if (x > iw * 0.06 && x < iw * 0.94) continue;
+    let n = 0;
+    for (let y = 0; y < ih; y += 8) if (gray(x, y)) n++;
+    if (n > colN * 0.5) (x < iw * 0.06 ? leftCols : rightCols).push(x);
+  }
+  const longest = a => {
+    let best = null, start = 0;
+    for (let i = 0; i <= a.length; i++) if (i === a.length || (i > 0 && a[i] !== a[i - 1] + 1)) {
+      if (i > start && (!best || i - start > best.n)) best = { lo: a[start], hi: a[i - 1], n: i - start };
+      start = i;
+    }
+    return best && best.n >= 4 ? best : null;
+  };
+  const top = longest(topRows), bottom = longest(bottomRows);
+  const left = longest(leftCols), right = longest(rightCols);
+  if (!top || !bottom || !left || !right) return null;
+  const bounds = { x0: left.hi + 1, y0: top.hi + 1, x1: right.lo, y1: bottom.lo };
+  return bounds.x1 - bounds.x0 > iw * 0.7 && bounds.y1 - bounds.y0 > ih * 0.6 ? bounds : null;
+}
+
 /* 取色用的模块级缓冲与直方图 —— cellColor 每格调用一次（大图上万次），
    真机是无 JIT 的解释器，逐次分配数组 + 闭包 sort 是压倒性开销（实测占总耗时
    一半以上）。这里全部改成定长缓冲 + 值域直方图，零分配零闭包 */
@@ -501,6 +563,22 @@ function cellColor(data, iw, ih, cx, cy, pitch) {
   return [medOf(kR, k), medOf(kG, k), medOf(kB, k)];
 }
 
+// 白底图纸里的白豆与空格底色相同；有色号的白豆可凭格子中央的深色笔画识别。
+// 只看中央 60%，避开格线/描边；要求多颗深色像素，免得单点压缩噪声误判。
+function hasDarkLabel(data, iw, ih, cx, cy, pitch, inkMax) {
+  inkMax = inkMax || 190;
+  const half = pitch * 0.3;
+  const x0 = Math.max(0, Math.ceil(cx - half)), x1 = Math.min(iw - 1, Math.floor(cx + half));
+  const y0 = Math.max(0, Math.ceil(cy - half)), y1 = Math.min(ih - 1, Math.floor(cy + half));
+  let dark = 0;
+  const need = Math.max(2, Math.ceil((x1 - x0 + 1) * (y1 - y0 + 1) * 0.01));
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) {
+    const o = (y * iw + x) * 4;
+    if (data[o + 3] >= 200 && data[o] < inkMax && data[o + 1] < inkMax && data[o + 2] < inkMax && ++dark >= need) return true;
+  }
+  return false;
+}
+
 // 半格距相位锁定检测（内容终检）：沿轴取几条带的连续格中心色，看相邻对的
 // 同色率。若当前格距是真格距的一半，k=偶 与 k=偶+1 是同一颗豆的两半 ——
 // 偶起对几乎全同色、奇起对只有邻豆恰好同色时才同色，两者严重不对称；
@@ -546,14 +624,15 @@ function halfLocked(data, iw, ih, inner, pitch, offset, vertical) {
 // 阈值收紧到 0.016：C16/C20 这类相邻藏青色号也要分开，各自成板上一色
 const GROUP_D2 = 0.016 * 0.016;
 
-function groupColors(samples) {
+function groupColors(samples, threshold2) {
   // samples: [{rgb, lab}]，返回 groups + 每格所属 group
+  threshold2 = threshold2 || GROUP_D2;
   const groups = []; // {lab, sum:[r,g,b], count}
   const gi = new Int32Array(samples.length).fill(-1);
   for (let s = 0; s < samples.length; s++) {
     const it = samples[s];
     if (!it) continue;
-    let best = -1, bd = GROUP_D2, nearest = -1, nd = Infinity;
+    let best = -1, bd = threshold2, nearest = -1, nd = Infinity;
     for (let g = 0; g < groups.length; g++) {
       const d = lab2(it.lab, groups[g].lab);
       if (d < bd) { bd = d; best = g; }
@@ -589,7 +668,9 @@ function groupColors(samples) {
       if (remap[a] !== a) continue;
       for (let b = a + 1; b < groups.length; b++) {
         if (remap[b] !== b) continue;
-        if (lab2(groups[a].lab, groups[b].lab) >= GROUP_D2) continue;
+        const d = lab2(groups[a].lab, groups[b].lab);
+        const dark = g => g.sum[0] / g.count < 20 && g.sum[1] / g.count < 20 && g.sum[2] / g.count < 20;
+        if (d >= threshold2 && !(threshold2 > GROUP_D2 && d < 0.05 * 0.05 && dark(groups[a]) && dark(groups[b]))) continue;
         const big = groups[a].count >= groups[b].count ? a : b;
         const small = big === a ? b : a;
         const G = groups[big], S = groups[small];
@@ -634,6 +715,51 @@ function capGroups(groups, cap) {
   return remap.map((_, i) => resolve(i));
 }
 
+// 水印压在格子上会把同一豆色拆成大量低频灰/暗组。保留主要豆色与少量高饱和
+// 点缀色，低频脏色按邻格和颜色距离归回；孤立于图案外的灰色水印笔画留空。
+function denoiseWatermark(groups, gi, w, h) {
+  if (groups.length <= 20) return { groups, gi };
+  const mean = g => g.sum.map(v => v / g.count);
+  const dark = rgb => Math.max(...rgb) < 25;
+  const neutralGray = rgb => Math.max(...rgb) - Math.min(...rgb) < 18 &&
+    Math.min(...rgb) >= 65 && Math.max(...rgb) <= 235;
+  const order = groups.map((_, i) => i).sort((a, b) => groups[b].count - groups[a].count);
+  const base = [];
+  for (const i of order) {
+    const rgb = mean(groups[i]);
+    const redAccent = groups[i].count >= 2 && rgb[0] > 170 && rgb[0] > rgb[1] * 1.35 && rgb[0] > rgb[2] * 1.3;
+    if ((groups[i].count < 10 && !redAccent) || neutralGray(rgb)) continue;
+    if (dark(rgb) && base.some(j => dark(mean(groups[j])))) continue;
+    base.push(i);
+  }
+  if (base.length < 2) return { groups, gi };
+  const byGroup = groups.map(g => {
+    let best = base[0], bd = Infinity;
+    for (const b of base) {
+      const d = lab2(g.lab, groups[b].lab);
+      if (d < bd) { bd = d; best = b; }
+    }
+    return best;
+  });
+  const baseSet = new Set(base);
+  const out = Int32Array.from(gi);
+  for (let i = 0; i < out.length; i++) {
+    const g = gi[i];
+    if (g < 0) continue;
+    if (!baseSet.has(g) && neutralGray(mean(groups[g]))) {
+      const x = i % w, y = (i / w) | 0;
+      let empty = 0;
+      if (x === 0 || gi[i - 1] < 0) empty++;
+      if (x + 1 === w || gi[i + 1] < 0) empty++;
+      if (y === 0 || gi[i - w] < 0) empty++;
+      if (y + 1 === h || gi[i + w] < 0) empty++;
+      if (empty >= 3) { out[i] = -1; continue; }
+    }
+    out[i] = base.indexOf(byGroup[g]);
+  }
+  return { groups: base.map(i => groups[i]), gi: out };
+}
+
 const hex2 = v => (v < 16 ? '0' : '') + Math.round(v).toString(16).toUpperCase();
 const rgbToHex = (r, g, b) => '#' + hex2(r) + hex2(g) + hex2(b);
 
@@ -648,7 +774,7 @@ function analyzeChart(data, iw, ih, opts) {
 
   const bg = pageBg(data, iw, ih); // null = 没有统一页面底色（紧贴网格的裁剪图）
   // 亮度图 + 非背景掩码 + 近白行直方图（单遍全图）
-  const { mask, whiteRows } = scanImage(data, iw, ih, bg);
+  const { mask, whiteRows, checkerBg } = scanImage(data, iw, ih, bg);
   // 页面底色不是白（或没有底色）→ 先框出白底区（网格铺在白底上；图例/说明/
   // 页面装饰纹理都在非白底上，天然排除），再在白底区内取内容 bbox 作为主体。
   // 页面就是白的则直接全图取内容 bbox（图例靠留白与主体分带）
@@ -670,6 +796,16 @@ function analyzeChart(data, iw, ih, opts) {
   let px = detectPitch(gx, sx);
   let py = detectPitch(gy, sy);
   if (!px || !py) return { ok: false, reason: '识别不出网格', debug: { body } };
+  // 手动裁剪可能把四边坐标栏裁掉，两轴都会被每 5 格的橙色粗线锁到 5 倍格距。
+  // 棋盘空白版式若存在贯穿的橙线，且五分之一格距两轴都有稳定齿，则恢复细格。
+  if (checkerBg && Math.max(px.pitch, py.pitch) >= 80) {
+    const fine = Math.max(px.pitch, py.pitch) / 5;
+    const bounds = warmGridBounds(data, iw, ih, fine);
+    const fx = bounds && forcePitch(gx, sx, fine), fy = bounds && forcePitch(gy, sy, fine);
+    if (fx && fy && fx.conf >= 1.5 && fy.conf >= 1.5 && fx.fracWeak <= 0.35 && fy.fracWeak <= 0.35) {
+      px = fx; py = fy;
+    }
+  }
   // 半格距终检（内容裁决）：检测到相邻格成对同色的相位锁定就翻倍重精化
   const promote = (a, g, s, vertical) => {
     for (let t = 0; t < 2; t++) {
@@ -701,7 +837,11 @@ function analyzeChart(data, iw, ih, opts) {
   let ratio = px.pitch / py.pitch;
   if (ratio < 0.88 || ratio > 1.14) {
     // 两轴挑了不同谐波 → 十字救援：可信轴的格距按到另一轴上重试
-    const xGood = px.conf >= py.conf;
+    // 5 格参考线极强时，较大格距的置信度会虚高；若较小轴有连续格线支撑，
+    // 用较小轴反推另一轴，避免把 31×31 图纸错认成 6×6。
+    const smallerStrong = ratio > 3.5 ? py.conf >= 1.35 && py.fracLine >= 0.6
+      : ratio < 1 / 3.5 ? px.conf >= 1.35 && px.fracLine >= 0.6 : false;
+    const xGood = smallerStrong ? px.pitch < py.pitch : px.conf >= py.conf;
     const forced = forcePitch(xGood ? gy : gx, xGood ? sy : sx, (xGood ? px : py).pitch);
     if (forced && forced.fracWeak <= 0.4) {
       if (xGood) py = forced; else px = forced;
@@ -724,6 +864,9 @@ function analyzeChart(data, iw, ih, opts) {
   const lowConf = !(strong(px) && strong(py));
   const pitch = (px.pitch + py.pitch) / 2;
   if (pitch < MIN_PITCH) return { ok: false, reason: '格子太小，换更清晰的截图', debug: dbg() };
+  const checkerBounds = checkerBg ? warmGridBounds(data, iw, ih, pitch) : null;
+  const axisBounds = !checkerBounds ? grayAxisBounds(data, iw, ih) : null;
+  const gridBounds = checkerBounds || axisBounds;
 
   // 相位换算回整图坐标；主体（内容 bbox）连浅色豆一起框住了，
   // 只外推 2 格兜住边界取整误差 —— 再远就够到坐标数字/说明文字了
@@ -748,7 +891,7 @@ function analyzeChart(data, iw, ih, opts) {
       conf: Math.round(Math.min(px.conf, py.conf) * 100) / 100,
       grid: { px: px.pitch, py: py.pitch, offX, offY },
       // 网格区即主体：直接拿它当裁剪框初值（吸附到格线）
-      rectPx: {
+      rectPx: gridBounds || {
         x: offX + Math.round((body.x0 - offX) / pitch) * pitch,
         y: offY + Math.round((body.y0 - offY) / pitch) * pitch,
         w: Math.round((body.x1 - body.x0) / pitch) * pitch,
@@ -762,20 +905,67 @@ function analyzeChart(data, iw, ih, opts) {
   // 距离很近，拿页面底色判空会把大片近白豆误吞掉。
   // 满铺模式（页面非白且没有可信白底区）：网格没有白底，近白格是白色豆子
   // （H2 白豆），不能当空格 —— 留到下面的保护圈判空里处理
-  const whiteAsBead = bgNotWhite && !clipW;
+  const whiteAsBead = bgNotWhite && !clipW && !checkerBg;
   const whiteLab = rgb2oklab(255, 255, 255);
   const EMPTY_D2 = 0.034 * 0.034;
   const samples = new Array(w0 * h0).fill(null);
+  const whiteLabels = [];
   for (let ky = 0; ky < h0; ky++) {
     const cy = offY + (k0y + ky + 0.5) * pitch;
     if (cy < 1 || cy >= ih - 1) continue;
+    if (gridBounds && (cy < gridBounds.y0 || cy >= gridBounds.y1)) continue;
     for (let kx = 0; kx < w0; kx++) {
       const cx = offX + (k0x + kx + 0.5) * pitch;
       if (cx < 1 || cx >= iw - 1) continue;
+      if (gridBounds && (cx < gridBounds.x0 || cx >= gridBounds.x1)) continue;
       const rgb = cellColor(data, iw, ih, cx, cy, pitch);
       const lab = rgb2oklab(rgb[0], rgb[1], rgb[2]);
-      if (!whiteAsBead && lab2(lab, whiteLab) < EMPTY_D2) continue; // 空格
+      // 有些图纸用浅灰棋盘纹表示空格（而非纯白）；中性浅灰无色号也应留空。
+      const neutralBlank = checkerBg && Math.min(rgb[0], rgb[1], rgb[2]) >= 225 &&
+        Math.max(rgb[0], rgb[1], rgb[2]) - Math.min(rgb[0], rgb[1], rgb[2]) <= 12;
+      const axisBlank = checkerBg && rgb[0] >= 220 && rgb[1] >= 230 && rgb[2] >= 238 &&
+        rgb[2] - rgb[0] >= 8 && rgb[2] >= rgb[1]; // 浅蓝坐标栏
+      if (!whiteAsBead && (lab2(lab, whiteLab) < EMPTY_D2 || neutralBlank || axisBlank)) {
+        if (!axisBlank && hasDarkLabel(data, iw, ih, cx, cy, pitch, axisBounds || pitch < 20 ? 160 : 190)) whiteLabels.push([ky * w0 + kx, { rgb, lab }]);
+        continue;
+      }
       samples[ky * w0 + kx] = { rgb, lab };
+    }
+  }
+
+  // 白豆色号只在彩豆围出的图案范围内才可信；图案外的坐标数字同样会落在白格中央。
+  if (whiteLabels.length) {
+    let minX = w0, maxX = -1, minY = h0, maxY = -1;
+    for (let i = 0; i < samples.length; i++) if (samples[i]) {
+      const x = i % w0, y = (i / w0) | 0;
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+    }
+    const candidates = new Map();
+    for (const [i, s] of whiteLabels) {
+      const x = i % w0, y = (i / w0) | 0;
+      if (x >= minX && x <= maxX && y >= minY && y <= maxY) candidates.set(i, s);
+    }
+    const seen = new Set();
+    for (const i of candidates.keys()) {
+      if (seen.has(i)) continue;
+      const group = [i]; seen.add(i);
+      for (let k = 0; k < group.length; k++) {
+        const j = group[k], x = j % w0;
+        const adj = [j - w0, j + w0];
+        if (x > 0) adj.push(j - 1);
+        if (x + 1 < w0) adj.push(j + 1);
+        for (const n of adj) if (candidates.has(n) && !seen.has(n)) { seen.add(n); group.push(n); }
+      }
+      // 大片色号白豆直接保留。零散白豆若嵌在彩色轮廓中也保留；
+      // 坐标数字位于图案外缘，通常既不成片也没有两侧彩豆包围。
+      const enclosed = group.some(j => {
+        const x = j % w0, y = (j / w0) | 0;
+        if (x <= minX || x >= maxX || y <= minY || y >= maxY) return false;
+        return (samples[j - 1] ? 1 : 0) + (samples[j + 1] ? 1 : 0) +
+          (samples[j - w0] ? 1 : 0) + (samples[j + w0] ? 1 : 0) >= 2;
+      });
+      if (group.length >= 3 || enclosed) for (const j of group) samples[j] = candidates.get(j);
     }
   }
 
@@ -874,7 +1064,14 @@ function analyzeChart(data, iw, ih, opts) {
   }
 
   // 聚色 → 作品自带色板（图纸真实颜色，按用量从大到小排）→ cells
-  const { groups, gi } = groupColors(kept);
+  // 棋盘底 JPEG 图的黑色豆受压缩后会裂成多个近黑组；只在该版式适当放宽聚色。
+  let { groups, gi } = groupColors(kept, checkerBounds ? 0.035 * 0.035 : GROUP_D2);
+  const groupTotal = groups.reduce((n, g) => n + g.count, 0);
+  const darkGroups = groups.filter(g => g.sum.every(v => v / g.count < 25)).length;
+  if (axisBounds || (groups.length > 20 && darkGroups >= 4 && groups.slice().sort((a, b) => b.count - a.count)
+    .slice(0, 5).reduce((n, g) => n + g.count, 0) > groupTotal * 0.85)) {
+    ({ groups, gi } = denoiseWatermark(groups, gi, w, h));
+  }
   if (!groups.length) return { ok: false, reason: '图纸是空的' };
   // 低置信验收：真图纸的豆子高度集中在前几十个颜色组里（压缩噪声能把 24 色
   // 打碎成 300+ 组，但碎组都是零星几格，top-48 仍占 9 成以上）；照片/织物纹理

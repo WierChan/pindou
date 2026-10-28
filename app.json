@@ -20,6 +20,7 @@
     "navigationBarTextStyle": "black"
   },
   "resizable": true,
+  "requiredPrivateInfos": ["chooseAddress"],
   "usingComponents": {
     "share-modal": "/components/share-modal/share-modal",
     "guide": "/components/guide/guide"

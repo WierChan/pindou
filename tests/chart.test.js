@@ -214,6 +214,26 @@ const rnd0 = mulberry32(42);
   run('O4 满铺2568→2048', resize(hiF, 2048 / hiF.w), truth, cols, rows, false, FB_COLORS);
 }
 
+// P. 白底图纸内带色号的纯白豆：不能和无字白底一起判空。
+{
+  const { makeRealChart, REAL_COLORS } = require('./chart-real.js');
+  const cols = 50, rows = 30, colors = REAL_COLORS.concat([[254, 254, 254]]);
+  const truth = new Int16Array(cols * rows).fill(-1);
+  for (let y = 3; y < 27; y++) for (let x = 4; x < 46; x++) {
+    truth[y * cols + x] = x === 4 || x === 45 || y === 3 || y === 26 ? 18 : 24;
+  }
+  // 被黑色细节隔开的单颗白豆，不能因白豆连通块不足三格而漏掉。
+  for (const [x, y] of [[19, 12], [21, 12], [20, 11], [20, 13]]) truth[y * cols + x] = 18;
+  const pitch = 28.32;
+  const im = makeRealChart(truth, cols, rows, { seed: 51, pitch, colors, cellLabels: true });
+  const { fill } = require('./chart-synth.js');
+  const scale = pitch / 14.16 * cols / 78, gx = 90.5 * scale, gy = 168 * scale;
+  for (let y = 4; y < 26; y++) for (let x = 5; x < 45; x++) {
+    if (truth[y * cols + x] === 24) fill(im, gx + (x + 0.33) * pitch, gy + (y + 0.33) * pitch, 10, 10, [80, 80, 80]);
+  }
+  run('P 白底内有色号白豆', im, truth, cols, rows, false, colors);
+}
+
 // M. 往返闭环：buildChartExportTo（图纸样式导出）的像素镜像 → analyzeChart 全量还原。
 // 版式镜像在 tests/export-synth.js（米黄页 + 白卡片 + 逐格色号 + 坐标数字 + 图例），
 // 与 utils/share.js 的版式常量保持逐项一致；share.js 改版式必须同步镜像

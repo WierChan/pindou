@@ -10,6 +10,7 @@ const ads = require('../../utils/ads');
 const { buildGuide, guideSeen, markGuideSeen } = require('../../utils/guidance');
 const { normalize, extractCode, format, fetchByCode, reportFlow } = require('../../utils/importcode');
 const api = require('../../utils/api');
+const imageReviewCache = require('../../utils/image-review-cache');
 
 const PENDING_IMAGE = 'pindou.pendingImageReview';
 
@@ -142,7 +143,7 @@ Page({
       let saved;
       try { saved = wx.getStorageSync(PENDING_IMAGE); } catch (e) { /* 忽略 */ }
       if (saved && saved.path && saved.reviewId) {
-        this._pendingImage = { path: saved.path, reviewId: saved.reviewId,
+        this._pendingImage = { path: saved.path, reviewId: saved.reviewId, fileKey: saved.fileKey || '',
           onPath: saved.mode === 'chart' ? path => this._openReviewedChart(path) : path => this._openCrop(path, 'image', {}) };
       }
     }
@@ -260,22 +261,25 @@ Page({
   },
 
   _reviewPickedImage(path, onPath, mode) {
-    wx.showLoading({ title: '提交图片审核', mask: true });
-    api.upload('/api/content/images', path).then(result => {
-      wx.hideLoading();
-      if (result.status === 'pass') { onPath(path); return; }
-      if (!result.reviewId) throw { message: '图片审核未能提交' };
-      this._pendingImage = { path, reviewId: result.reviewId, onPath };
-      this._reviewPollCount = 0;
-      // 临时图片持久化，用户离开页面后也能在下次进入时继续。
-      wx.saveFile({ tempFilePath: path, success: saved => {
-        if (!this._pendingImage || this._pendingImage.reviewId !== result.reviewId) return;
-        this._pendingImage.path = saved.savedFilePath;
-        try { wx.setStorageSync(PENDING_IMAGE, { path: saved.savedFilePath, reviewId: result.reviewId, mode }); }
-        catch (e) { /* 本次仍可轮询 */ }
-      } });
-      this._showReviewLoading();
-      this._pollImageReview();
+    wx.showLoading({ title: '核对图片', mask: true });
+    imageReviewCache.fileKey(path).then(fileKey => {
+      if (imageReviewCache.approved(fileKey)) { wx.hideLoading(); onPath(path); return; }
+      return api.upload('/api/content/images', path).then(result => {
+        wx.hideLoading();
+        if (result.status === 'pass') { imageReviewCache.remember(fileKey); onPath(path); return; }
+        if (!result.reviewId) throw { message: '图片审核未能提交' };
+        this._pendingImage = { path, reviewId: result.reviewId, fileKey, onPath };
+        this._reviewPollCount = 0;
+        // 临时图片持久化，用户离开页面后也能在下次进入时继续。
+        wx.saveFile({ tempFilePath: path, success: saved => {
+          if (!this._pendingImage || this._pendingImage.reviewId !== result.reviewId) return;
+          this._pendingImage.path = saved.savedFilePath;
+          try { wx.setStorageSync(PENDING_IMAGE, { path: saved.savedFilePath, reviewId: result.reviewId, fileKey, mode }); }
+          catch (e) { /* 本次仍可轮询 */ }
+        } });
+        this._showReviewLoading();
+        this._pollImageReview();
+      });
     }).catch(err => { wx.hideLoading(); ui.toast((err && err.message) || '图片审核失败，请重试'); });
   },
 
@@ -318,7 +322,7 @@ Page({
       this._pendingImage = null;
       try { wx.removeStorageSync(PENDING_IMAGE); } catch (e) { /* 忽略 */ }
       this._hideReviewLoading();
-      if (r.status === 'pass') pending.onPath(pending.path);
+      if (r.status === 'pass') { imageReviewCache.remember(pending.fileKey); pending.onPath(pending.path); }
       else ui.toast('图片未通过审核，请更换图片');
     }).catch(() => {
       if (this._reviewPolling === pending.reviewId) this._reviewPolling = null;

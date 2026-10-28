@@ -98,6 +98,8 @@
         <view class="ol-sec-t">费用</view>
         <view wx:for="{{detail.items}}" wx:key="key" class="ol-kv"><text class="k">{{item.label}}</text><text class="v">¥{{item.yuan}}</text></view>
         <view class="ol-kv total"><text class="k">合计</text><text class="v">¥{{detail.totalYuan}}</text></view>
+        <view wx:if="{{detail.refundedFen}}" class="ol-kv"><text class="k">已退款</text><text class="v">¥{{detail.refundedYuan}}</text></view>
+        <view wx:for="{{detail.refunds}}" wx:key="id" class="ol-kv dim"><text class="k">退款</text><text class="v">¥{{item.yuan}} · {{item.timeText}}{{item.reason ? ' · ' + item.reason : ''}}</text></view>
 
         <view class="ol-kv dim"><text class="k">订单号</text><text class="v" selectable="true">{{detail.id}}</text></view>
         <view class="ol-kv dim"><text class="k">下单</text><text class="v">{{detail.timeText}}</text></view>

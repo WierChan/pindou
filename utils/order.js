@@ -248,6 +248,10 @@ function toVM(o) {
     deliveryText: o.delivery === 'express' ? '快递到家' + (logi && o.status === 'shipped' ? ' · ' + logi.text : '') : '到店自取',
     logi,
     totalYuan: pricing.yuan(o.totalFen),
+    refundedYuan: pricing.yuan(o.refundedFen || 0),
+    refunds: (o.refunds || []).filter(r => r.status === 'success').map(r => ({
+      id: r.id, yuan: pricing.yuan(r.amountFen), reason: r.reason || '', timeText: fmtTime(r.successAt || r.createdAt),
+    })),
     timeText: fmtTime(o.createdAt),
     paidText: fmtTime(o.paidAt),
     items: (o.items || []).map(i => Object.assign({}, i, { yuan: pricing.yuan(i.fen) })),

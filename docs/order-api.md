@@ -107,7 +107,7 @@ merchant = net − platform             商家应得（≈ 实付 86.76%；商�
 - 拦截（`ok=false`）：超过 `maxItems` 张（默认 10）/ 某一张不合格（`badIndex` 指出第几张）/ 所有箱型都装不下或计费重超 `maxG`
   （提示分两单或找客服）/ 港澳台。
 - 结算口径不变：整单实付先扣手续费和税费再 90/10，商家到手 ≥ 各张商品报价之和 + 运费 × 86.76%。
-- 退款仍然只能整单（done 前后台随时可退，done 后 409 走结算扣回，§6.5），不支持退其中一张。
+- 退款按订单金额处理，可全额退剩余可退金额或自定义部分金额；多图订单不按单张作品自动拆分退款（§6.5）。
 - ⚠ `parcel` 里的数字（每颗豆重、箱型、抛比、续重价）**全是占位**，要商家称成品、量箱子、拿快递合同价后在 §2 下发覆盖。
 
 ## 2. `GET /api/config` 新增 `order` 字段
@@ -123,7 +123,7 @@ merchant = net − platform             商家应得（≈ 实付 86.76%；商�
 }
 ```
 
-- `enabled`：当前客户端暂时强制隐藏所有代拼入口（首页横条 / 拼豆页横幅 / 查看页按钮 / 设置页），即使服务端或缓存下发 `true` 也不显示；恢复服务时需同步恢复客户端开关逻辑。
+- `enabled`：代拼入口总开关，缺省 `true`；服务端下发 `false` 时隐藏首页横条、拼豆页横幅、查看页按钮和设置页入口。
 - `pickupArea` / `pickupHint`：下单页「到店自取」只显示这两句，**不出现任何商家名或地址**；具体地址派单后走订单 VO 的 `pickupAddress`。
 - `notice`：下单页费用明细下方的说明。三个字符串空或缺省用客户端内置值。
 - `finishImages`（可选）：烫法示例实拍**放大图**的高清 URL，`{ "towel": "https://…/towel.jpg", … }`，key 为烫法
@@ -346,7 +346,7 @@ webhook(企业微信群机器人), settle{accountName, bankName, accountNo}（�
 | `POST /admin/orders/:id/ship` `{carrier, trackingNo}` | accepted → shipped（快递单） |
 | `POST /admin/orders/:id/ready` | accepted → ready（自取单） |
 | `POST /admin/orders/:id/done` | shipped/ready → done（客户不点确认时手动完成，计入待结算） |
-| `POST /admin/orders/:id/refund` `{reason}` | paid/assigned/accepted/shipped/ready → refunded：调微信退款接口原路退款（§6.5），全额。**done（已完成）一律 `409` 拒绝**——完成的单已计入商家结算，按合作协议 6.3 处理：未出结算单的由管理员在商户平台手工退款并把单从待结算剔除，已打款给商家的从下期结算款扣回后再退客户 |
+| `POST /admin/orders/:id/refund` `{reason, amountFen?}` | paid/assigned/accepted/shipped/ready 可原路退款；`amountFen` 缺省退剩余全部，传入时退指定正整数分且不得超过剩余可退金额。部分退款保留原履约状态，累计退满才变 `refunded`（§6.5）。**done（已完成）一律 `409` 拒绝**，按合作协议由管理员线下处理结算扣回 |
 | `POST /admin/orders/:id/note` `{merchantNote}` | 商家留言（客户端详情展示） |
 | `GET/POST/PUT /admin/merchants` | 商家增改、暂停接单、维护收款账户（§6.3） |
 | `GET /admin/settlements?status=` | 商家结算单列表（§6.4：生成、确认打款、扣回明细） |
@@ -458,8 +458,13 @@ webhook(企业微信群机器人), settle{accountName, bankName, accountNo}（�
 
 ### 6.5 退款
 
+- 管理员可选“全额退款”（退当前剩余可退金额）或“自定义金额退款”（`amountFen` 为正整数分）。后端必须用订单实付 `totalFen` 减去**已成功退款**的金额计算剩余可退金额，拒绝 0、负数、非整数及超额金额；并发请求须锁定订单，防止累计超退。
+- 每次退款建独立退款记录 `{id, amountFen, reason, status, createdAt, successAt}`，退款单号唯一；订单 VO 返回 `refundedFen`（已成功退款累计）、`refundableFen`（剩余）、`refunds[]`（成功及处理中记录）。重复请求必须用幂等键防止重复退款；微信回调或查询确认成功后再增加 `refundedFen`。
+- 部分退款成功后订单仍保持原履约状态，可继续制作、发货和完成；累计退满后才置 `refunded` 并作废导入码。客户端只展示退款金额与记录，不提供自助申请退款入口。
+- 部分退款后的商家结算以实际未退金额为基础重新计算，保留原始实付和每笔退款流水供对账；商家已承诺的报价差额和退款责任由客服按合作协议协商。
+
 - **done 之前**（paid/assigned/accepted/shipped/ready）：后台退款接口调微信退款 `POST /v3/refund/domestic/refunds`
-  （用 `transactionId`），退款单号 = 订单id + '-r1'，全额原路退（零钱几分钟、银行卡 1~3 个工作日），手续费按比例退还。
+  （用 `transactionId`），每笔退款使用独立退款单号，按管理员指定金额原路退（零钱几分钟、银行卡 1~3 个工作日），手续费按比例退还。
   结果以退款回调 / 查询接口为准；**商户号余额不足会失败**，置「待重试」并告警，财务充值后重试（§6.1）。
 - **done 之后**（极少，走客服协商）：接口一律 `409`，由管理员处理——还没出结算单的，在商户平台手工退款并把单
   从待结算剔除；已打款给商家的，按协议 6.3 计入下期 `deductFen` 扣回后再退客户。
@@ -687,7 +692,7 @@ webhook(企业微信群机器人), settle{accountName, bankName, accountNo}（�
   搜索参数 `q` 除了订单号、主表名称、手机号，还要能搜到 `works[].name`。
 - `GET /admin/orders/:id`（详情）：多图订单的 `works[]` 带全字段（含 `colors / payload / patternCode`）。
   顶层的 `colors / payload / patternCode` 留空，后台会自己按张画图纸，并把各张备豆清单按色号合计。
-- 其余管理接口（接单、发货、待自取、完成、退款、留言、结算）都**按整单操作**，逻辑不变。退款仍然只能整单、done 前（§6.5）。
+- 其余管理接口（接单、发货、待自取、完成、退款、留言、结算）仍按整单管理；退款金额可为剩余全额或自定义部分金额，仅 done 前可通过后台接口操作（§6.5）。
 
 ### 11.7 派单：每张一个导入码，payload 加 `order` 标记；订单结束后作废
 
