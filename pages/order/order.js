@@ -224,8 +224,9 @@ Page({
     }, 200);
   },
 
-  // 服务端目前返回单图 quote 结构；转换成页面统一使用的 quoteCart 结构。
+  // 单图响应转换成 quoteCart；多图响应本身就是 quoteCart 结构。
   _mergeServerQuote(local, server) {
+    if (Array.isArray(server.lines)) return Object.assign({}, local, server);
     const all = Array.isArray(server.items) ? server.items : [];
     const shipping = all.find(x => x.key === 'shipping') || null;
     const goods = all.filter(x => x.key !== 'shipping');

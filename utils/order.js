@@ -97,16 +97,18 @@ function workBody(work, finish, hole, st) {
   };
 }
 
-// 创建订单前由服务端核价，不创建订单、不发起支付。当前服务端只接单图代拼。
+// 创建订单前由服务端核价，不创建订单、不发起支付；多图由服务端计算合寄运费。
 function quote(list, o) {
-  if (!Array.isArray(list) || list.length !== 1) {
-    return Promise.reject({ message: '多图订单暂时无法核价，请分开下单' });
-  }
-  const x = list[0];
-  const body = Object.assign({
+  if (!Array.isArray(list) || !list.length) return Promise.reject({ message: '还没有选择作品' });
+  const body = {
     delivery: o.delivery,
     address: o.delivery === 'express' ? (o.address || null) : null,
-  }, workBody(x.work, x.finish, o.hole, x.stats));
+  };
+  if (list.length === 1) {
+    Object.assign(body, workBody(list[0].work, list[0].finish, o.hole, list[0].stats));
+  } else {
+    body.works = list.map(x => workBody(x.work, x.finish, o.hole, x.stats));
+  }
   return api.post('/api/orders/quote', body);
 }
 

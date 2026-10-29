@@ -207,6 +207,21 @@ merchant = net − platform             商家应得（≈ 实付 86.76%；商�
 
 页面合计必须使用 `totalFen`（单位：分），不能使用结算明细中的 `taxFen`。报价成功后才允许调用 `POST /api/orders`；后者仍会再次复算，防止报价配置在提交期间发生变化。
 
+两张及以上时，`POST /api/orders/quote` 使用 `works[]`，每张只需要 `name / w / h / glitter / payload`；服务端逐张从 payload 重算豆数与色数，再计算一次合寄运费：
+
+```json
+{
+  "delivery": "express",
+  "address": { "province": "浙江省" },
+  "works": [
+    { "name": "第一张", "w": 30, "h": 30, "glitter": false, "payload": "{...}" },
+    { "name": "第二张", "w": 30, "h": 30, "glitter": true, "payload": "{...}" }
+  ]
+}
+```
+
+多图成功响应的 `data` 为 `{ ok, reason, badIndex, lines, shipping, goodsFen, shippingFen, totalFen, merchantQuoteFen, zone, parcel, needAddress, colorOver }`。`lines[i]` 是第 i 张的商品费用，`shipping` 是整单唯一运费行，页面仍取整单 `totalFen`。
+
 行为：
 
 1. 校验：尺寸/豆数/色数从 payload 重算；豆数 < minBeads 或长边 > maxSide → `400`；快递省份在 blocked → `400`。代拼下单不要求 `patternCode`，也不触发图片安全审核。
