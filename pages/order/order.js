@@ -1,5 +1,5 @@
 // 代拼下单：把图纸交给商家拼好（烫法 / 豆孔 → 自取或快递 → 报价 → 微信支付）。
-// 金额本地 pricing.js 即时估算展示；创建订单时服务端复算并返回权威金额，不一致先告知再拉起支付。
+// 本地 pricing.js 只做即时占位；页面随后调用服务端报价接口，以服务端 totalFen 为准，报价成功后才允许下单。
 // 多图订单（cfg.ORDER.multi）：一单可放几张作品（代拼篮，本地只存 id + 烫法），每张各选烫法、各自计价，
 // 整单派给一个商家合寄，运费只收一次（pricing.quoteCart）。上面的作品卡 / 烫法 / 预览都跟着「当前选中的那张」走。
 const { store } = require('../../utils/store');
@@ -42,6 +42,7 @@ Page({
     blocked: '',        // 不能下单的原因（豆数不足 / 尺寸超档 / 地区不可达）
     notice: '',
     canPay: false,
+    quoting: false,
     submitting: false,
   },
 
@@ -110,7 +111,7 @@ Page({
     });
   },
 
-  onUnload() { clearTimeout(this._pvT); },
+  onUnload() { clearTimeout(this._pvT); clearTimeout(this._quoteT); },
 
   /* ---------- 代拼篮 ---------- */
   selectWork(e) {
@@ -185,7 +186,8 @@ Page({
   },
   noop() {},
 
-  // 本地报价（即时展示）。内容一变就换幂等键：同一内容重试沿用同一订单，改了选项再提交才是新单
+  // 本地先即时估算，随后用创建订单前的服务端报价覆盖。报价完成前不能下单。
+  // 内容一变就换幂等键：同一内容重试沿用同一订单，改了选项再提交才是新单
   // 明细：单张照旧逐项（代拼费 / 格利特 / 运费）；多张每张一行小计 + 一行运费
   _requote() {
     const d = this.data;
@@ -196,8 +198,46 @@ Page({
       delivery: d.delivery,
       province: (d.delivery === 'express' && this.addr) ? this.addr.province : '',
     });
-    this.q = q;
+    this.q = null;
     this.coid = genId();
+    this._showQuote(q, false);
+    if (!q.ok) { this.q = q; return; }
+    const seq = (this._quoteSeq || 0) + 1;
+    this._quoteSeq = seq;
+    clearTimeout(this._quoteT);
+    this.setData({ quoting: true, canPay: false });
+    this._quoteT = setTimeout(() => {
+      order.quote(this.items.map(x => ({ work: x.work, finish: x.finish, stats: x.stats })), {
+        hole: this.data.hole,
+        delivery: this.data.delivery,
+        address: this.data.delivery === 'express' ? this.addr : null,
+      }).then(server => {
+        if (seq !== this._quoteSeq) return;
+        const authoritative = this._mergeServerQuote(q, server || {});
+        this.q = authoritative;
+        this._showQuote(authoritative, true);
+      }).catch(err => {
+        if (seq !== this._quoteSeq) return;
+        this.q = null;
+        this.setData({ quoting: false, canPay: false, blocked: order.errText(err) || '服务端核价失败，请稍后重试' });
+      });
+    }, 200);
+  },
+
+  // 服务端目前返回单图 quote 结构；转换成页面统一使用的 quoteCart 结构。
+  _mergeServerQuote(local, server) {
+    const all = Array.isArray(server.items) ? server.items : [];
+    const shipping = all.find(x => x.key === 'shipping') || null;
+    const goods = all.filter(x => x.key !== 'shipping');
+    const line = Object.assign({}, local.lines[0] || {}, {
+      items: goods,
+      goodsFen: server.goodsFen | 0,
+      merchantQuoteFen: server.merchantQuoteFen | 0,
+    });
+    return Object.assign({}, local, server, { lines: [line], shipping });
+  },
+
+  _showQuote(q, authoritative) {
     const row = (key, label, desc, fen) => ({ key, label, desc, yuan: pricing.yuan(fen) });
     let items;
     if (q.lines.length === 1) {
@@ -214,7 +254,8 @@ Page({
       items,
       totalYuan: pricing.yuan(q.totalFen),
       blocked: q.ok ? '' : q.reason,
-      canPay: q.ok, // 含色数超档（q.colorOver）不提示也不加价，商家在派单信息里自己看色数
+      quoting: !authoritative && q.ok,
+      canPay: !!authoritative && q.ok && !q.needAddress, // 服务端核价成功且已具备地址后才开放
     };
     this.data.works.forEach((w, i) => { patch['works[' + i + '].bad'] = i === q.badIndex; });
     this.setData(patch);
@@ -292,7 +333,7 @@ Page({
   submit() {
     if (this.data.submitting) return;
     const d = this.data, q = this.q;
-    if (!q || !q.ok) { ui.toast(q ? q.reason : '报价中，稍等'); return; }
+    if (!q || !q.ok) { ui.toast(q ? q.reason : '服务端核价中，稍等'); return; }
     let phone = String(this._phone != null ? this._phone : d.phone || '').replace(/\D/g, '');
     if (d.delivery === 'express') {
       if (!this.addr) { ui.toast('先选一下收货地址'); this.chooseAddress(); return; }
@@ -302,24 +343,52 @@ Page({
       return;
     }
     const note = String(this._note != null ? this._note : d.note || '').trim().slice(0, 100);
+    const selections = this.items.map(x => ({ work: x.work, finish: x.finish, stats: x.stats }));
     this.setData({ submitting: true });
-    wx.showLoading({ title: '创建订单', mask: true });
-    order.create(this.items.map(x => ({ work: x.work, finish: x.finish, stats: x.stats })), {
-      clientOrderId: this.coid,
+    wx.showLoading({ title: '核对金额', mask: true });
+    // 提交前再核一次，避免后台刚好改价时先创建订单、后让用户确认。
+    order.quote(selections, {
       hole: d.hole, delivery: d.delivery,
-      phone, address: d.delivery === 'express' ? this.addr : null, note,
-      quote: q,
+      address: d.delivery === 'express' ? this.addr : null,
+    }).then(server => {
+      const checked = this._mergeServerQuote(q, server || {});
+      if ((checked.totalFen | 0) === (q.totalFen | 0)) return checked;
+      wx.hideLoading();
+      this.q = checked;
+      this._showQuote(checked, true);
+      return new Promise(resolve => wx.showModal({
+        title: '金额已更新',
+        content: '最新核算金额为 ¥' + pricing.yuan(checked.totalFen) + '，是否按新金额创建订单？',
+        confirmText: '确认下单',
+        cancelText: '再看看',
+        confirmColor: '#C9838F',
+        success: r => resolve(r.confirm ? checked : null),
+        fail: () => resolve(null),
+      }));
+    }).then(checked => {
+      if (!checked) {
+        this.setData({ submitting: false });
+        return null;
+      }
+      wx.showLoading({ title: '创建订单', mask: true });
+      return order.create(selections, {
+        clientOrderId: this.coid,
+        hole: d.hole, delivery: d.delivery,
+        phone, address: d.delivery === 'express' ? this.addr : null, note,
+        quote: checked,
+      });
     }).then(res => {
+      if (!res) return;
       wx.hideLoading();
       const o = res && res.order;
       if (!o || !o.id) throw { message: '下单失败，稍后再试' };
       if (d.delivery === 'pickup') order.rememberPhone(phone);
       if (this.multi) order.cartClear(); // 订单已建（付没付都在「我的订单」里），篮子清空
-      // 服务端复算与本地估算不一致：以服务端为准，先告知再付
-      if ((o.totalFen | 0) !== q.totalFen) {
+      // 极小概率下配置在二次核价与落库之间变化，保留最后一道保护。
+      if ((o.totalFen | 0) !== (this.q.totalFen | 0)) {
         return new Promise(resolve => wx.showModal({
           title: '金额已更新',
-          content: '服务器核算的金额为 ¥' + pricing.yuan(o.totalFen) + '（本地估算 ¥' + pricing.yuan(q.totalFen) + '），是否继续支付？',
+          content: '服务器最终核算金额为 ¥' + pricing.yuan(o.totalFen) + '，是否继续支付？',
           confirmText: '继续支付',
           cancelText: '稍后再说',
           confirmColor: '#C9838F',

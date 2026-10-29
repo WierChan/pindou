@@ -137,7 +137,7 @@
 
   <view class="od-bar">
     <view class="od-total"><text class="od-total-lb">合计</text><text class="od-total-v">¥{{totalYuan}}</text></view>
-    <view class="btn-primary od-pay {{canPay ? '' : 'off'}}" hover-class="pressed" bindtap="submit">{{submitting ? '提交中…' : '去支付'}}</view>
+    <view class="btn-primary od-pay {{canPay ? '' : 'off'}}" hover-class="pressed" bindtap="submit">{{submitting ? '提交中…' : (quoting ? '核价中…' : '去支付')}}</view>
   </view>
 </view>
 

@@ -97,6 +97,19 @@ function workBody(work, finish, hole, st) {
   };
 }
 
+// 创建订单前由服务端核价，不创建订单、不发起支付。当前服务端只接单图代拼。
+function quote(list, o) {
+  if (!Array.isArray(list) || list.length !== 1) {
+    return Promise.reject({ message: '多图订单暂时无法核价，请分开下单' });
+  }
+  const x = list[0];
+  const body = Object.assign({
+    delivery: o.delivery,
+    address: o.delivery === 'express' ? (o.address || null) : null,
+  }, workBody(x.work, x.finish, o.hole, x.stats));
+  return api.post('/api/orders/quote', body);
+}
+
 // 创建订单并预下单。list: [{ work, finish, stats? }]（1 张 = 老的单图格式；多张 = works[]，docs/order-api.md §3.1b）
 // o: { clientOrderId, hole, delivery, phone, address, note, quote（quoteCart 结果） }
 // 返回 { order, payParams }；服务端按 (用户, clientOrderId) 幂等
@@ -261,7 +274,7 @@ function toVM(o) {
 
 module.exports = {
   STATUS, ORDER_FINISH, statusInfo, isGlitter, orderFinish, finishLabel, workStats, buildPayload,
-  create, requestPay, list, get, payParams, cancel, confirm, track, errText,
+  quote, create, requestPay, list, get, payParams, cancel, confirm, track, errText,
   cartRead, cartWrite, cartClear,
   remember, localList, localCount, lastPhone, rememberPhone, fmtTime, toVM,
 };

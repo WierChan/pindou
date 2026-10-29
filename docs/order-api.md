@@ -192,6 +192,21 @@ merchant = net − platform             商家应得（≈ 实付 86.76%；商�
 | clientQuote | object | 客户端估算 `{items:[{key,fen}], totalFen}`，仅用于比对/埋点 |
 | payload | string | 图纸 JSON `{w, h, cells, palette?, name}` ≤256KB，**与导入码 payload 同构**（见 §5.3） |
 
+创建订单前，客户端必须先调用 `POST /api/orders/quote` 获取服务端权威报价。该接口不创建订单、不发起支付，请求使用单图字段中的 `w / h / glitter / delivery / address / payload`，响应 `data`：
+
+```json
+{
+  "items": [{ "key": "labor", "label": "代拼费", "fen": 5240 }, { "key": "shipping", "label": "运费", "fen": 0 }],
+  "goodsFen": 5240,
+  "shippingFen": 0,
+  "totalFen": 5240,
+  "merchantQuoteFen": 4541,
+  "needAddress": false
+}
+```
+
+页面合计必须使用 `totalFen`（单位：分），不能使用结算明细中的 `taxFen`。报价成功后才允许调用 `POST /api/orders`；后者仍会再次复算，防止报价配置在提交期间发生变化。
+
 行为：
 
 1. 校验：尺寸/豆数/色数从 payload 重算；豆数 < minBeads 或长边 > maxSide → `400`；快递省份在 blocked → `400`。代拼下单不要求 `patternCode`，也不触发图片安全审核。
