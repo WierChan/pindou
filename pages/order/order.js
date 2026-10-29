@@ -303,7 +303,7 @@ Page({
     }
     const note = String(this._note != null ? this._note : d.note || '').trim().slice(0, 100);
     this.setData({ submitting: true });
-    wx.showLoading({ title: '审核并创建订单', mask: true });
+    wx.showLoading({ title: '创建订单', mask: true });
     order.create(this.items.map(x => ({ work: x.work, finish: x.finish, stats: x.stats })), {
       clientOrderId: this.coid,
       hole: d.hole, delivery: d.delivery,

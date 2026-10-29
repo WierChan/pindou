@@ -2,7 +2,6 @@
 // 接口契约见 docs/order-api.md（pindou-server 实现）。金额以服务端复算为准，
 // 本地 utils/pricing.js 只做即时展示；图纸随单以「导入码同款 payload」上传，商家可直接导入拼。
 const api = require('./api');
-const { createCode } = require('./importcode');
 const { ENV } = require('./env');
 const { PALETTE, hexToRgb } = require('./palette');
 const { colorStats, nearestPalette } = require('./convert');
@@ -88,10 +87,10 @@ function buildPayload(work) {
 /* ---------- 接口 ---------- */
 
 // 单张图的下单字段（单图订单平铺在请求体里；多图订单作为 works[] 的一项）
-function workBody(work, finish, hole, st, patternCode) {
+function workBody(work, finish, hole, st) {
   st = st || workStats(work);
   return {
-    workId: work.id, patternCode, name: work.name, w: work.w, h: work.h,
+    workId: work.id, name: work.name, w: work.w, h: work.h,
     beads: st.beads, colorN: st.colorN, colors: st.colors,
     finish, finishName: finishLabel(finish), glitter: isGlitter(finish), hole: hole || 'none',
     payload: buildPayload(work),
@@ -110,18 +109,16 @@ function create(list, o) {
     if (q.shipping) items.push({ key: 'shipping', fen: q.shipping.fen });
     clientQuote = { items, totalFen: q.totalFen };
   }
-  return Promise.all(list.map(x => createCode(x.work))).then(codes => {
-    const body = {
-      clientOrderId: o.clientOrderId,
-      delivery: o.delivery, phone: o.phone || '', address: o.address || null, note: o.note || '',
-      clientQuote,
-    };
-    if (list.length === 1) Object.assign(body, workBody(list[0].work, list[0].finish, o.hole, list[0].stats, codes[0]));
-    else body.works = list.map((x, i) => workBody(x.work, x.finish, o.hole, x.stats, codes[i]));
-    return api.post('/api/orders', body).then(d => {
-      if (d && d.order) remember(d.order);
-      return d;
-    });
+  const body = {
+    clientOrderId: o.clientOrderId,
+    delivery: o.delivery, phone: o.phone || '', address: o.address || null, note: o.note || '',
+    clientQuote,
+  };
+  if (list.length === 1) Object.assign(body, workBody(list[0].work, list[0].finish, o.hole, list[0].stats));
+  else body.works = list.map(x => workBody(x.work, x.finish, o.hole, x.stats));
+  return api.post('/api/orders', body).then(d => {
+    if (d && d.order) remember(d.order);
+    return d;
   });
 }
 

@@ -176,7 +176,7 @@ merchant = net − platform             商家应得（≈ 实付 86.76%；商�
 |---|---|---|
 | clientOrderId | string | 幂等键。同一 (userId, clientOrderId) 重复调用返回已有订单（客户端改选项会换键） |
 | workId | string | 作品在客户端的 id（仅溯源） |
-| patternCode | string | 当前图纸的审核凭证。客户端先生成口令并等待图片审核通过；服务端校验口令归属用户，且名称、尺寸、豆数和 payload 与审核快照完全一致 |
+| patternCode | string | 兼容旧客户端的可选字段；代拼下单不依赖分享口令或图片审核 |
 | name | string | 作品名 ≤20 字，**过 msgSecCheck** |
 | w, h | int | 图纸尺寸 1~256（校验 max(w,h) ≤ maxSide） |
 | beads, colorN | int | 豆数 / 色数（服务端从 payload 重算校验，豆数 ≥ minBeads） |
@@ -194,7 +194,7 @@ merchant = net − platform             商家应得（≈ 实付 86.76%；商�
 
 行为：
 
-1. 校验：尺寸/豆数/色数从 payload 重算；豆数 < minBeads 或长边 > maxSide → `400`；快递省份在 blocked → `400`。同时校验 `patternCode` 已通过图片审核，且绑定的图纸快照与本次下单内容一致。
+1. 校验：尺寸/豆数/色数从 payload 重算；豆数 < minBeads 或长边 > maxSide → `400`；快递省份在 blocked → `400`。代拼下单不要求 `patternCode`，也不触发图片安全审核。
 2. 用 `pricing.quote()` 复算金额（**以服务端为准**），落库 `items/goodsFen/shippingFen/totalFen`，同时算好 `settle(totalFen)` 三个数存到订单上。
 3. 建订单 `status = unpaid`，30 分钟支付超时（超时未付 → `cancelled`，reason「支付超时」）。
 4. 调微信支付 APIv3 的 JSAPI 下单接口 `POST /v3/pay/transactions/jsapi`（商户号 1117800336）：
