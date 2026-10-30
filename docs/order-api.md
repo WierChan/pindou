@@ -250,7 +250,7 @@ merchant = net − platform             商家应得（≈ 实付 86.76%；商�
 ```
 
 顶层 `name` 由服务端拼好「第一张名 等 N 件」、`beads` 为合计；顶层 `items` 只放运费，金额字段都是整单合计。单图订单没有 `works`，VO 保持现状。
-客户接口的 `works[]` 不带 `colors/payload/patternCode`。派单（§5.3）**每张建一条 pattern、各给一个导入码**（`clientWorkId = 'order:' + 订单id + ':' + 序号`），
+客户订单详情的 `works[]` 带 `payload` 供客户看图纸；客户接口不带 `colors/patternCode`，列表及建单响应不带 `payload`。派单（§5.3）**每张建一条 pattern、各给一个导入码**（`clientWorkId = 'order:' + 订单id + ':' + 序号`），
 派单文案逐张列「作品 · 尺寸 · 烫法 · 导入码」，备豆清单按色号合并（自带色板按 hex 合并），格式照 `pindou-admin/src/lib/format.js buildDispatch`。
 
 ### 3.2 我的订单 `GET /api/orders`
@@ -260,6 +260,7 @@ merchant = net − platform             商家应得（≈ 实付 86.76%；商�
 ### 3.3 订单详情 `GET /api/orders/:id`
 
 `data = { order: VO }`。非本人订单 `404`。刚支付完客户端会 1.5s × 6 次轮询它等回调落地。
+仅此详情接口返回图纸预览数据：单图为 `order.payload`，多图为每张 `order.works[].payload`，格式是下单时保存的 JSON 字符串 `{w,h,cells,palette?,name}`。已取消订单仍返回；列表和建单响应不返回 `payload`，客户接口也不返回 `patternCode` 或后台备豆 `colors`。
 
 ### 3.4 继续支付 `POST /api/orders/:id/pay`
 
@@ -685,7 +686,7 @@ webhook(企业微信群机器人), settle{accountName, bankName, accountNo}（�
 }
 ```
 
-- 客户接口的 `works[]` **不带** `colors / payload / patternCode`，只有管理端带（11.6）。
+- 客户接口的 `works[]` 不带 `colors / patternCode`；仅 `GET /api/orders/:id` 详情返回每张 `payload`，供小程序绘制图纸预览。
 - 单图订单**不带** `works` 字段（也不要下发空数组），VO 和现在一样。
 - 小程序订单详情用 `works[].name / w / h / beads / colorN / finish / finishName / items`，列表用主表 `name / beads / totalFen`。
 

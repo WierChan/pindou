@@ -4,6 +4,20 @@ const order = require('../../utils/order');
 const { store } = require('../../utils/store');
 const { cfg } = require('../../utils/config');
 const ui = require('../../utils/ui');
+const { renderPatternTo } = require('../../utils/board');
+const { PALETTE } = require('../../utils/palette');
+
+function parsePattern(payload) {
+  try {
+    const p = typeof payload === 'string' ? JSON.parse(payload) : payload;
+    if (!p || !Number.isInteger(p.w) || !Number.isInteger(p.h) || p.w < 1 || p.h < 1 || p.w > 256 || p.h > 256 ||
+      !Array.isArray(p.cells) || p.cells.length !== p.w * p.h) return null;
+    const palette = Array.isArray(p.palette) && p.palette.length ? p.palette : null;
+    if (palette && !palette.every(hex => typeof hex === 'string' && /^#[0-9a-fA-F]{6}$/.test(hex))) return null;
+    if (!p.cells.every(v => Number.isInteger(v) && v >= -1 && v < (palette ? palette.length : PALETTE.length))) return null;
+    return { w: p.w, h: p.h, cells: p.cells, palette: palette || undefined };
+  } catch (e) { return null; }
+}
 
 Page({
   data: {
@@ -16,6 +30,8 @@ Page({
     cartN: 0,           // 代拼篮里没下单的作品数（多图订单开了才有）
     traces: [],         // 详情里的物流轨迹（新的在前），后端接了快递查询才有
     traceAll: false,    // 轨迹默认只显示最近 3 条
+    previews: [],
+    capW: 1, capH: 1,
   },
 
   onLoad(q) {
@@ -33,7 +49,7 @@ Page({
   goCart() {
     if (this.cart && this.cart.length) wx.navigateTo({ url: '/pages/order/order?id=' + this.cart[this.cart.length - 1].id });
   },
-  onUnload() { this._polling = false; },
+  onUnload() { this._polling = false; this._previewToken = null; },
 
   goBack() { wx.navigateBack({ fail: () => ui.backHome() }); },
   noop() {},
@@ -86,12 +102,44 @@ Page({
     order.get(id).then(x => {
       const vm = order.toVM(x);
       this._patch(vm);
+      if (this.data.detail && this.data.detail.id === id) this._renderPreviews(x);
       if (!o) this._loadTrack(vm); // 列表里没有（离线索引）时，拿到详情再拉轨迹
     }).catch(() => { /* 用列表里的 */ });
   },
   _showDetail(vm) {
-    this.setData({ detail: vm, traces: [], traceAll: false });
+    this._previewToken = {};
+    this.setData({ detail: vm, traces: [], traceAll: false, previews: [] });
     this._loadTrack(vm);
+  },
+  _renderPreviews(raw) {
+    const token = this._previewToken = {};
+    const entries = Array.isArray(raw.works) && raw.works.length ? raw.works : [raw];
+    const patterns = entries.map(x => {
+      const p = parsePattern(x.payload);
+      if (p) p.name = x.name || '拼豆作品';
+      return p;
+    });
+    if (!patterns.some(Boolean)) return;
+    ui.queryNode(this, '#order-preview-canvas').then(info => {
+      if (!info || !info.node || this._previewToken !== token) return;
+      const previews = patterns.map(() => '');
+      return patterns.reduce((chain, p, i) => chain.then(() => {
+        if (!p || this._previewToken !== token) return;
+        const cellPx = Math.max(5, Math.min(12, Math.floor(560 / Math.max(p.w, p.h))));
+        const drawPreview = () => renderPatternTo(info.node, p, { cellPx, matte: true, scale: 1 });
+        return ui.captureCanvas(this, info.node, drawPreview, '#order-preview-canvas').then(path => {
+          if (this._previewToken !== token) return;
+          previews[i] = path;
+          this.setData({ previews: previews.slice() });
+        });
+      }), Promise.resolve());
+    }).catch(() => { /* 图纸缺失或绘制失败时，订单文字仍可查看 */ });
+  },
+  previewPattern(e) {
+    const index = Number(e.currentTarget.dataset.index);
+    const urls = this.data.previews.filter(Boolean);
+    const current = this.data.previews[index];
+    if (current) wx.previewImage({ current, urls });
   },
   // 物流轨迹：只有快递单、且后端返回了 logistics（接了快递查询）才拉；失败就不显示轨迹，单号仍可查看
   _loadTrack(vm) {
@@ -106,7 +154,7 @@ Page({
     }).catch(() => { /* 忽略 */ });
   },
   toggleTraces() { this.setData({ traceAll: !this.data.traceAll }); },
-  closeDetail() { this.setData({ detail: null, traces: [] }); },
+  closeDetail() { this._previewToken = null; this.setData({ detail: null, traces: [], previews: [] }); },
 
   /* ---------- 操作 ---------- */
   payAgain(e) {

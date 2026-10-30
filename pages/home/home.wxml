@@ -29,11 +29,11 @@
 
   <view class="cta-new {{ctaAnim}}" hover-class="pressed" bindtap="goCreate">＋ 开始新作品</view>
 
-  <!-- 代拼服务入口：不想自己拼的把图纸交给商家；有订单时带数量 -->
+  <!-- 已有代拼订单的查看入口；下单从具体作品进入 -->
   <view wx:if="{{orderOn}}" class="home-order" hover-class="pressed" bindtap="goOrders">
     <image class="pxi" src="/assets/icons/parcel.png" />
-    <view class="ho-txt">代拼服务 · 不想自己拼？交给商家拼好寄给你</view>
-    <view class="ho-r">我的订单{{orderN ? ' · ' + orderN : ''}} ›</view>
+    <view class="ho-txt">我的代拼订单</view>
+    <view class="ho-r">{{orderN ? orderN + ' 单 · ' : ''}}查看 ›</view>
   </view>
 
   <view class="tabs home-tabs">

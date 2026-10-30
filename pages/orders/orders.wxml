@@ -51,13 +51,15 @@
         <block wx:if="{{detail.works}}">
           <view wx:for="{{detail.works}}" wx:key="index" class="ol-kv">
             <text class="k">{{index + 1}}</text>
-            <view class="v"><view>{{item.name}} · ¥{{item.yuan}}</view><view class="ol-kv-sub">{{item.dims}} · {{item.finishText}}</view></view>
+            <view class="v"><view>{{item.name}} · ¥{{item.yuan}}</view><view class="ol-kv-sub">{{item.dims}} · {{item.finishText}}</view><image wx:if="{{previews[index]}}" class="ol-pattern" src="{{previews[index]}}" mode="aspectFit" bindtap="previewPattern" data-index="{{index}}" /><view wx:if="{{previews[index]}}" class="ol-kv-sub">点图放大</view></view>
           </view>
         </block>
         <block wx:else>
           <view class="ol-kv"><text class="k">名称</text><text class="v">{{detail.name}}</text></view>
           <view class="ol-kv"><text class="k">规格</text><text class="v">{{detail.dims}}</text></view>
           <view wx:if="{{detail.finishText}}" class="ol-kv"><text class="k">烫法</text><text class="v">{{detail.finishText}}{{detail.holeText ? ' · ' + detail.holeText : ''}}</text></view>
+          <image wx:if="{{previews[0]}}" class="ol-pattern ol-pattern-single" src="{{previews[0]}}" mode="aspectFit" bindtap="previewPattern" data-index="0" />
+          <view wx:if="{{previews[0]}}" class="ol-kv-sub">点图放大</view>
         </block>
         <view wx:if="{{detail.note}}" class="ol-kv"><text class="k">备注</text><text class="v">{{detail.note}}</text></view>
 
@@ -114,4 +116,5 @@
       </scroll-view>
     </view>
   </view>
+  <canvas type="2d" id="order-preview-canvas" class="ol-preview-canvas" style="width:{{capW}}px;height:{{capH}}px" />
 </view>

@@ -261,7 +261,7 @@ function toVM(o) {
     name: x.name || '', dims: dimsOf(x), finishText: finishOf(x),
     yuan: pricing.yuan((x.items || []).reduce((a, i) => a + (i.fen | 0), 0)),
   })) : null;
-  return Object.assign({}, o, {
+  const vm = Object.assign({}, o, {
     stText: st.text, stCls: st.cls, stDesc: desc,
     works,
     name: o.name || (works ? works[0].name + ' 等 ' + works.length + ' 件' : ''),
@@ -284,6 +284,8 @@ function toVM(o) {
     canConfirm: o.status === 'shipped' || o.status === 'ready',
     canContact: ['paid', 'assigned', 'accepted', 'shipped', 'ready', 'done'].indexOf(o.status) >= 0,
   });
+  delete vm.payload; // 图纸仅在订单详情页解析绘制，不传入 setData
+  return vm;
 }
 
 module.exports = {

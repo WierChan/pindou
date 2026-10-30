@@ -368,7 +368,7 @@
   opacity: .92;
 }
 
-/* 代拼服务入口：CTA 下面一条细横条（曦黄底），右端「我的订单 · N」 */
+/* 代拼订单入口：CTA 下面一条细横条 */
 .home-order {
   display: flex;
   align-items: center;

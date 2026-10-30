@@ -19,6 +19,9 @@
 .olpage .ol-cart { width: calc(100% - 32px); }
 .ol-cart-go { margin-left: auto; color: var(--accent-dark); font-weight: 900; flex-shrink: 0; }
 .ol-kv-sub { font-size: 12px; color: var(--ink2); }
+.ol-pattern { display: block; width: 112px; height: 84px; margin-top: 3px; background: #fff; box-sizing: border-box; }
+.ol-pattern-single { width: 120px; height: 90px; margin: 2px 0 0 54px; }
+.ol-preview-canvas { position: fixed; left: -10000px; top: 0; opacity: 0; pointer-events: none; }
 
 /* 物流：状态徽标 + 时间线（最新一条高亮） */
 .ol-logi { margin: 4px 2px 6px; padding: 10px 12px; background: var(--chipbg); border: 2px solid var(--ink); }
