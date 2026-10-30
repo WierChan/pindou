@@ -1,0 +1,100 @@
+{
+	"pages": [
+		{
+			"path": "pages/splash/splash",
+			"style": {
+				"usingComponents": {},
+				"disableScroll": true,
+				"initialRenderingCache": "static"
+			}
+		},
+		{
+			"path": "pages/home/home",
+			"style": {
+				"usingComponents": {}
+			}
+		},
+		{
+			"path": "pages/create/create",
+			"style": {
+				"usingComponents": {
+					"crop-modal": "/components/crop-modal/crop-modal"
+				}
+			}
+		},
+		{
+			"path": "pages/play/play",
+			"style": {
+				"usingComponents": {},
+				"disableScroll": true
+			}
+		},
+		{
+			"path": "pages/free/free",
+			"style": {
+				"usingComponents": {
+					"crop-modal": "/components/crop-modal/crop-modal"
+				},
+				"disableScroll": true
+			}
+		},
+		{
+			"path": "pages/iron/iron",
+			"style": {
+				"usingComponents": {},
+				"disableScroll": true
+			}
+		},
+		{
+			"path": "pages/view/view",
+			"style": {
+				"usingComponents": {},
+				"disableScroll": true
+			}
+		},
+		{
+			"path": "pages/settings/settings",
+			"style": {
+				"navigationStyle": "custom",
+				"usingComponents": {}
+			}
+		},
+		{
+			"path": "pages/order/order",
+			"style": {
+				"usingComponents": {},
+				"disableScroll": true
+			}
+		},
+		{
+			"path": "pages/orders/orders",
+			"style": {
+				"usingComponents": {},
+				"disableScroll": true
+			}
+		}
+	],
+	"resizable": true,
+	"requiredPrivateInfos": [
+		"chooseAddress"
+	],
+	"style": "v2",
+	"sitemapLocation": "sitemap.json",
+	"lazyCodeLoading": "requiredComponents",
+	"easycom": {
+		"autoscan": true,
+		"custom": {
+			"^share-modal$": "@/components/share-modal/share-modal",
+			"^guide$": "@/components/guide/guide"
+		}
+	},
+	"globalStyle": {
+		"navigationStyle": "custom",
+		"backgroundColor": "#FBF5EC",
+		"backgroundTextStyle": "dark",
+		"navigationBarBackgroundColor": "#FBF5EC",
+		"navigationBarTitleText": "拼豆便利店",
+		"navigationBarTextStyle": "black"
+	},
+	"subPackages": []
+}

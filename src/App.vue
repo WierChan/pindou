@@ -1,0 +1,725 @@
+<script>
+// 拼豆便利店 · 小程序入口
+const api = require('./utils/api');
+const { loadConfig } = require('./utils/config');
+export default {
+    data() {
+        return {};
+    },
+    onLaunch() {
+        // 静默登录 + 拉运行时配置。失败不打扰：
+        // 配置沿用上次服务端缓存，作品同步会在首页 onShow 时重试。
+        api.ensureLogin()
+            .then(() => loadConfig())
+            .catch((err) => console.warn('启动联网初始化失败（离线可继续本地使用）', err));
+    },
+    globalData: {}
+};
+</script>
+<style>
+/* 拼豆便利店 · 全局样式（奶油淡彩像素风：樱粉×曦黄，玫瑰褐描边 + 方角 + 掉落式硬投影） */
+page {
+    --bg: #fbf5ec;
+    --card: #ffffff;
+    --ink: #5f4a4e; /* 玫瑰褐（描边/主文字） */
+    --ink2: #a59795;
+    --accent: #eabfc3; /* 樱桃粉（主按钮/进度） */
+    --accent-dark: #c9838f;
+    --blue: #f2cb8e; /* 曦黄（激活 Tab；沿用旧变量名少改动） */
+    --blue-dark: #c29040;
+    --coin: #f5d5d9; /* 绛羽粉（点缀/徽章） */
+    --coin-dark: #c9939f;
+    --chipbg: #f7ede9;
+    --line: rgba(95, 74, 78, 0.16);
+    --radius: 0px;
+    --shadow: 4px 4px 0 #e2dad3;
+
+    background: var(--bg);
+    /* 像素格子底纹 */
+    background-image: repeating-linear-gradient(0deg, rgba(95, 74, 78, 0.06) 0, rgba(95, 74, 78, 0.06) 1px, transparent 1px, transparent 13px),
+        repeating-linear-gradient(90deg, rgba(95, 74, 78, 0.06) 0, rgba(95, 74, 78, 0.06) 1px, transparent 1px, transparent 13px);
+    color: var(--ink);
+    font-family: -apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    font-size: 15px;
+    height: 100%;
+}
+
+view,
+text,
+image,
+canvas,
+input,
+scroll-view,
+button {
+    box-sizing: border-box;
+}
+
+/* 通用按压反馈：像素风按键往右下"按进去" */
+.pressed {
+    transform: translate(2px, 2px);
+}
+
+/* 隐藏的工具画布：用于生成缩略图 / 导出图 / 读取图片像素 */
+.util-canvas {
+    position: fixed;
+    left: -9999px;
+    top: 0;
+    width: 700px;
+    height: 900px;
+}
+
+/* ============ 内容容器 ============ */
+.screen {
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 16px;
+}
+@media (min-width: 900px) {
+    .screen {
+        max-width: 880px;
+    }
+}
+
+/* ============ 顶栏（自定义导航） ============ */
+.topbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 8px;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: linear-gradient(var(--bg) 75%, transparent);
+}
+.tb-back {
+    width: 38px;
+    height: 38px;
+    border-radius: 0;
+    background: var(--card);
+    border: 3px solid var(--ink);
+    box-shadow: 3px 3px 0 #e2dad3;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 28px;
+    text-align: center;
+    flex-shrink: 0;
+    transition: transform 0.12s;
+}
+.tb-title {
+    flex: 1;
+    min-width: 0;
+    font-weight: 800;
+    font-size: 17px;
+    letter-spacing: 1px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.tb-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+.icon-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 0;
+    background: var(--card);
+    border: 3px solid var(--ink);
+    box-shadow: 3px 3px 0 #e2dad3;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.12s;
+}
+
+/* ============ 通用控件 ============ */
+.tabs {
+    display: flex;
+    gap: 10px;
+}
+.tab {
+    flex: 1;
+    padding: 11px 6px;
+    border-radius: 0;
+    background: var(--card);
+    border: 3px solid var(--ink);
+    box-shadow: 3px 3px 0 #e2dad3;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--ink2);
+    text-align: center;
+    transition: transform 0.12s;
+}
+.tab.active {
+    background: var(--blue);
+    color: #7a5a2e; /* 曦黄底配深蜜色字 */
+    box-shadow: 3px 3px 0 var(--blue-dark);
+}
+
+.btn-primary {
+    padding: 14px;
+    background: var(--accent);
+    color: #7a4a55; /* 淡彩主色配深玫瑰字，不用白字 */
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 2px;
+    border: 3px solid var(--ink);
+    border-radius: 0;
+    box-shadow: 4px 4px 0 var(--accent-dark);
+    text-align: center;
+    transition: transform 0.12s;
+}
+.btn-primary.slim {
+    padding: 10px 22px;
+    font-size: 14px;
+}
+.btn-ghost {
+    padding: 9px 16px;
+    border-radius: 0;
+    background: var(--card);
+    border: 3px solid var(--ink);
+    box-shadow: 3px 3px 0 #e2dad3;
+    font-weight: 700;
+    font-size: 14px;
+    align-self: flex-start;
+    text-align: center;
+    transition: transform 0.12s;
+}
+.btn-ghost.slim2 {
+    padding: 10px 18px;
+    align-self: auto;
+}
+.btn-ghost.slim3 {
+    padding: 14px;
+    font-size: 16px;
+    box-shadow: 4px 4px 0 #e2dad3;
+}
+/* 彩色副按钮（给白底 ghost 按钮上色，像素风=浅色底 + 同色深一档的硬投影）。
+   放在 slim3 之后：同为双类选择器，靠源码顺序压过 slim3 的白色投影 */
+.btn-ghost.c-green {
+    background: #b7e6a6;
+    box-shadow: 4px 4px 0 #5cc454;
+}
+.btn-ghost.c-gold {
+    background: #ffe39a;
+    box-shadow: 3px 3px 0 #d98f2b;
+}
+.btn-ghost.c-mute {
+    background: #ece4dc;
+    box-shadow: 3px 3px 0 #c9bfb4;
+}
+.btn-link {
+    color: var(--ink2);
+    font-size: 13px;
+    padding: 6px;
+    text-align: center;
+}
+.b {
+    font-weight: 700;
+    color: var(--ink);
+}
+
+/* 原生 button 重置（用于 open-type 分享按钮） */
+button.btn-reset {
+    margin: 0;
+    padding: 0;
+    background: none;
+    border: none;
+    line-height: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    color: inherit;
+    border-radius: 0;
+}
+button.btn-reset::after {
+    border: none;
+}
+
+/* ============ 拼豆 / 熨烫 / 查看 页面骨架 ============ */
+.playpage {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.playpage .topbar {
+    padding-left: 16px;
+    padding-right: 16px;
+    position: relative;
+    background: none;
+}
+
+.prog-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 16px 8px;
+    max-width: 720px;
+    width: 100%;
+    margin: 0 auto;
+}
+.prog-bar {
+    flex: 1;
+    height: 12px;
+    background: var(--card);
+    border: 2px solid var(--ink);
+    border-radius: 0;
+    overflow: hidden;
+}
+.prog-bar .fill {
+    display: block;
+    height: 100%;
+    width: 0;
+    /* 像素分段进度条 */
+    background: repeating-linear-gradient(90deg, var(--accent) 0, var(--accent) 8px, #f4dcdf 8px, #f4dcdf 10px);
+    border-radius: 0;
+    transition: width 0.25s;
+}
+.prog-txt {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    justify-content: center;
+    flex-shrink: 0;
+    min-width: 34px;
+    line-height: 1.2;
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--accent-dark);
+    text-align: right;
+}
+/* 拼豆页进度：百分比下面再显示"还差 X 颗"（熨烫页只有一行百分比，样式沿用上面即可） */
+.prog-txt .prog-left {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--ink2);
+}
+
+.board-area {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+.board {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.zoom-fabs {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.zoom-fabs view {
+    width: 40px;
+    height: 40px;
+    border-radius: 0;
+    background: var(--card);
+    border: 2px solid var(--ink);
+    box-shadow: 3px 3px 0 #e2dad3;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.12s;
+}
+
+/* 底栏工具按钮组：原画板右下的悬浮键（定位/分享/还原）挪进底栏，不再挡住豆子 */
+.tr-btns {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+.tools-row .tr-btns {
+    margin-left: auto;
+} /* 拼豆页：顶到工具栏右端 */
+.iron-tr {
+    display: flex;
+    justify-content: flex-end;
+    padding: 2px 16px 6px;
+} /* 熨烫页：底栏顶端右对齐一排 */
+.tr-btn {
+    width: 34px;
+    height: 34px;
+    border: 2px solid var(--ink);
+    background: var(--card);
+    box-shadow: 2px 2px 0 #e2dad3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+}
+.tr-btn.loc {
+    color: #e94737;
+} /* 定位：常态红字 */
+.tr-btn.loc.active {
+    /* 开启：整块变红 */
+    background: #e94737;
+    color: #ffffff;
+    border-color: #b41e14;
+    box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.18);
+}
+
+.confetti {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 90;
+    pointer-events: none;
+}
+
+.bottom-bar {
+    background: var(--card);
+    border-top: 3px solid var(--ink);
+    border-radius: 0;
+    box-shadow: 0 -4px 0 #f0e5de;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+}
+.bb-inner {
+    max-width: 720px;
+    margin: 0 auto;
+}
+
+.tools-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 2px 4px 8px;
+    flex-wrap: wrap;
+}
+.tool-chip {
+    padding: 8px 14px;
+    border-radius: 0;
+    background: var(--chipbg);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink);
+    border: 2px solid var(--ink);
+    flex-shrink: 0;
+    transition: transform 0.12s;
+}
+.tool-chip .b {
+    color: var(--accent-dark);
+}
+.tool-chip.active {
+    background: var(--coin);
+    box-shadow: 3px 3px 0 var(--coin-dark);
+}
+/* 一键拼豆 chip：武装时高亮并轻轻上下浮动（提示"去点画板选一片"），用尽时灰掉 */
+.fill-chip.armed {
+    background: var(--blue);
+    color: #7a5a2e;
+    box-shadow: 3px 3px 0 var(--blue-dark);
+    animation: fillbob 1s ease-in-out infinite;
+}
+.fill-chip.off {
+    opacity: 0.5;
+}
+/* 拼满此色 chip：用尽时灰掉（无武装态，点一下即整幅铺满当前色） */
+.fillc-chip.off {
+    opacity: 0.5;
+}
+@keyframes fillbob {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-2px);
+    }
+}
+
+/* 分段控件（设置页 / 熨烫豆孔等共用）：一整条描边，内部竖线分隔，选中项绛羽粉底 */
+.seg {
+    display: flex;
+    border: 2px solid var(--ink);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.seg-i {
+    padding: 7px 13px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ink2);
+    background: var(--card);
+    border-left: 2px solid var(--ink); /* 不加 transition：选中即时变色 */
+}
+.seg-i:first-child {
+    border-left: none;
+}
+.seg-i.on {
+    background: var(--coin);
+    color: var(--ink);
+}
+
+/* ===== 选烫法：分类 Tab + 卡片（熨烫页 / 查看页共用） ===== */
+.fp-tabs {
+    display: inline-flex;
+    background: var(--chipbg);
+    border: 2px solid var(--ink);
+    padding: 3px;
+    gap: 2px;
+    margin: 0 12px 10px;
+}
+.fp-tab {
+    padding: 6px 15px;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--ink2);
+}
+.fp-tab.on {
+    background: var(--card);
+    color: var(--ink);
+    box-shadow: 2px 2px 0 #e2dad3;
+}
+
+.fp-label {
+    font-size: 12px;
+    color: var(--ink2);
+    font-weight: 700;
+    margin: 2px 14px 6px;
+}
+.fp-scroll {
+    width: 100%;
+    white-space: nowrap;
+}
+.fp-row {
+    display: inline-flex;
+    align-items: stretch;
+    gap: 8px;
+    padding: 0 12px 2px;
+}
+.fp-card {
+    flex-shrink: 0;
+    width: 100px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    padding: 8px 5px;
+    background: var(--chipbg);
+    border: 2px solid transparent;
+    border-radius: 14px;
+}
+.fp-card.on {
+    background: var(--card);
+    border-color: var(--ink);
+    box-shadow: 2px 2px 0 #e2dad3;
+}
+.fp-pv {
+    width: 54px;
+    height: 54px;
+    border-radius: 12px;
+    background: #ffffff;
+    box-shadow: inset 0 0 0 1px rgba(95, 74, 78, 0.12);
+}
+.fp-pv.ph {
+    background: repeating-linear-gradient(45deg, #f0e7df 0 5px, #f6efe8 5px 10px);
+}
+.fp-nm {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--ink);
+    line-height: 1.15;
+    white-space: normal;
+    text-align: center;
+}
+.fp-sub {
+    font-size: 10px;
+    color: var(--ink2);
+    line-height: 1.1;
+    white-space: normal;
+    text-align: center;
+}
+.tools-hint {
+    font-size: 12px;
+    color: var(--ink2);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.palette-bar {
+    white-space: nowrap;
+    width: 100%;
+    padding: 4px 4px 2px;
+}
+.pchip {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    vertical-align: top;
+    padding: 5px 6px;
+    margin-right: 10px;
+    border-radius: 0;
+    border: 2px solid rgba(0, 0, 0, 0);
+    transition: transform 0.1s;
+}
+.pchip.active {
+    border-color: var(--ink);
+    background: var(--chipbg);
+    box-shadow: 3px 3px 0 #e2dad3;
+}
+.pchip.done {
+    opacity: 0.38;
+}
+.pdot {
+    width: 34px;
+    height: 34px;
+    border-radius: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 800;
+    border: 2px solid var(--ink);
+    /* 像素方块的硬斜面高光 */
+    box-shadow: inset -3px -3px 0 rgba(0, 0, 0, 0.16), inset 3px 3px 0 rgba(255, 255, 255, 0.5);
+}
+.pcount {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink2);
+}
+
+.view-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding-top: 14px;
+    flex-wrap: wrap;
+    max-width: 720px;
+    margin: 0 auto;
+}
+.view-bottom .tools-hint {
+    white-space: normal;
+    text-align: center;
+    line-height: 1.6;
+}
+
+/* ============ 弹窗 ============ */
+.overlay {
+    position: fixed;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 100;
+    background: rgba(95, 74, 78, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.3s;
+    padding: 24px;
+}
+/* 盖在画板 canvas 上方的弹窗用（参照引导遮罩的层级）；
+   同时建议放到页面根节点最外层，别嵌在带画布的容器里 */
+.overlay.hi {
+    z-index: 200;
+}
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+}
+.modal {
+    background: var(--card);
+    border: 4px solid var(--ink);
+    border-radius: 0;
+    box-shadow: 6px 6px 0 rgba(95, 74, 78, 0.3);
+    padding: 26px 22px;
+    width: 100%;
+    max-width: 340px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    animation: popUp 0.35s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+@keyframes popUp {
+    from {
+        transform: scale(0.7);
+        opacity: 0;
+    }
+}
+/* 含原生 input 的弹窗用：transform 动画会让真机上的输入框焦点错位/文字裁切 */
+.modal.no-anim {
+    animation: none;
+}
+.modal-title {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 2px;
+}
+.modal-art {
+    display: flex;
+    justify-content: center;
+}
+.modal-sub {
+    color: var(--ink2);
+    font-size: 14px;
+    line-height: 1.7;
+}
+.modal-btns {
+    display: flex;
+    gap: 10px;
+}
+.modal-btns > view,
+.modal-btns > button {
+    flex: 1;
+}
+
+/* 流量主 banner 容器：只留外边距定位，不改广告本体样式（遮挡/裁剪广告违反流量主规范） */
+.ad-slot {
+    margin: 16px 0 4px;
+}
+
+/* 自绘像素图标（assets/icons/，tools/gen-icons.js 生成）：
+   替代 UI 里的系统 emoji —— iOS/安卓渲染一致，且与全站像素风统一 */
+.pxi {
+    width: 16px;
+    height: 16px;
+    vertical-align: -3px;
+    margin-right: 4px;
+}
+.pxi-s {
+    width: 13px;
+    height: 13px;
+    vertical-align: -2px;
+    margin-right: 3px;
+}
+.pxi-l {
+    width: 20px;
+    height: 20px;
+    vertical-align: -4px;
+}
+.pxi-xl {
+    width: 40px;
+    height: 40px;
+}
+.icon-btn .pxi-l,
+.tb-actions .pxi-l {
+    vertical-align: 0;
+    margin: 0;
+}
+</style>
