@@ -115,7 +115,7 @@ merchant = net − platform             商家应得（≈ 实付 86.76%；商�
 ```json
 "order": {
   "enabled": true,
-  "multi": false,
+  "multi": true,
   "pickupArea": "杭州市内到店自取",
   "pickupHint": "具体取货地址在派单后的订单详情里显示，做好后商家会电话联系你约时间",
   "notice": "下单后 3-7 天内完成制作，节假日顺延",
@@ -129,7 +129,7 @@ merchant = net − platform             商家应得（≈ 实付 86.76%；商�
 - `finishImages`（可选）：烫法示例实拍**放大图**的高清 URL，`{ "towel": "https://…/towel.jpg", … }`，key 为烫法
   key（smooth/towel/bath/glaze/paper/mesh/glitter/glitterFine），只认 https。缺省用包内 `assets/finish/<key>-l.jpg`
   （长边 640）；缩略图始终用包内 220×220 的 `<key>.jpg`。想换图不发版就下发这个。
-- `multi`：多图订单（代拼篮）开关，**缺省 `false`**。后端实现 §3.1b 的 `works[]` 后下发 `true`，下单页才出现「再加一张」。
+- `multi`：多图订单（代拼篮）已上线，客户端固定开启；旧配置中的 `false` 不再隐藏「再加一张」。
 - `pricing`：报价表覆盖，缺省 `null` 用内置表。形状（都是可选项，只接受合法的）：
 
 ```json
@@ -168,6 +168,10 @@ merchant = net − platform             商家应得（≈ 实付 86.76%；商�
 
 ## 3. 客户接口
 
+### 3.0 下单页报价 `POST /api/orders/quote`
+
+需要小程序登录令牌。单图请求传 `name`、`w`、`h`、`finish`、`glitter`、`delivery`、`address` 和完整图纸 JSON 字符串 `payload`；服务端从 `payload.cells` 重算豆数和色数。单图响应 `data.items` 是费用行。多图请求把每张图的 `name/w/h/finish/glitter/payload` 放进 `works[]`，响应 `data.lines[]` 是每张的费用行、`data.shipping` 是整单一次运费。两种响应都用 `data.totalFen` 作为页面合计，`needAddress=true` 时禁止提交。下单页不在本地计算价格。业务校验失败返回 `code=400`，原因在外层 `message`。
+
 ### 3.1 创建订单 + 预下单 `POST /api/orders`
 
 请求体：
@@ -176,7 +180,6 @@ merchant = net − platform             商家应得（≈ 实付 86.76%；商�
 |---|---|---|
 | clientOrderId | string | 幂等键。同一 (userId, clientOrderId) 重复调用返回已有订单（客户端改选项会换键） |
 | workId | string | 作品在客户端的 id（仅溯源） |
-| patternCode | string | 兼容旧客户端的可选字段；代拼下单不依赖分享口令或图片审核 |
 | name | string | 作品名 ≤20 字，**过 msgSecCheck** |
 | w, h | int | 图纸尺寸 1~256（校验 max(w,h) ≤ maxSide） |
 | beads, colorN | int | 豆数 / 色数（服务端从 payload 重算校验，豆数 ≥ minBeads） |
@@ -189,42 +192,12 @@ merchant = net − platform             商家应得（≈ 实付 86.76%；商�
 | phone | string | 联系手机（自取必填 11 位；快递用地址里的电话） |
 | address | object\|null | 快递必填：`{name, tel, province, city, county, detail, full}`（来自 wx.chooseAddress） |
 | note | string | 备注 ≤100 字，**过 msgSecCheck** |
-| clientQuote | object | 客户端估算 `{items:[{key,fen}], totalFen}`，仅用于比对/埋点 |
+| clientQuote | object | 最近一次服务端报价 `{items:[{key,fen}], totalFen}`，用于创建订单时核对价格 |
 | payload | string | 图纸 JSON `{w, h, cells, palette?, name}` ≤256KB，**与导入码 payload 同构**（见 §5.3） |
-
-创建订单前，客户端必须先调用 `POST /api/orders/quote` 获取服务端权威报价。该接口不创建订单、不发起支付，请求使用单图字段中的 `w / h / glitter / delivery / address / payload`，响应 `data`：
-
-```json
-{
-  "items": [{ "key": "labor", "label": "代拼费", "fen": 5240 }, { "key": "shipping", "label": "运费", "fen": 0 }],
-  "goodsFen": 5240,
-  "shippingFen": 0,
-  "totalFen": 5240,
-  "merchantQuoteFen": 4541,
-  "needAddress": false
-}
-```
-
-页面合计必须使用 `totalFen`（单位：分），不能使用结算明细中的 `taxFen`。报价成功后才允许调用 `POST /api/orders`；后者仍会再次复算，防止报价配置在提交期间发生变化。
-
-两张及以上时，`POST /api/orders/quote` 使用 `works[]`，每张只需要 `name / w / h / glitter / payload`；服务端逐张从 payload 重算豆数与色数，再计算一次合寄运费：
-
-```json
-{
-  "delivery": "express",
-  "address": { "province": "浙江省" },
-  "works": [
-    { "name": "第一张", "w": 30, "h": 30, "glitter": false, "payload": "{...}" },
-    { "name": "第二张", "w": 30, "h": 30, "glitter": true, "payload": "{...}" }
-  ]
-}
-```
-
-多图成功响应的 `data` 为 `{ ok, reason, badIndex, lines, shipping, goodsFen, shippingFen, totalFen, merchantQuoteFen, zone, parcel, needAddress, colorOver }`。`lines[i]` 是第 i 张的商品费用，`shipping` 是整单唯一运费行，页面仍取整单 `totalFen`。
 
 行为：
 
-1. 校验：尺寸/豆数/色数从 payload 重算；豆数 < minBeads 或长边 > maxSide → `400`；快递省份在 blocked → `400`。代拼下单不要求 `patternCode`，也不触发图片安全审核。
+1. 校验：尺寸/豆数/色数从 payload 重算；豆数 < minBeads 或长边 > maxSide → `400`；快递省份在 blocked → `400`。代拼下单不要求 `patternCode`，也不触发图纸图片安全审核；作品名和备注仍按本节要求做文本安全检查。服务端派单时再为商家生成订单导入码。
 2. 用 `pricing.quote()` 复算金额（**以服务端为准**），落库 `items/goodsFen/shippingFen/totalFen`，同时算好 `settle(totalFen)` 三个数存到订单上。
 3. 建订单 `status = unpaid`，30 分钟支付超时（超时未付 → `cancelled`，reason「支付超时」）。
 4. 调微信支付 APIv3 的 JSAPI 下单接口 `POST /v3/pay/transactions/jsapi`（商户号 1117800336）：
@@ -238,10 +211,10 @@ merchant = net − platform             商家应得（≈ 实付 86.76%；商�
   "payParams": { "timeStamp": "1700000000", "nonceStr": "…", "package": "prepay_id=…", "signType": "RSA", "paySign": "…" } }
 ```
 
-客户端拿到后：若 `order.totalFen` ≠ 本地估算，先弹「金额已更新」确认；然后 `wx.requestPayment(payParams)`。`signType` 直连 APIv3 固定 `RSA`，客户端透传。
+客户端拿到后：仅当 `order.totalFen` 与最近一次服务端报价一致时调用 `wx.requestPayment(payParams)`；若价格变化，停止支付并刷新报价，让用户重新确认。`signType` 直连 APIv3 固定 `RSA`，客户端透传。
 用户取消支付订单仍保留为 `unpaid`，可在订单页「继续支付」。
 
-### 3.1b 多图订单（客户端与管理后台已做，等后端实现后下发 `order.multi: true` 打开）
+### 3.1b 多图订单（客户端、管理后台与后端已支持）
 
 > 这里是概要，后端实现以 §11 为准。
 
@@ -556,7 +529,7 @@ webhook(企业微信群机器人), settle{accountName, bankName, accountNo}（�
 | 5 | 同上换「粗闪格利特」 | 多一行格利特 ¥0.60（商家 0.50），合计 ¥10.70 |
 | 6 | 99 颗作品 / 长边 105 | 红条提示，去支付不可用 |
 | 7 | 快递 + 浙江 / 北京 / 香港地址 | 运费 ¥6.00 / ¥10.00（商家成本原价，不加价）/ 红条「暂不支持快递」；切换自取与快递时代拼费不变 |
-| 8 | 服务端复算与本地不一致 | 弹「金额已更新」，确认后按服务端金额支付 |
+| 8 | 创建订单金额与页面服务端报价不一致 | 停止支付，刷新报价，用户重新确认后再下单 |
 | 9 | 支付成功 | 订单页自动展开该单，状态 1.5s 内从待支付变待接单；后台待派单队列出现该单，平台群收到通知 |
 | 10 | 后台派单给商家 A | 客户端状态「已派单」+ 显示商家名；商家 A 的群收到派单消息与导入码；商家用导入码能导入并保存图纸 |
 | 11 | 支付中取消 / 待支付取消 | 「继续支付」能再拉起；取消后状态已取消、微信侧已关单 |
@@ -688,7 +661,7 @@ webhook(企业微信群机器人), settle{accountName, bankName, accountNo}（�
 6. **落库**：主表按 11.3 写；每张写 `order_works`，`items = q.lines[i].items`，`goods_fen = q.lines[i].goodsFen`，`merchant_quote_fen = q.lines[i].merchantQuoteFen`；
    主表 `items = [q.shipping]`，金额取 `q.goodsFen / q.shippingFen / q.totalFen / q.merchantQuoteFen`，再存 `settle(q.totalFen)`。
 7. **支付下单**：和单图一样，金额用 `q.totalFen`。商品描述用「拼豆代拼·小熊等3件」，超过微信 `description` 长度限制（127 字节）就截断作品名。
-8. **响应**：`{ order: VO（11.5）, payParams }`。如果服务端金额和 `clientQuote.totalFen` 不一样，客户端会弹「金额已更新」让客户确认，服务端不用额外处理。
+8. **响应**：`{ order: VO（11.5）, payParams }`。如果服务端金额和 `clientQuote.totalFen` 不一样，客户端停止支付并刷新报价。
 
 错误码：业务校验失败都用 `400` + 中文 `message`，客户端直接 toast 出来；其他错误码的含义不变。
 
@@ -782,7 +755,7 @@ webhook(企业微信群机器人), settle{accountName, bankName, accountNo}（�
 3. 生产部署后下发 `"multi": true`，所有用户下次冷启动生效。
 4. 出问题时下发 `false` 就能关掉，不用发版。已经下好的多图订单照常流转。
 
-小程序代码里 `multi` 的默认值是 `false`（`utils/config.js ORDER_DEF`）。这个默认值只在配置从来没拉到过时才起作用，平时以下发的值为准。
+小程序代码里 `multi` 固定为 `true`（`utils/config.js ORDER_DEF`），旧的服务端开关不再影响入口。上面的开关步骤保留为历史上线记录。
 
 ### 11.11 验收用例
 

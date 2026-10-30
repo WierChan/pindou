@@ -1,6 +1,6 @@
 // 代拼订单：客户端下单 / 微信支付 / 查单封装 + 本地订单索引。
 // 接口契约见 docs/order-api.md（pindou-server 实现）。金额以服务端复算为准，
-// 本地 utils/pricing.js 只做即时展示；图纸随单以「导入码同款 payload」上传，商家可直接导入拼。
+// 下单页调用服务端报价；图纸随单以「导入码同款 payload」上传，商家可直接导入拼。
 const api = require('./api');
 const { ENV } = require('./env');
 const { PALETTE, hexToRgb } = require('./palette');
@@ -97,21 +97,6 @@ function workBody(work, finish, hole, st) {
   };
 }
 
-// 创建订单前由服务端核价，不创建订单、不发起支付；多图由服务端计算合寄运费。
-function quote(list, o) {
-  if (!Array.isArray(list) || !list.length) return Promise.reject({ message: '还没有选择作品' });
-  const body = {
-    delivery: o.delivery,
-    address: o.delivery === 'express' ? (o.address || null) : null,
-  };
-  if (list.length === 1) {
-    Object.assign(body, workBody(list[0].work, list[0].finish, o.hole, list[0].stats));
-  } else {
-    body.works = list.map(x => workBody(x.work, x.finish, o.hole, x.stats));
-  }
-  return api.post('/api/orders/quote', body);
-}
-
 // 创建订单并预下单。list: [{ work, finish, stats? }]（1 张 = 老的单图格式；多张 = works[]，docs/order-api.md §3.1b）
 // o: { clientOrderId, hole, delivery, phone, address, note, quote（quoteCart 结果） }
 // 返回 { order, payParams }；服务端按 (用户, clientOrderId) 幂等
@@ -134,6 +119,33 @@ function create(list, o) {
   return api.post('/api/orders', body).then(d => {
     if (d && d.order) remember(d.order);
     return d;
+  });
+}
+
+// 下单页报价只读请求；金额和费用行均以服务端返回为准。
+function quote(list, o) {
+  const quoteWork = x => ({
+    name: x.work.name,
+    w: x.work.w,
+    h: x.work.h,
+    finish: x.finish,
+    glitter: isGlitter(x.finish),
+    payload: buildPayload(x.work),
+  });
+  const body = list.length === 1 ? quoteWork(list[0]) : { works: list.map(quoteWork) };
+  Object.assign(body, {
+    delivery: o.delivery,
+    address: o.address || null,
+  });
+  return api.post('/api/orders/quote', body).then(d => {
+    const q = (d && d.quote) || d;
+    if (list.length !== 1 || !q || !Array.isArray(q.items)) return q;
+    const shipping = q.items.find(i => i.key === 'shipping');
+    return Object.assign({}, q, {
+      lines: [{ items: q.items.filter(i => i.key !== 'shipping'), goodsFen: q.goodsFen }],
+      shipping,
+      badIndex: -1,
+    });
   });
 }
 
@@ -276,7 +288,7 @@ function toVM(o) {
 
 module.exports = {
   STATUS, ORDER_FINISH, statusInfo, isGlitter, orderFinish, finishLabel, workStats, buildPayload,
-  quote, create, requestPay, list, get, payParams, cancel, confirm, track, errText,
+  create, quote, requestPay, list, get, payParams, cancel, confirm, track, errText,
   cartRead, cartWrite, cartClear,
   remember, localList, localCount, lastPhone, rememberPhone, fmtTime, toVM,
 };

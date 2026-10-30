@@ -28,10 +28,10 @@ function pickAd(src) {
 //   notice         下单页展示的说明(可空)
 //   finishImages   烫法示例放大图的高清 URL {finishKey: url}(可空;缺省用包内 assets/finish/<key>-l.jpg)
 //   pricing        报价表覆盖 {minBeads, maxSide, tiers, shipping, parcel},缺省用 utils/pricing.js 内置表
-//   multi          多图订单(代拼篮)开关。缺省 = 关:后端按 docs/order-api.md §11 支持 works[] 后下发 true 才出现「再加一张」
+//   multi          多图订单(代拼篮)已上线，客户端固定开启；兼容旧配置里的 false
 const ORDER_DEF = {
   enabled: true,
-  multi: false,
+  multi: true,
   pickupArea: '杭州市内到店自取',
   pickupHint: '具体取货地址在派单后的订单详情里显示，做好后商家会电话联系你约时间',
   notice: '',
@@ -43,7 +43,6 @@ function pickOrder(src) {
   const o = Object.assign({}, ORDER_DEF);
   if (src && typeof src === 'object') {
     if (typeof src.enabled === 'boolean') o.enabled = src.enabled;
-    if (typeof src.multi === 'boolean') o.multi = src.multi;
     ['pickupArea', 'pickupHint', 'notice'].forEach(k => {
       if (typeof src[k] === 'string' && src[k]) o[k] = src[k];
     });

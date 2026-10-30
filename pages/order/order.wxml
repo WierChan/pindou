@@ -40,6 +40,7 @@
           <view class="od-work-sub">商家备豆、按这张图纸拼好并熨烫定型，寄给你或到店自取；豆子和熨烫都含在代拼费里</view>
         </view>
       </view>
+      <view class="od-hint od-rights-hint">图片授权提醒：请确认本单图纸为您原创，或已获得用于代拼制作的授权；未经授权请勿下单。</view>
       <view wx:if="{{blocked}}" class="od-block">{{blocked}}</view>
     </view>
 
@@ -57,9 +58,9 @@
                 <view wx:for="{{item.items}}" wx:for-item="it" wx:key="key"
                       class="fin-card {{finish === it.key ? 'on' : ''}}" hover-class="pressed"
                       data-v="{{it.key}}" bindtap="pickFinish">
-                  <view class="fin-pv" data-v="{{it.key}}" data-n="{{it.name}}" data-s="{{it.sub}}" data-fee="{{it.fee}}" catchtap="previewFinish">
+                  <view class="fin-pv">
                     <image class="fin-img" src="{{it.img}}" mode="aspectFill" />
-                    <view class="fin-zoom">放大</view>
+                    <view class="fin-zoom" data-v="{{it.key}}" data-n="{{it.name}}" data-s="{{it.sub}}" data-fee="{{it.fee}}" catchtap="previewFinish">放大</view>
                   </view>
                   <view class="fin-nm">{{it.name}}<text wx:if="{{it.fee}}" class="fin-fee">{{it.fee}}</text></view>
                 </view>
@@ -119,7 +120,9 @@
     <!-- 费用 -->
     <view class="od-sec">
       <view class="od-sec-t">费用明细</view>
-      <view class="od-card">
+      <view wx:if="{{quoteLoading}}" class="od-hint od-quote-status">正在获取报价…</view>
+      <view wx:if="{{quoteError}}" class="od-hint od-quote-status warn" bindtap="retryQuote">{{quoteError}}，点击重试</view>
+      <view class="od-card od-fees-card">
         <view wx:for="{{items}}" wx:key="key" class="od-fee">
           <view class="od-fee-l">
             <text class="od-fee-nm">{{item.label}}</text>
@@ -137,7 +140,7 @@
 
   <view class="od-bar">
     <view class="od-total"><text class="od-total-lb">合计</text><text class="od-total-v">¥{{totalYuan}}</text></view>
-    <view class="btn-primary od-pay {{canPay ? '' : 'off'}}" hover-class="pressed" bindtap="submit">{{submitting ? '提交中…' : (quoting ? '核价中…' : '去支付')}}</view>
+    <view class="btn-primary od-pay {{canPay ? '' : 'off'}}" hover-class="pressed" bindtap="submit">{{submitting ? '提交中…' : '去支付'}}</view>
   </view>
 </view>
 
