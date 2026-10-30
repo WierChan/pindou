@@ -47,6 +47,7 @@ Page({
     chips: [],
     paintOn: false,
     locateOn: false,
+    previewOn: false,
     fillLeft: 3,        // 一键拼豆今日剩余次数
     fillColorLeft: 3,   // 拼满此色今日剩余次数（独立额度）
     fillArmed: false,   // 一键拼豆武装中：等用户点画板选一整片同色
@@ -99,6 +100,12 @@ Page({
     };
     // MARD 色号只对全局色板作品展示（自带色板的颜色不是实体豆色，标了会误导买豆）
     this.palCode = pal => (work.palette ? '' : PALETTE[pal].code + ' ');
+    this.displayCode = pal => {
+      if (!work.palette) return PALETTE[pal].code;
+      const c = hexToRgb(work.palette[pal]);
+      return PALETTE[nearestPalette(c[0], c[1], c[2])].code;
+    };
+    this.chartCodes = () => (work.palette || PALETTE).map((_, pal) => this.displayCode(pal));
 
     const stats = colorStats(work.cells);
     this.colorsUsed = stats.map(s => s.pal);
@@ -114,6 +121,7 @@ Page({
     this.placedCount = this.total - left;
     this.sel = this.colorsUsed.find(p => this.remaining.get(p) > 0);
     if (this.sel == null) this.sel = this.colorsUsed[0];
+    this.previewSel = null;
     this.finished = false;
     this.pending = [];
     this.flushTimer = 0;
@@ -129,7 +137,7 @@ Page({
     const chips = this.colorsUsed.map((pal, i) => {
       const n = this.remaining.get(pal);
       return {
-        pal, num: i + 1,
+        pal, num: i + 1, code: this.displayCode(pal),
         hex: this.palHex(pal),
         tcol: textColorFor(this.palHex(pal)),
         left: n > 0 ? n : '✓',
@@ -235,10 +243,12 @@ Page({
         w: this.work.w, h: this.work.h,
         cells: this.work.cells, placed: this.work.placed,
         palette: this.work.palette || null,
+        chartCodes: this.chartCodes(),
         mode: 'play',
         locate: this.locateOn,
+        preview: this.data.previewOn,
         numbers: this.numbers,
-        getSelected: () => this.sel,
+        getSelected: () => this.data.previewOn ? this.previewSel : this.sel,
         canSwipe: () => this.paintOn,
         onPlace: i => this._onPlace(i),
         onWrong: () => {
@@ -361,7 +371,27 @@ Page({
   /* ---------- 色板 / 工具 ---------- */
   tapChip(e) {
     if (this.finished) return;
-    this._setSel(+e.currentTarget.dataset.pal);
+    const pal = +e.currentTarget.dataset.pal;
+    if (this.data.previewOn) {
+      const old = this.previewSel;
+      this.previewSel = old === pal ? null : pal;
+      const patch = {};
+      if (old != null && this.chipIdx.has(old)) patch['chips[' + this.chipIdx.get(old) + '].active'] = false;
+      if (this.previewSel != null && this.chipIdx.has(this.previewSel)) patch['chips[' + this.chipIdx.get(this.previewSel) + '].active'] = true;
+      this.setData(patch);
+      if (this.bv) this.bv.requestRender();
+      return;
+    }
+    this._setSel(pal);
+  },
+
+  togglePreview() {
+    if (this.finished) return;
+    const previewOn = !this.data.previewOn;
+    if (previewOn && this.fillArmed) this._setFillArmed(false);
+    this.previewSel = null;
+    this.setData({ previewOn, chips: this.data.chips.map(item => Object.assign({}, item, { active: !previewOn && item.pal === this.sel })) });
+    if (this.bv) this.bv.setPreview(previewOn);
   },
 
   _setSel(pal) {
@@ -421,7 +451,7 @@ Page({
       }
       this._rebuildColors(toGlobalIdx, order);  // 选中切到换成的新色
     }
-    if (this.bv) { this.bv.setColors(work.palette || null, this.numbers); this.bv.requestRender(); }
+    if (this.bv) { this.bv.setColors(work.palette || null, this.numbers); this.bv.o.chartCodes = this.chartCodes(); this.bv.requestRender(); }
     this._savePattern();
     this._refreshThumb();
     ui.toast('换好啦 ✨');
@@ -455,7 +485,7 @@ Page({
     const chips = used.map((pal, i) => {
       const n = this.remaining.get(pal);
       return {
-        pal, num: i + 1, hex: this.palHex(pal), tcol: textColorFor(this.palHex(pal)),
+        pal, num: i + 1, code: this.displayCode(pal), hex: this.palHex(pal), tcol: textColorFor(this.palHex(pal)),
         left: n > 0 ? n : '✓', done: n === 0, active: pal === this.sel,
       };
     });

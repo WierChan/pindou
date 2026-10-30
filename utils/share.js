@@ -228,7 +228,7 @@ function fitText(ctx, s, maxW) {
 // 图纸样式导出（分享弹窗「保存图纸」）：仿实体拼豆图纸版式（参照 RED 图纸工坊）——
 // 米黄页面底 + 白底网格卡片；格内直接印 MARD 色号（对着图纸抓豆；自带色板作品——
 // 图纸导入等——按 OKLab 就近匹配 MARD 色号印出）、四边坐标数字、每格淡灰线 +
-// 10 格酒红实线 / 5 格酒红虚线加粗参考线（仿实体拼豆板）；
+// 10 格红棕色实线 / 5 格红棕色虚线加粗参考线（仿实体拼豆板）；
 // 底部「名称 · 尺寸 · 色数/总颗数」说明行 + 色号图例（编号 色号 ×数量 ——
 // 编号是 app 拼豆页色卡的编号，图例即两套标识的对照桥）。
 // 网格区仍是平色格（无豆孔/高光），保存的图可再从「导入拼豆图纸」识别回来（往返闭环）；
@@ -257,8 +257,8 @@ function buildChartExportTo(canvas, work, opts) {
   // 版式（逻辑像素）—— 常量改动要同步 tests/export-synth.js
   const P = 30, HEADER = 56, COORD = 30, CARD_PAD = 14;
   const INFO_H = 46, PILL_H = 42, PILL_GAP = 12, FOOT = 54;
-  const GRID_LINE_A = 0.32; // 小格线用浅酒红；白底上清晰可见，仍弱于大格参考线
-  const GRID_MAJOR_A = 0.9; // 5/10 格参考线透明度：拼的时候靠它数格，要一眼可辨；只占 1/5 洗色有限
+  const GRID_LINE_A = 0.36;
+  const GRID_MAJOR_A = 0.9;
   const GRID_DASH = 5, GRID_GAP = 4; // 5 格虚线的实/空段长（逻辑像素）
   const GRID_MAJOR_W = 2;   // 参考线线宽（逻辑像素）：比 1px 细格线粗一档，骑缝居中画
   const gridW = w * cellPx, gridH = h * cellPx;
@@ -302,6 +302,15 @@ function buildChartExportTo(canvas, work, opts) {
   ctx.fillStyle = '#FFFFFF';
   rr(ctx, cardX, cardY, cardW, cardH, 14);
   ctx.fill();
+  ctx.fillStyle = Math.min(w, h) < 12 ? '#F5F5F5' : '#D9D9D9';
+  ctx.fillRect(gridX, gridY - COORD, gridW, COORD);
+  ctx.fillRect(gridX, gridY + gridH, gridW, COORD);
+  ctx.fillRect(gridX - COORD, gridY, COORD, gridH);
+  ctx.fillRect(gridX + gridW, gridY, COORD, gridH);
+  ctx.fillRect(gridX - COORD, gridY - COORD, COORD, COORD);
+  ctx.fillRect(gridX + gridW, gridY - COORD, COORD, COORD);
+  ctx.fillRect(gridX - COORD, gridY + gridH, COORD, COORD);
+  ctx.fillRect(gridX + gridW, gridY + gridH, COORD, COORD);
 
   // 平色格（无孔无高光）
   for (let y = 0; y < h; y++) {
@@ -313,11 +322,12 @@ function buildChartExportTo(canvas, work, opts) {
     }
   }
   // 格线画在豆色上层（真图纸同款，同色区域靠它分格）：细格线半透明（GRID_LINE_A）让豆色透出、
-  // 图纸不发白；参考线仿实体拼豆板——每 10 格酒红实线、夹中间的 5 格酒红虚线（GRID_MAJOR_A，
+  // 图纸不发白；参考线仿实体拼豆板——每 10 格红棕色实线、夹中间的 5 格红棕色虚线（GRID_MAJOR_A，
   // 加粗到 GRID_MAJOR_W、深到一眼可辨；边界线强制实线收边），数格先按实线大格再虚线对半。
   // 参考线虽强但只占 1/5，洗色有限；再导入的格距靠占多数的 1px 细线周期锁定，配合
   // analyzeChart 的谐波纠偏不会误锁 5×。
   ctx.save();
+  const lineBand = Math.min(w, h) < 12 ? 0 : COORD;
   const mOff = (GRID_MAJOR_W - 1) / 2; // 参考线骑缝居中的回退量
   const dashedV = (x, y, len) => { // 手绘虚线（fillRect 分段，便于 tests/export-synth.js 逐像素镜像）
     for (let s = 0; s < len; s += GRID_DASH + GRID_GAP) ctx.fillRect(x, y + s, GRID_MAJOR_W, Math.min(GRID_DASH, len - s));
@@ -328,20 +338,20 @@ function buildChartExportTo(canvas, work, opts) {
   for (let k = 0; k <= w; k++) {
     const major = k % 5 === 0;
     ctx.globalAlpha = major ? GRID_MAJOR_A : GRID_LINE_A;
-    ctx.fillStyle = '#8C2F43';
+    ctx.fillStyle = major ? '#8C2F43' : '#777777';
     const x = gridX + k * cellPx;
-    if (!major) ctx.fillRect(x, gridY, 1, gridH);
-    else if (k % 10 !== 0 && k !== w) dashedV(x - mOff, gridY, gridH);
-    else ctx.fillRect(x - mOff, gridY, GRID_MAJOR_W, gridH);
+    if (!major) ctx.fillRect(x, gridY - lineBand, 1, gridH + lineBand * 2);
+    else if (k % 10 === 5 && k !== w) dashedV(x - mOff, gridY - lineBand, gridH + lineBand * 2);
+    else ctx.fillRect(x - mOff, gridY - lineBand, GRID_MAJOR_W, gridH + lineBand * 2);
   }
   for (let k = 0; k <= h; k++) {
     const major = k % 5 === 0;
     ctx.globalAlpha = major ? GRID_MAJOR_A : GRID_LINE_A;
-    ctx.fillStyle = '#8C2F43';
+    ctx.fillStyle = major ? '#8C2F43' : '#777777';
     const y = gridY + k * cellPx;
-    if (!major) ctx.fillRect(gridX, y, gridW, 1);
-    else if (k % 10 !== 0 && k !== h) dashedH(gridX, y - mOff, gridW);
-    else ctx.fillRect(gridX, y - mOff, gridW, GRID_MAJOR_W);
+    if (!major) ctx.fillRect(gridX - lineBand, y, gridW + lineBand * 2, 1);
+    else if (k % 10 === 5 && k !== h) dashedH(gridX - lineBand, y - mOff, gridW + lineBand * 2);
+    else ctx.fillRect(gridX - lineBand, y - mOff, gridW + lineBand * 2, GRID_MAJOR_W);
   }
   ctx.restore();
   // 逐格标签（深浅字按格色亮度选）。色号 2-3 字符比编号宽：从理想字号起，
@@ -370,25 +380,19 @@ function buildChartExportTo(canvas, work, opts) {
     }
   }
 
-  // 四边坐标数字（1, 6, 11, …, 尾数；在米黄底上）
-  ctx.fillStyle = '#A59795';
-  ctx.font = '13px sans-serif';
+  // 四边逐格坐标，与参考图的灰色坐标带一致。
+  ctx.fillStyle = '#444444';
+  ctx.font = Math.min(12, Math.max(7, cellPx * 0.38)) + 'px sans-serif';
   ctx.textAlign = 'center';
-  const marks = n => {
-    const a = [];
-    for (let k = 1; k <= n; k += 5) a.push(k);
-    if (a[a.length - 1] !== n) a.push(n);
-    return a;
-  };
-  for (const k of marks(w)) {
+  for (let k = 1; k <= w; k++) {
     const x = gridX + (k - 0.5) * cellPx;
-    ctx.fillText(String(k), x, cardY - COORD / 2);
-    ctx.fillText(String(k), x, cardY + cardH + COORD / 2);
+    ctx.fillText(String(k), x, gridY - COORD / 2);
+    ctx.fillText(String(k), x, gridY + gridH + COORD / 2);
   }
-  for (const k of marks(h)) {
+  for (let k = 1; k <= h; k++) {
     const y = gridY + (k - 0.5) * cellPx;
-    ctx.fillText(String(k), cardX - COORD / 2, y);
-    ctx.fillText(String(k), cardX + cardW + COORD / 2, y);
+    ctx.fillText(String(k), gridX - COORD / 2, y);
+    ctx.fillText(String(k), gridX + gridW + COORD / 2, y);
   }
 
   // 说明行：「名字」 MARD · w×h · N 色 / 共 total 颗（与 RED 图纸工坊同位置的品牌标识；

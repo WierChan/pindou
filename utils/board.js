@@ -1,7 +1,7 @@
 // 画板渲染引擎（小程序版）：豆子绘制、缩放平移手势、拼豆/熨烫交互
 // 色板：默认全局 PALETTE；作品可自带 palette（hex 数组，图纸导入的真实颜色），
 // drawPatternInto 自动认 p.palette，BoardView 走 opts.palette
-const { PALETTE_RGB, hexToRgb } = require('./palette');
+const { PALETTE_RGB, hexToRgb, relLum } = require('./palette');
 
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 // hex 色板 → RGB 三元组数组；没有自定义色板时用全局的
@@ -567,6 +567,7 @@ class BoardView {
     this.hole = opts.hole; // 成品豆孔档位：none / small / large
     this.holeR = holeRatio(opts.hole);
     this.chart = !!opts.chart; // 图纸显示模式（view）
+    this.preview = !!opts.preview;
     this.locate = !!opts.locate; // 定位模式（play）：高亮当前色未拼格、其余变淡
     this.fillArmed = false;      // 一键拼豆武装中：下一次轻点画板 → 铺满点击处周围一块（各色）
     this.scale = 20; this.ox = 0; this.oy = 0;
@@ -602,6 +603,7 @@ class BoardView {
   setHole(v) { this.hole = v; this.holeR = holeRatio(v); this.dirty = true; }
   // 图纸显示模式（view 模式用）：平色格 + 网格线，与分享/导出图纸同款观感
   setChart(v) { this.chart = !!v; this.dirty = true; }
+  setPreview(v) { this.preview = !!v; this.dirty = true; }
   // 定位模式（play 模式用）：当前选中色的未拼格高亮红、其余变淡，方便找位置
   setLocate(v) { this.locate = !!v; this.dirty = true; }
   // 一键拼豆武装开关（play 模式用）：武装后轻点画板不再单颗上豆，而是铺满点击处周围一块（各色）
@@ -682,7 +684,7 @@ class BoardView {
       const p = [...this.pointers.values()][0];
       this.gesture = { start: p, moved: 0, painted: false, wrongCell: -1, pinched: false };
       // 一键拼豆武装时按下不落豆：等抬手确认是轻点，再铺满整片（拖动则平移）
-      if (this.o.mode === 'play') { if (!this.fillArmed) this._paintAt(p, true); }
+      if (this.o.mode === 'play') { if (!this.preview && !this.fillArmed) this._paintAt(p, true); }
       // free 模式按下先不落豆：等移动确认是划豆（双指随后落下则是缩放，抬起时轻点再补画）
       else if (this.o.mode === 'iron') {
         this.ironPos = this._ironPoint(p);
@@ -731,7 +733,7 @@ class BoardView {
     const dx = p.x - prev.x, dy = p.y - prev.y;
     this.gesture.moved += Math.hypot(dx, dy);
     const tool = this.o.getTool ? this.o.getTool() : null;
-    if (this.o.mode === 'play' && !tool && !this.fillArmed && (!this.o.canSwipe || this.o.canSwipe())) {
+    if (this.o.mode === 'play' && !this.preview && !tool && !this.fillArmed && (!this.o.canSwipe || this.o.canSwipe())) {
       // 沿轨迹逐格上豆，避免快速滑动漏格
       const steps = Math.ceil(Math.hypot(dx, dy) / (this.scale * 0.4)) || 1;
       for (let i = 1; i <= steps; i++) {
@@ -778,11 +780,11 @@ class BoardView {
       const g = this.gesture;
       this.gesture = null;
       // 一键拼豆武装中：轻点（没拖动、没缩放）→ 铺满点到的那一整片同色；页面在 onFill 里扣次数、收起武装
-      if (this.o.mode === 'play' && this.fillArmed && !g.pinched && g.moved < 8) {
+      if (this.o.mode === 'play' && !this.preview && this.fillArmed && !g.pinched && g.moved < 8) {
         const cell = this.cellAt(g.start);
         const filled = cell >= 0 ? this.fillBlockAt(cell) : [];
         if (this.o.onFill) this.o.onFill(filled, cell);
-      } else if (this.o.mode === 'play' && !g.pinched && !g.painted && g.moved < 8 && g.wrongCell >= 0) {
+      } else if (this.o.mode === 'play' && !this.preview && !g.pinched && !g.painted && g.moved < 8 && g.wrongCell >= 0) {
         this.wrongFx = { i: g.wrongCell, t0: now() };
         this.dirty = true;
         if (this.o.onWrong) this.o.onWrong(g.wrongCell);
@@ -1047,6 +1049,18 @@ class BoardView {
           }
         }
       }
+    } else if (this.o.mode === 'play' && this.preview) {
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(ox, oy, w * s, h * s);
+      ctx.fillStyle = '#D9D9D9';
+      ctx.fillRect(ox, oy - 18, w * s, 18);
+      ctx.fillRect(ox, oy + h * s, w * s, 18);
+      ctx.fillRect(ox - 18, oy, 18, h * s);
+      ctx.fillRect(ox + w * s, oy, 18, h * s);
+      ctx.fillRect(ox - 18, oy - 18, 18, 18);
+      ctx.fillRect(ox + w * s, oy - 18, 18, 18);
+      ctx.fillRect(ox - 18, oy + h * s, 18, 18);
+      ctx.fillRect(ox + w * s, oy + h * s, 18, 18);
     } else {
       // 底板（像素风：右下掉落式硬投影 + 白底 + 靛墨描边）
       const pad = Math.max(6, s * 0.4);
@@ -1072,7 +1086,8 @@ class BoardView {
     const ironed = this.o.ironed;
     const sel = isPlay ? this.o.getSelected() : -2;
     const locate = isPlay && this.locate; // 定位：高亮当前色未拼格、其余变淡
-    const showNum = isPlay && !locate && s >= 15 && this.o.numbers;
+    const showNum = isPlay && !this.preview && !locate && s >= 15 && this.o.numbers;
+    const previewLabelFont = isPlay && this.preview && this.o.chartCodes ? Math.min(12, Math.max(3, s * 0.5)) : 0;
     const showPeg = s >= 9;
     const tiny = s < 3.5; // 大画布缩到很小时改用方块填充，绕开圆弧/渐变的开销
     const fused = this.fused && !isPlay && !isIron && !chartView;
@@ -1117,6 +1132,25 @@ class BoardView {
           }
         }
         if (tc < 0) continue;
+        if (isPlay && this.preview) {
+          const selected = tc === sel;
+          ctx.fillStyle = css(this.pal[tc]);
+          ctx.globalAlpha = sel == null || selected ? 1 : 0.22;
+          ctx.fillRect(px, py, s, s);
+          ctx.globalAlpha = 1;
+          if (previewLabelFont && (sel == null || selected)) {
+            const code = this.o.chartCodes[tc];
+            if (code) {
+              const rgb = this.pal[tc];
+              ctx.fillStyle = relLum(rgb) > 0.45 ? 'rgba(45,35,28,.85)' : 'rgba(255,255,255,.95)';
+              ctx.font = previewLabelFont + 'px sans-serif';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(code, mx, my, Math.max(1, s - 0.3));
+            }
+          }
+          continue;
+        }
         if (placed[i]) {
           let r = s * 0.46;
           const a0 = this.anims.get(i);
@@ -1225,6 +1259,64 @@ class BoardView {
           }
         }
       }
+    }
+
+    // 与导出图纸一致：每 10 格红棕实线、中间 5 格虚线，普通格用浅灰细线。
+    if (isPlay && this.preview && s >= 3) {
+      const gx0 = clamp(Math.ceil((0 - ox) / s), 0, w);
+      const gx1 = clamp(Math.floor((this.vw - ox) / s), 0, w);
+      const gy0 = clamp(Math.ceil((0 - oy) / s), 0, h);
+      const gy1 = clamp(Math.floor((this.vh - oy) / s), 0, h);
+      const exportCell = clamp(Math.floor(1600 / Math.max(w, h)), 12, 32);
+      const ratio = s / exportCell;
+      const dash = 5 * ratio, gap = 4 * ratio;
+      const minorW = ratio, majorW = 2 * ratio, majorOff = (majorW - minorW) / 2;
+      ctx.save();
+      for (let k = gx0; k <= gx1; k++) {
+        const major = k % 5 === 0;
+        const x = ox + k * s;
+        ctx.globalAlpha = major ? 0.9 : 0.36;
+        ctx.fillStyle = major ? '#8C2F43' : '#777777';
+        if (!major) ctx.fillRect(x, oy - 18, minorW, h * s + 36);
+        else if (k % 10 === 5 && k !== w) {
+          for (let p = 0; p < h * s + 36; p += dash + gap) ctx.fillRect(x - majorOff, oy - 18 + p, majorW, Math.min(dash, h * s + 36 - p));
+        } else ctx.fillRect(x - majorOff, oy - 18, majorW, h * s + 36);
+      }
+      for (let k = gy0; k <= gy1; k++) {
+        const major = k % 5 === 0;
+        const y = oy + k * s;
+        ctx.globalAlpha = major ? 0.9 : 0.36;
+        ctx.fillStyle = major ? '#8C2F43' : '#777777';
+        if (!major) ctx.fillRect(ox - 18, y, w * s + 36, minorW);
+        else if (k % 10 === 5 && k !== h) {
+          for (let p = 0; p < w * s + 36; p += dash + gap) ctx.fillRect(ox - 18 + p, y - majorOff, Math.min(dash, w * s + 36 - p), majorW);
+        } else ctx.fillRect(ox - 18, y - majorOff, w * s + 36, majorW);
+      }
+      ctx.restore();
+
+      // 与导出图纸一样，灰色坐标带逐格编号。
+      ctx.save();
+      ctx.fillStyle = '#444444';
+      const coordFont = Math.min(10, Math.max(5, s * 0.7));
+      ctx.font = coordFont + 'px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const coordWidth = Math.max(1, s - 0.3);
+      for (let k = 1; k <= w; k++) {
+        const x = ox + (k - 0.5) * s;
+        if (x >= 0 && x <= this.vw) {
+          ctx.fillText(String(k), x, oy - 9, coordWidth);
+          ctx.fillText(String(k), x, oy + h * s + 9, coordWidth);
+        }
+      }
+      for (let k = 1; k <= h; k++) {
+        const y = oy + (k - 0.5) * s;
+        if (y >= 0 && y <= this.vh) {
+          ctx.fillText(String(k), ox - 9, y, 17);
+          ctx.fillText(String(k), ox + w * s + 9, y, 17);
+        }
+      }
+      ctx.restore();
     }
 
     // 烫法贴片：给已熔合的格子统一铺一遍（噪声/网格/釉光/闪粉）。

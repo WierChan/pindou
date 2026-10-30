@@ -1,6 +1,9 @@
 /* 拼豆界面：主体样式在 app.wxss 的 playpage 骨架里 */
 /* 工具提示挪到单独一行（给「一键拼豆」腾位）：全宽显示，不再被挤成省略号 */
 .tools-hint.row2 { padding: 0 6px 8px; }
+.palette-bar .pdot { min-width: 34px; width: auto; padding: 0 3px; box-sizing: border-box; font-size: 10px; }
+.mode-chip { width: 96px; box-sizing: border-box; padding: 8px 4px; text-align: center; background: #DCEEF7; box-shadow: 3px 3px 0 #A9CBDD; }
+.mode-chip.active { background: #B8DBEF; box-shadow: 3px 3px 0 #82B4D0; }
 
 
 /* 换色取色器（底部弹层 + 全色板网格） */

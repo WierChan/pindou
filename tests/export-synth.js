@@ -51,6 +51,15 @@ function makeAppExport(cells, w, h, paletteHex, opts) {
 
   // 白卡片（镜像用直角；真图圆角 14px 的角部差异对白底区定位无影响）
   fill(im, S(cardX), S(cardY), S(cardW), S(cardH), [255, 255, 255]);
+  const BAND = Math.min(w, h) < 12 ? [245, 245, 245] : [217, 217, 217];
+  fill(im, S(gridX), S(gridY - COORD), S(gridW), S(COORD), BAND);
+  fill(im, S(gridX), S(gridY + gridH), S(gridW), S(COORD), BAND);
+  fill(im, S(gridX - COORD), S(gridY), S(COORD), S(gridH), BAND);
+  fill(im, S(gridX + gridW), S(gridY), S(COORD), S(gridH), BAND);
+  fill(im, S(gridX - COORD), S(gridY - COORD), S(COORD), S(COORD), BAND);
+  fill(im, S(gridX + gridW), S(gridY - COORD), S(COORD), S(COORD), BAND);
+  fill(im, S(gridX - COORD), S(gridY + gridH), S(COORD), S(COORD), BAND);
+  fill(im, S(gridX + gridW), S(gridY + gridH), S(COORD), S(COORD), BAND);
 
   // 平色格
   const rgbOf = t => hex2rgb(paletteHex[t]);
@@ -66,9 +75,10 @@ function makeAppExport(cells, w, h, paletteHex, opts) {
   // 夹中间的 5 格虚线（边界强制实线），加粗 2 逻辑像素骑缝居中、半透明叠在豆色上。
   // 细线用 A_FINE、参考线用较重的 A_MAJOR，虚线实/空段 DASH/GAP 逻辑像素
   // （与 share.js 的 GRID_* 常量一致）。
-  const A_FINE = 0.32, A_MAJOR = 0.9;
+  const A_FINE = 0.36, A_MAJOR = 0.9;
+  const lineBand = Math.min(w, h) < 12 ? 0 : COORD;
   const DASH = 5, GAP = 4;
-  const MAJ = [140, 47, 67];
+  const MAJ = [140, 47, 67], FINE = [119, 119, 119];
   const lwM = Math.max(1, Math.round(2 * scale)); // 参考线 2 逻辑像素线宽
   const blendLine = (x, y, ww, hh, rgb, a) => {
     const x0 = Math.max(0, Math.round(x)), y0 = Math.max(0, Math.round(y));
@@ -83,33 +93,33 @@ function makeAppExport(cells, w, h, paletteHex, opts) {
   for (let k = 0; k <= w; k++) {
     const major = k % 5 === 0;
     if (!major) {
-      blendLine(S(gridX + k * cellPx), S(gridY), lw, S(gridH), MAJ, A_FINE);
+      blendLine(S(gridX + k * cellPx), S(gridY - lineBand), lw, S(gridH + lineBand * 2), FINE, A_FINE);
       continue;
     }
     const x = S(gridX + k * cellPx - 0.5); // 骑缝居中（与 share.js 的 mOff 一致）
-    if (k % 10 !== 0 && k !== w) {
-      for (let s = 0; s < gridH; s += DASH + GAP) {
-        const y0 = S(gridY + s);
-        blendLine(x, y0, lwM, S(gridY + Math.min(s + DASH, gridH)) - y0, MAJ, A_MAJOR);
+    if (k % 10 === 5 && k !== w) {
+      for (let s = 0; s < gridH + lineBand * 2; s += DASH + GAP) {
+        const y0 = S(gridY - lineBand + s);
+        blendLine(x, y0, lwM, S(gridY - lineBand + Math.min(s + DASH, gridH + lineBand * 2)) - y0, MAJ, A_MAJOR);
       }
     } else {
-      blendLine(x, S(gridY), lwM, S(gridH), MAJ, A_MAJOR);
+      blendLine(x, S(gridY - lineBand), lwM, S(gridH + lineBand * 2), MAJ, A_MAJOR);
     }
   }
   for (let k = 0; k <= h; k++) {
     const major = k % 5 === 0;
     if (!major) {
-      blendLine(S(gridX), S(gridY + k * cellPx), S(gridW), lw, MAJ, A_FINE);
+      blendLine(S(gridX - lineBand), S(gridY + k * cellPx), S(gridW + lineBand * 2), lw, FINE, A_FINE);
       continue;
     }
     const y = S(gridY + k * cellPx - 0.5);
-    if (k % 10 !== 0 && k !== h) {
-      for (let s = 0; s < gridW; s += DASH + GAP) {
-        const x0 = S(gridX + s);
-        blendLine(x0, y, S(gridX + Math.min(s + DASH, gridW)) - x0, lwM, MAJ, A_MAJOR);
+    if (k % 10 === 5 && k !== h) {
+      for (let s = 0; s < gridW + lineBand * 2; s += DASH + GAP) {
+        const x0 = S(gridX - lineBand + s);
+        blendLine(x0, y, S(gridX - lineBand + Math.min(s + DASH, gridW + lineBand * 2)) - x0, lwM, MAJ, A_MAJOR);
       }
     } else {
-      blendLine(S(gridX), y, S(gridW), lwM, MAJ, A_MAJOR);
+      blendLine(S(gridX - lineBand), y, S(gridW + lineBand * 2), lwM, MAJ, A_MAJOR);
     }
   }
 
@@ -136,22 +146,16 @@ function makeAppExport(cells, w, h, paletteHex, opts) {
     }
   }
 
-  // 四边坐标数字（米黄底上）
-  const marks = n => {
-    const a = [];
-    for (let k = 1; k <= n; k += 5) a.push(k);
-    if (a[a.length - 1] !== n) a.push(n);
-    return a;
-  };
-  for (const k of marks(w)) {
+  // 四边灰色坐标带逐格编号。
+  for (let k = 1; k <= w; k++) {
     const x = S(gridX + (k - 0.5) * cellPx - 8);
-    fakeText(im, x, S(cardY - COORD / 2 - 6), S(16), S(12), TEXT, rnd, 0.16);
-    fakeText(im, x, S(cardY + cardH + COORD / 2 - 6), S(16), S(12), TEXT, rnd, 0.16);
+    fakeText(im, x, S(gridY - COORD / 2 - 6), S(16), S(12), TEXT, rnd, 0.16);
+    fakeText(im, x, S(gridY + gridH + COORD / 2 - 6), S(16), S(12), TEXT, rnd, 0.16);
   }
-  for (const k of marks(h)) {
+  for (let k = 1; k <= h; k++) {
     const y = S(gridY + (k - 0.5) * cellPx - 6);
-    fakeText(im, S(cardX - COORD / 2 - 8), y, S(16), S(12), TEXT, rnd, 0.16);
-    fakeText(im, S(cardX + cardW + COORD / 2 - 8), y, S(16), S(12), TEXT, rnd, 0.16);
+    fakeText(im, S(gridX - COORD / 2 - 8), y, S(16), S(12), TEXT, rnd, 0.16);
+    fakeText(im, S(gridX + gridW + COORD / 2 - 8), y, S(16), S(12), TEXT, rnd, 0.16);
   }
 
   // 说明行 + 图例药丸 + 页脚

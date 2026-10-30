@@ -37,25 +37,26 @@
   <view class="bottom-bar">
     <view class="bb-inner">
       <view class="tools-row">
-        <view class="tool-chip {{paintOn ? 'active' : ''}}" bindtap="togglePaint"><image class="pxi-s" src="/assets/icons/hand.png" />连续上豆</view>
-        <view class="tool-chip fill-chip {{fillArmed ? 'armed' : ''}} {{fillLeft <= 0 ? 'off' : ''}}" hover-class="pressed" bindtap="oneKeyFill"><image class="pxi-s" src="/assets/icons/bolt.png" />一键拼豆 {{fillLeft}}</view>
-        <view class="tool-chip fillc-chip {{fillColorLeft <= 0 ? 'off' : ''}}" hover-class="pressed" bindtap="fillColor"><image class="pxi-s" src="/assets/icons/star.png" />拼满此色 {{fillColorLeft}}</view>
+        <view wx:if="{{!previewOn}}" class="tool-chip {{paintOn ? 'active' : ''}}" bindtap="togglePaint"><image class="pxi-s" src="/assets/icons/hand.png" />连续上豆</view>
+        <view wx:if="{{!previewOn}}" class="tool-chip fill-chip {{fillArmed ? 'armed' : ''}} {{fillLeft <= 0 ? 'off' : ''}}" hover-class="pressed" bindtap="oneKeyFill"><image class="pxi-s" src="/assets/icons/bolt.png" />一键拼豆 {{fillLeft}}</view>
+        <view wx:if="{{!previewOn}}" class="tool-chip fillc-chip {{fillColorLeft <= 0 ? 'off' : ''}}" hover-class="pressed" bindtap="fillColor"><image class="pxi-s" src="/assets/icons/star.png" />拼满此色 {{fillColorLeft}}</view>
+        <view class="tool-chip mode-chip {{previewOn ? 'active' : ''}}" hover-class="pressed" bindtap="togglePreview">{{previewOn ? '返回拼豆' : '查看图纸'}}</view>
         <view class="tr-btns">
-          <view class="tr-btn loc {{locateOn ? 'active' : ''}}" hover-class="pressed" bindtap="toggleLocate">◎</view>
+          <view wx:if="{{!previewOn}}" class="tr-btn loc {{locateOn ? 'active' : ''}}" hover-class="pressed" bindtap="toggleLocate">◎</view>
           <view class="tr-btn" hover-class="pressed" bindtap="openSwap">🎨</view>
           <view class="tr-btn" hover-class="pressed" bindtap="openResize">📐</view>
           <view class="tr-btn" hover-class="pressed" bindtap="shareMenu"><image class="pxi-l" src="/assets/icons/export.png" /></view>
           <view class="tr-btn" hover-class="pressed" bindtap="zoomFit">⛶</view>
         </view>
       </view>
-      <view class="tools-hint row2">{{fillArmed ? '点画板上想拼的位置 → 周围一块向外扩散铺上～' : (paintOn ? '划过格子连续上豆！' : '选颜色点格子上豆 ·「一键拼豆」点哪、哪周围一块都铺上')}}</view>
+      <view class="tools-hint row2">{{previewOn ? '点击下方色号，查看图纸中对应的色块' : (fillArmed ? '点画板上想拼的位置 → 周围一块向外扩散铺上～' : (paintOn ? '划过格子连续上豆！' : '选颜色点格子上豆 ·「一键拼豆」点哪、哪周围一块都铺上'))}}</view>
       <view wx:if="{{fromCode}}" class="btn-link" bindtap="reportImported">举报导入图纸</view>
       <scroll-view class="palette-bar" scroll-x scroll-into-view="{{scrollInto}}"
                    scroll-with-animation enhanced show-scrollbar="{{false}}">
         <view class="pchip {{item.active ? 'active' : ''}} {{item.done ? 'done' : ''}}"
               wx:for="{{chips}}" wx:key="pal" id="c{{item.pal}}"
               bindtap="tapChip" data-pal="{{item.pal}}">
-          <view class="pdot" style="background:{{item.hex}};color:{{item.tcol}}">{{item.num}}</view>
+          <view class="pdot" style="background:{{item.hex}};color:{{item.tcol}}">{{item.code}}</view>
           <view class="pcount">{{item.left}}</view>
         </view>
       </scroll-view>
